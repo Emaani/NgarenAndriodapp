@@ -2,7 +2,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { summary } from '@/data/mock';
-import { AppText, GradientHeader, Icon, IconName } from '@/ui';
+import { AppText, GradientHeader, Icon, IconName, NotificationBell } from '@/ui';
 
 type Action = { icon: IconName; label: string; route: string; tint: string };
 
@@ -35,19 +35,22 @@ export default function Home() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <GradientHeader
         right={
-          <Pressable hitSlop={8} onPress={() => router.push('/(tabs)/profile')}>
-            <View
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: radius.full,
-                backgroundColor: 'rgba(255,255,255,0.25)',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-              <AppText style={{ color: '#fff', fontWeight: '700' }}>PE</AppText>
-            </View>
-          </Pressable>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+            <NotificationBell />
+            <Pressable hitSlop={8} onPress={() => router.push('/(tabs)/profile')}>
+              <View
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: radius.full,
+                  backgroundColor: 'rgba(255,255,255,0.25)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                <AppText style={{ color: '#fff', fontWeight: '700' }}>PE</AppText>
+              </View>
+            </Pressable>
+          </View>
         }>
         <View style={{ marginTop: spacing.xs }}>
           <AppText variant="bodyLarge" color="rgba(255,255,255,0.9)">

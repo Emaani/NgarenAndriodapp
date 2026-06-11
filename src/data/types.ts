@@ -64,6 +64,50 @@ export interface AppNotification {
   message: string;
   timestamp: string;
   unread: boolean;
+  deviceSerial?: string;
+}
+
+/**
+ * Backend notification taxonomy — mirrors the platform-api enum that the Nuxt
+ * web app consumes (types/notification.d.ts → Notification.type).
+ */
+export type NotificationType = 'DEVICE_ACTIVITY' | 'BOUNDARY_CHECK';
+
+/**
+ * Per-alert-type delivery channel. Parity-exact with the web app's
+ * EmailNotificationSetting union (EMAIL | SMS | EMAIL_AND_SMS). Push is handled
+ * device-side via expo-notifications and is not part of this enum.
+ */
+export type AlertChannel = 'EMAIL' | 'SMS' | 'EMAIL_AND_SMS';
+
+/**
+ * Notification preferences payload — matches the web app's
+ * NotificationSettingsRequestPayload sent to POST/PUT /api/ngaren/notifications/settings.
+ */
+export interface NotificationSettings {
+  deviceActivityConfig: AlertChannel;
+  boundaryCheckAlertConfig: AlertChannel;
+}
+
+/** Raw backend notification shape (platform-api / web app types/notification.d.ts). */
+export interface BackendNotification {
+  id: number;
+  type: string;
+  deviceSerialNumber: string;
+  description: string;
+  dateCreated: string;
+}
+
+/** Spring-style page envelope returned by the BFF/platform-api. */
+export interface Paginated<T> {
+  items: T[];
+  page: {
+    pageNumber: number;
+    pageSize: number;
+    numberOfElements: number;
+    totalElements: number;
+    totalPages: number;
+  };
 }
 
 export interface DashboardSummary {

@@ -17,6 +17,7 @@ export { StatusCard } from './StatusCard';
 export { ChartCard } from './ChartCard';
 export { TextField, SelectField } from './Field';
 export { GradientHeader } from './GradientHeader';
+export { NotificationBell } from './NotificationBell';
 export { Input } from './Input';
 export { DonutChart } from './charts/DonutChart';
 export { LineChart } from './charts/LineChart';

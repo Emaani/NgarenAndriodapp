@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, spacing } from '@/theme';
 import { animals as allAnimals } from '@/data/mock';
-import { AnimalListItem, EmptyState, Fab, GradientHeader, Screen, SearchBar } from '@/ui';
+import { AnimalListItem, EmptyState, Fab, GradientHeader, NotificationBell, Screen, SearchBar } from '@/ui';
 
 export default function AnimalsTab() {
   const router = useRouter();
@@ -21,7 +21,7 @@ export default function AnimalsTab() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Your animals" subtitle={`${allAnimals.length} registered`} />
+      <GradientHeader title="Your animals" subtitle={`${allAnimals.length} registered`} right={<NotificationBell />} />
       <View style={{ padding: spacing.md, paddingBottom: 0 }}>
         <SearchBar value={query} onChangeText={setQuery} placeholder="Search by tag, name or breed..." />
       </View>

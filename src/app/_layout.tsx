@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -9,6 +10,7 @@ import {
   Inter_600SemiBold,
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
+import { addNotificationResponseListener } from '@/services/push';
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -17,6 +19,9 @@ export default function RootLayout() {
     Inter_600SemiBold,
     Inter_700Bold,
   });
+
+  // Deep-link taps on push notifications into the right screen.
+  useEffect(() => addNotificationResponseListener(), []);
 
   if (!fontsLoaded) return null;
 
@@ -35,6 +40,8 @@ export default function RootLayout() {
           <Stack.Screen name="find-vet/request" />
           <Stack.Screen name="register-animal" />
           <Stack.Screen name="animals/[id]" />
+          <Stack.Screen name="notifications" />
+          <Stack.Screen name="notification-settings" />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>
