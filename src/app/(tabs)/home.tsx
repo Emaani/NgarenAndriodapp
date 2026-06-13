@@ -9,7 +9,7 @@ type Action = { icon: IconName; label: string; route: string; tint: string };
 const ACTIONS: Action[] = [
   { icon: 'stethoscope', label: 'Find a Vet', route: '/find-vet', tint: '#21C45D' },
   { icon: 'plus-circle-outline', label: 'Register Animal', route: '/register-animal', tint: '#6D874F' },
-  { icon: 'clipboard-check-outline', label: 'Stock Take', route: '/(tabs)/animals', tint: '#F59E0B' },
+  { icon: 'clipboard-check-outline', label: 'Stock Take', route: '/stock-take', tint: '#F59E0B' },
   { icon: 'cow', label: 'View Animals', route: '/(tabs)/animals', tint: '#2563EB' },
   { icon: 'map-marker-radius', label: 'Track Animals', route: '/(tabs)/track', tint: '#16A34A' },
   { icon: 'wallet-outline', label: 'Payments', route: '/(tabs)/profile', tint: '#9333EA' },
