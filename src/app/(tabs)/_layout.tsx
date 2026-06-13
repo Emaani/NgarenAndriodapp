@@ -1,8 +1,9 @@
 
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { ColorValue, Platform } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { colors, font, layout } from '@/theme';
+import { useAuth } from '@/services/auth';
 
 type Mdi = keyof typeof MaterialCommunityIcons.glyphMap;
 
@@ -11,6 +12,12 @@ const tab = (name: Mdi) =>
     <MaterialCommunityIcons name={name} size={size} color={color as string} />;
 
 export default function TabsLayout() {
+  const { isAuthenticated, role } = useAuth();
+
+  // Farmer area: require a signed-in farmer. Vets get sent to their dashboard.
+  if (!isAuthenticated) return <Redirect href="/login" />;
+  if (role === 'vet') return <Redirect href="/vet" />;
+
   return (
     <Tabs
       initialRouteName="home"

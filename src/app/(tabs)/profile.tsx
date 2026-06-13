@@ -1,6 +1,7 @@
 import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
+import { useAuth } from '@/services/auth';
 import { AppText, GradientHeader, Icon, IconName, Screen } from '@/ui';
 
 type Row = { icon: IconName; label: string; route?: string; tint?: string };
@@ -29,12 +30,6 @@ const SECTIONS: { title: string; rows: Row[] }[] = [
       { icon: 'help-circle-outline', label: 'Help & Support' },
     ],
   },
-  {
-    title: 'Professional',
-    rows: [
-      { icon: 'stethoscope', label: 'Switch to Vet Dashboard', route: '/vet', tint: '#16A34A' },
-    ],
-  },
 ];
 
 function MenuRow({ row, onPress, last }: { row: Row; onPress: () => void; last?: boolean }) {
@@ -60,6 +55,12 @@ function MenuRow({ row, onPress, last }: { row: Row; onPress: () => void; last?:
 
 export default function Profile() {
   const router = useRouter();
+  const { signOut } = useAuth();
+
+  const onLogout = () => {
+    signOut();
+    router.replace('/login');
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -105,7 +106,7 @@ export default function Profile() {
         ))}
 
         <Pressable
-          onPress={() => router.replace('/login')}
+          onPress={onLogout}
           style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.md }}>
           <Icon name="logout" size={20} color={colors.error} />
           <AppText variant="bodyLarge" color={colors.error} style={{ fontWeight: '600' }}>

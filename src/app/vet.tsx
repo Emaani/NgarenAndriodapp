@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { calloutRequests as seed } from '@/data/mock';
 import { CalloutRequest, CalloutStatus, CalloutUrgency } from '@/data/types';
+import { getCalloutRequests, updateCalloutStatus } from '@/data/api';
+import { useAuth } from '@/services/auth';
 import { ActionChip, AppText, Button, GradientHeader, Icon, IconChip, Screen } from '@/ui';
 
 type Filter = 'pending' | 'accepted' | 'all';
@@ -106,11 +107,15 @@ function RequestCard({
 
 export default function VetDashboard() {
   const router = useRouter();
-  const [requests, setRequests] = useState<CalloutRequest[]>(seed);
+  const { role, isAuthenticated, signOut } = useAuth();
+  const [requests, setRequests] = useState<CalloutRequest[]>([]);
   const [filter, setFilter] = useState<Filter>('pending');
 
-  const setStatus = (id: number, status: CalloutStatus) =>
-    setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
+  useEffect(() => {
+    getCalloutRequests()
+      .then(setRequests)
+      .catch(() => setRequests([]));
+  }, []);
 
   const counts = useMemo(
     () => ({
@@ -127,13 +132,28 @@ export default function VetDashboard() {
     return requests.filter((r) => r.status === 'accepted');
   }, [requests, filter]);
 
+  // Vet area: only signed-in vets. Farmers go back to their home.
+  // (Declared after all hooks to keep hook order stable across renders.)
+  if (!isAuthenticated) return <Redirect href="/login" />;
+  if (role !== 'vet') return <Redirect href="/(tabs)/home" />;
+
+  const setStatus = (id: number, status: CalloutStatus) => {
+    setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
+    updateCalloutStatus(id, status).catch(() => {});
+  };
+
+  const onSignOut = () => {
+    signOut();
+    router.replace('/login');
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <GradientHeader
         showBack
         right={
-          <Pressable onPress={() => router.replace('/(tabs)/home')} hitSlop={8}>
-            <Icon name="account-switch-outline" size={24} color="#fff" />
+          <Pressable onPress={onSignOut} hitSlop={8}>
+            <Icon name="logout" size={24} color="#fff" />
           </Pressable>
         }>
         <View style={{ marginTop: spacing.xs }}>

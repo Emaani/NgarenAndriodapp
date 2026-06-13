@@ -3,6 +3,12 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { AppText, Button, GradientHeader, Icon, IconName, Input } from '@/ui';
+import { Role, useAuth } from '@/services/auth';
+
+const ROLES: { key: Role; label: string; icon: IconName }[] = [
+  { key: 'farmer', label: 'Farmer', icon: 'cow' },
+  { key: 'vet', label: 'Vet', icon: 'stethoscope' },
+];
 
 function SocialButton({ icon, color }: { icon: IconName; color: string }) {
   return (
@@ -25,9 +31,16 @@ function SocialButton({ icon, color }: { icon: IconName; color: string }) {
 
 export default function Login() {
   const router = useRouter();
+  const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
+  const [role, setRole] = useState<Role>('farmer');
+
+  const onLogin = () => {
+    signIn(role);
+    router.replace(role === 'vet' ? '/vet' : '/(tabs)/home');
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -64,6 +77,38 @@ export default function Login() {
         </View>
 
         <View style={{ width: 320, gap: spacing.md }}>
+          <View style={{ gap: spacing.sm }}>
+            <AppText variant="body" color={colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
+              I am signing in as
+            </AppText>
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              {ROLES.map((r) => {
+                const active = role === r.key;
+                return (
+                  <Pressable
+                    key={r.key}
+                    onPress={() => setRole(r.key)}
+                    style={{
+                      flex: 1,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: spacing.sm,
+                      paddingVertical: spacing.mdMinus,
+                      borderRadius: radius.md,
+                      backgroundColor: active ? colors.primary : colors.surface,
+                      borderWidth: 1,
+                      borderColor: active ? colors.primary : colors.divider,
+                    }}>
+                    <Icon name={r.icon} size={20} color={active ? '#fff' : colors.onSurfaceVariant} />
+                    <AppText variant="bodyLarge" color={active ? '#fff' : colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
+                      {r.label}
+                    </AppText>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
           <Input
             label="Email address"
             value={email}
@@ -92,7 +137,7 @@ export default function Login() {
             }
           />
 
-          <Button label="Login" onPress={() => router.replace('/(tabs)/home')} style={{ marginTop: spacing.sm }} />
+          <Button label="Login" onPress={onLogin} style={{ marginTop: spacing.sm }} />
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginVertical: spacing.md }}>
             <View style={{ flex: 1, height: 1, backgroundColor: colors.divider }} />

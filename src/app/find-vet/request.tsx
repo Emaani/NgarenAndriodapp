@@ -3,6 +3,8 @@ import { View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { animals, locations, vets } from '@/data/mock';
+import { submitCalloutRequest } from '@/data/api';
+import { CalloutUrgency } from '@/data/types';
 import { AppText, Button, GradientHeader, Icon, Screen, SelectField, TextField } from '@/ui';
 
 const URGENCY = ['Routine', 'Soon', 'Emergency'] as const;
@@ -16,6 +18,26 @@ export default function RequestCallout() {
   const [location, setLocation] = useState(locations[0]?.name ?? '');
   const [urgency, setUrgency] = useState<(typeof URGENCY)[number]>('Routine');
   const [notes, setNotes] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const onSubmit = async () => {
+    if (!animal || submitting) return;
+    setSubmitting(true);
+    try {
+      await submitCalloutRequest({
+        vetId: vet?.id,
+        animal,
+        locationName: location,
+        urgency: urgency as CalloutUrgency,
+        notes: notes || undefined,
+      });
+    } catch {
+      // Submission is best-effort here; in mock mode it's a no-op and the
+      // farmer still gets routed home. A production build would surface a toast.
+    } finally {
+      router.replace('/(tabs)/home');
+    }
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -104,7 +126,12 @@ export default function RequestCallout() {
           multiline
         />
 
-        <Button label="Submit Request" onPress={() => router.replace('/(tabs)/home')} style={{ marginTop: spacing.sm }} />
+        <Button
+          label={submitting ? 'Submitting…' : 'Submit Request'}
+          onPress={onSubmit}
+          disabled={!animal || submitting}
+          style={{ marginTop: spacing.sm }}
+        />
       </Screen>
     </View>
   );

@@ -22,6 +22,9 @@ import {
   AlertChannel,
   AppNotification,
   BackendNotification,
+  CalloutRequest,
+  CalloutStatus,
+  CalloutUrgency,
   NotificationCategory,
   NotificationSettings,
   Paginated,
@@ -155,6 +158,54 @@ export async function registerPushToken(
 export async function syncDevices(): Promise<void> {
   if (!isBackendConfigured()) return;
   await request<void>('/api/sync/devices', { method: 'POST' });
+}
+
+/**
+ * Vet call-out requests — the work queue powering the vet persona, and the
+ * sink for a farmer's "Request a Call-out" submission.
+ *   GET   /api/ngaren/callouts?pageNumber=&pageSize=   (vet inbox)
+ *   POST  /api/ngaren/callouts                          (farmer submits)
+ *   PATCH /api/ngaren/callouts/{id}                     (vet accepts/declines)
+ * All env-gated with mock fallback, identical to the notifications client.
+ */
+export interface CalloutRequestPayload {
+  vetId?: number;
+  animal: string;
+  locationName: string;
+  urgency: CalloutUrgency;
+  notes?: string;
+}
+
+/** Fetch the vet's incoming call-out requests. Falls back to mock offline. */
+export async function getCalloutRequests(
+  pageNumber = 0,
+  pageSize = 50,
+): Promise<CalloutRequest[]> {
+  if (!isBackendConfigured()) {
+    return mock.calloutRequests;
+  }
+  const data = await request<Paginated<CalloutRequest>>(
+    `/api/ngaren/callouts?pageNumber=${pageNumber}&pageSize=${pageSize}`,
+  );
+  return data.items ?? [];
+}
+
+/** Submit a new call-out request (farmer side). No-op in mock mode. */
+export async function submitCalloutRequest(payload: CalloutRequestPayload): Promise<void> {
+  if (!isBackendConfigured()) return;
+  await request<void>('/api/ngaren/callouts', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+/** Update a call-out's status (vet accepts / declines / completes). No-op in mock mode. */
+export async function updateCalloutStatus(id: number, status: CalloutStatus): Promise<void> {
+  if (!isBackendConfigured()) return;
+  await request<void>(`/api/ngaren/callouts/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
 }
 
 export const CHANNEL_LABELS: Record<AlertChannel, string> = {

@@ -11,6 +11,7 @@ import {
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
 import { addNotificationResponseListener } from '@/services/push';
+import { AuthProvider } from '@/services/auth';
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -28,9 +29,10 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <StatusBar style="dark" />
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#F7F7F7' } }}>
-          <Stack.Screen name="index" />
+        <AuthProvider>
+          <StatusBar style="dark" />
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#F7F7F7' } }}>
+            <Stack.Screen name="index" />
           <Stack.Screen name="onboarding" />
           <Stack.Screen name="login" />
           <Stack.Screen name="signup" />
@@ -46,7 +48,8 @@ export default function RootLayout() {
           <Stack.Screen name="vet" />
           <Stack.Screen name="notifications" />
           <Stack.Screen name="notification-settings" />
-        </Stack>
+          </Stack>
+        </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
