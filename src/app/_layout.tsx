@@ -41,6 +41,9 @@ export default function RootLayout() {
           <Stack.Screen name="register-animal" />
           <Stack.Screen name="animals/[id]" />
           <Stack.Screen name="stock-take" />
+          <Stack.Screen name="payments" />
+          <Stack.Screen name="rate-vet" />
+          <Stack.Screen name="vet" />
           <Stack.Screen name="notifications" />
           <Stack.Screen name="notification-settings" />
         </Stack>

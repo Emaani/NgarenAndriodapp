@@ -6,7 +6,7 @@ import { vets } from '@/data/mock';
 import { Vet } from '@/data/types';
 import { AppText, Button, GradientHeader, Icon, Screen, SearchBar } from '@/ui';
 
-function VetCard({ vet, onRequest }: { vet: Vet; onRequest: () => void }) {
+function VetCard({ vet, onRequest, onRate }: { vet: Vet; onRequest: () => void; onRate: () => void }) {
   return (
     <View
       style={[
@@ -36,12 +36,12 @@ function VetCard({ vet, onRequest }: { vet: Vet; onRequest: () => void }) {
             <AppText variant="bodyLarge" style={{ fontWeight: '600' }}>
               {vet.name}
             </AppText>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+            <Pressable onPress={onRate} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
               <Icon name="star" size={14} color={colors.warning} />
               <AppText variant="caption" color={colors.onSurface}>
                 {vet.rating} ({vet.reviews})
               </AppText>
-            </View>
+            </Pressable>
           </View>
           <AppText variant="body" color={colors.onSurfaceVariant}>
             {vet.clinic}
@@ -109,7 +109,12 @@ export default function FindVet() {
       </View>
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         {filtered.map((v) => (
-          <VetCard key={v.id} vet={v} onRequest={() => router.push(`/find-vet/request?vetId=${v.id}`)} />
+          <VetCard
+            key={v.id}
+            vet={v}
+            onRequest={() => router.push(`/find-vet/request?vetId=${v.id}`)}
+            onRate={() => router.push(`/rate-vet?vetId=${v.id}`)}
+          />
         ))}
         <Button
           label="Request a Call-out"

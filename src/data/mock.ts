@@ -3,9 +3,12 @@ import {
   AnimalMarker,
   AppNotification,
   BehaviourSeries,
+  CalloutRequest,
   DashboardSummary,
   Device,
+  Invoice,
   Location,
+  Plan,
   User,
   Vet,
 } from './types';
@@ -157,6 +160,27 @@ export const behaviourSeries: BehaviourSeries[] = [
 ];
 
 export const breeds = ['Hereford', 'Ankole', 'Boran', 'Friesian', 'Sahiwal'];
+
+export const calloutRequests: CalloutRequest[] = [
+  { id: 1, farmerName: 'Patrick Etyang', animal: 'Bull #A-042', locationName: 'North Paddock', distanceKm: 2.4, urgency: 'Emergency', notes: 'Visible limp on the front left leg, not grazing.', requestedAt: '10 min ago', status: 'pending' },
+  { id: 2, farmerName: 'Grace Wanjiru', animal: 'Cow #A-017', locationName: 'Water Point A', distanceKm: 5.1, urgency: 'Soon', notes: 'Reduced milk yield over the last 3 days.', requestedAt: '40 min ago', status: 'pending' },
+  { id: 3, farmerName: 'Daniel Mwangi', animal: 'Heifer #A-061', locationName: 'South Paddock', distanceKm: 8.3, urgency: 'Routine', notes: 'Routine pregnancy check.', requestedAt: '2 hours ago', status: 'accepted' },
+  { id: 4, farmerName: 'Esther Achieng', animal: 'Cow #A-008', locationName: 'Holding Yard', distanceKm: 11.6, urgency: 'Routine', notes: 'Annual vaccination due.', requestedAt: 'Yesterday', status: 'completed' },
+];
+
+export const plans: Plan[] = [
+  { id: 'basic', name: 'Basic', priceLabel: 'UGX 0', cadence: '/month', devicesIncluded: 1, features: ['1 device', 'Boundary alerts', 'Email notifications'] },
+  { id: 'pro', name: 'Pro', priceLabel: 'UGX 45,000', cadence: '/month', devicesIncluded: 25, features: ['Up to 25 devices', 'Device + boundary alerts', 'Email & SMS', 'Vet call-outs'] },
+  { id: 'enterprise', name: 'Enterprise', priceLabel: 'Custom', cadence: '', devicesIncluded: 100, features: ['Unlimited devices', 'Priority support', 'API access', 'Dedicated manager'] },
+];
+
+export const currentPlanId = 'pro';
+
+export const invoices: Invoice[] = [
+  { id: 1, date: '01 Jun 2026', amount: 'UGX 45,000', status: 'Paid' },
+  { id: 2, date: '01 May 2026', amount: 'UGX 45,000', status: 'Paid' },
+  { id: 3, date: '01 Apr 2026', amount: 'UGX 45,000', status: 'Paid' },
+];
 
 export const vets: Vet[] = [
   { id: 1, name: 'Dr. Sarah Mwangi', clinic: 'Nakuru Animal Clinic', specialty: 'Large animal / Cattle', distanceKm: 2.4, rating: 4.9, reviews: 128, available: true },

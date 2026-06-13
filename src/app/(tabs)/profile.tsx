@@ -17,16 +17,22 @@ const SECTIONS: { title: string; rows: Row[] }[] = [
   {
     title: 'Billing',
     rows: [
-      { icon: 'wallet-outline', label: 'Payments & Subscription', tint: '#9333EA' },
-      { icon: 'receipt', label: 'Billing History' },
+      { icon: 'wallet-outline', label: 'Payments & Subscription', route: '/payments', tint: '#9333EA' },
+      { icon: 'receipt', label: 'Billing History', route: '/payments' },
     ],
   },
   {
     title: 'Support',
     rows: [
-      { icon: 'bell-outline', label: 'Notifications' },
+      { icon: 'bell-outline', label: 'Notifications', route: '/notifications' },
+      { icon: 'cog-outline', label: 'Notification Preferences', route: '/notification-settings' },
       { icon: 'help-circle-outline', label: 'Help & Support' },
-      { icon: 'cog-outline', label: 'Settings' },
+    ],
+  },
+  {
+    title: 'Professional',
+    rows: [
+      { icon: 'stethoscope', label: 'Switch to Vet Dashboard', route: '/vet', tint: '#16A34A' },
     ],
   },
 ];

@@ -140,6 +140,40 @@ export interface Vet {
   available: boolean;
 }
 
+export type CalloutUrgency = 'Routine' | 'Soon' | 'Emergency';
+export type CalloutStatus = 'pending' | 'accepted' | 'declined' | 'completed';
+
+/** An incoming vet call-out request — the unit of work in the vet persona. */
+export interface CalloutRequest {
+  id: number;
+  farmerName: string;
+  animal: string;
+  locationName: string;
+  distanceKm: number;
+  urgency: CalloutUrgency;
+  notes?: string;
+  requestedAt: string;
+  status: CalloutStatus;
+}
+
+/** A subscription plan shown on the Payments screen. */
+export interface Plan {
+  id: string;
+  name: string;
+  priceLabel: string;
+  cadence: string;
+  devicesIncluded: number;
+  features: string[];
+}
+
+/** A past invoice line on the Payments screen. */
+export interface Invoice {
+  id: number;
+  date: string;
+  amount: string;
+  status: 'Paid' | 'Due';
+}
+
 /** A single behaviour time-series for the detail charts. */
 export interface BehaviourSeries {
   label: string;

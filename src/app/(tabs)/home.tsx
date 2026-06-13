@@ -12,7 +12,7 @@ const ACTIONS: Action[] = [
   { icon: 'clipboard-check-outline', label: 'Stock Take', route: '/stock-take', tint: '#F59E0B' },
   { icon: 'cow', label: 'View Animals', route: '/(tabs)/animals', tint: '#2563EB' },
   { icon: 'map-marker-radius', label: 'Track Animals', route: '/(tabs)/track', tint: '#16A34A' },
-  { icon: 'wallet-outline', label: 'Payments', route: '/(tabs)/profile', tint: '#9333EA' },
+  { icon: 'wallet-outline', label: 'Payments', route: '/payments', tint: '#9333EA' },
 ];
 
 function Stat({ value, label }: { value: number; label: string }) {
