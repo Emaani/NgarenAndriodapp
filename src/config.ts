@@ -16,9 +16,18 @@ export const config = {
   platformUrl: process.env.EXPO_PUBLIC_CERES_PLATFORM_URL ?? '',
   /** Value sent as the `X-Ngaren-Consumer-Id` header (OIDC userid claim). */
   consumerId: process.env.EXPO_PUBLIC_NGAREN_CONSUMER_ID ?? '',
+  /** Supabase project URL — same project as the web app. Empty => auth disabled. */
+  supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL ?? '',
+  /** Supabase publishable (anon) key — public, RLS-gated, safe to ship. */
+  supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '',
 };
 
 /** True when a real backend base URL is present and the client should hit it. */
 export function isBackendConfigured(): boolean {
   return config.platformUrl.trim().length > 0;
+}
+
+/** True when Supabase credentials are present and real auth should be used. */
+export function isSupabaseConfigured(): boolean {
+  return config.supabaseUrl.trim().length > 0 && config.supabaseAnonKey.trim().length > 0;
 }

@@ -107,7 +107,7 @@ function RequestCard({
 
 export default function VetDashboard() {
   const router = useRouter();
-  const { role, isAuthenticated, signOut } = useAuth();
+  const { role, isAuthenticated, loading, user, signOut } = useAuth();
   const [requests, setRequests] = useState<CalloutRequest[]>([]);
   const [filter, setFilter] = useState<Filter>('pending');
 
@@ -134,6 +134,7 @@ export default function VetDashboard() {
 
   // Vet area: only signed-in vets. Farmers go back to their home.
   // (Declared after all hooks to keep hook order stable across renders.)
+  if (loading) return null;
   if (!isAuthenticated) return <Redirect href="/login" />;
   if (role !== 'vet') return <Redirect href="/(tabs)/home" />;
 
@@ -161,7 +162,7 @@ export default function VetDashboard() {
             Vet dashboard
           </AppText>
           <AppText variant="headline" color="#fff">
-            Dr. Sarah Mwangi
+            {user?.fullName?.trim() || user?.email || 'Veterinarian'}
           </AppText>
         </View>
         <View style={{ flexDirection: 'row', marginTop: spacing.md }}>

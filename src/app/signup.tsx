@@ -1,21 +1,37 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { colors, radius, spacing } from '@/theme';
+import { colors, spacing } from '@/theme';
 import { AppText, Button, GradientHeader, Input } from '@/ui';
-
-type Role = 'Farmer' | 'Vet';
+import { useAuth } from '@/services/auth';
 
 export default function SignUp() {
   const router = useRouter();
+  const { signUp } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
-  const [role, setRole] = useState<Role>('Farmer');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const valid = name.trim() && email.trim() && password.trim();
+
+  const onCreate = async () => {
+    if (!valid || submitting) return;
+    setSubmitting(true);
+    setError(null);
+    const { error: signUpError } = await signUp(email, password, name);
+    setSubmitting(false);
+    if (signUpError) {
+      setError(signUpError);
+      return;
+    }
+    // Whether or not email confirmation is required, send them to the success
+    // screen; the route guards handle gating access until a session exists.
+    router.replace('/signup-success');
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -23,36 +39,8 @@ export default function SignUp() {
 
       <ScrollView contentContainerStyle={{ alignItems: 'center', paddingVertical: spacing.lg, paddingBottom: spacing.xl }}>
         <View style={{ width: 320, gap: spacing.md }}>
-          <View style={{ gap: spacing.sm }}>
-            <AppText variant="bodyLarge">I am a</AppText>
-            <View style={{ flexDirection: 'row', gap: spacing.mdMinus }}>
-              {(['Farmer', 'Vet'] as Role[]).map((r) => {
-                const active = role === r;
-                return (
-                  <Pressable
-                    key={r}
-                    onPress={() => setRole(r)}
-                    style={{
-                      flex: 1,
-                      height: 48,
-                      borderRadius: radius.md,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: active ? colors.primaryTint : colors.surface,
-                      borderWidth: 1,
-                      borderColor: active ? colors.primary : colors.divider,
-                    }}>
-                    <AppText variant="bodyLarge" color={active ? colors.primary : colors.onSurfaceVariant}>
-                      {r}
-                    </AppText>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
           <Input label="Full name" value={name} onChangeText={setName} placeholder="Patrick Etyang" autoCapitalize="words" icon="account-outline" />
-          <Input label="Email address" value={email} onChangeText={setEmail} placeholder="patrickE@ngarendigital.com" keyboardType="email-address" icon="email-outline" />
+          <Input label="Email address" value={email} onChangeText={setEmail} placeholder="patrickE@ngarendigital.com" keyboardType="email-address" autoCapitalize="none" icon="email-outline" />
           <Input label="Phone number" value={phone} onChangeText={setPhone} placeholder="+254 700 000 000" keyboardType="phone-pad" icon="phone-outline" />
           <Input
             label="Password"
@@ -64,7 +52,19 @@ export default function SignUp() {
             onIconPress={() => setShow((s) => !s)}
           />
 
-          <Button label="Create account" disabled={!valid} onPress={() => router.replace('/signup-success')} style={{ marginTop: spacing.sm }} />
+          {error && (
+            <AppText variant="body" color={colors.error}>
+              {error}
+            </AppText>
+          )}
+
+          <Button
+            label={submitting ? 'Creating account…' : 'Create account'}
+            disabled={!valid || submitting}
+            loading={submitting}
+            onPress={onCreate}
+            style={{ marginTop: spacing.sm }}
+          />
 
           <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: spacing.sm }}>
             <AppText variant="bodyLarge" color={colors.onSurfaceVariant}>

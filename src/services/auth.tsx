@@ -1,39 +1,188 @@
-import { createContext, ReactNode, useContext, useMemo, useState } from 'react';
+import {
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+import type { Session, User } from '@supabase/supabase-js';
+import { isSupabaseConfigured, supabase } from './supabase';
 
 /**
- * Lightweight role-based session.
+ * Supabase-backed auth, sharing one identity with the Ngaren web app
+ * (livestock-command-center). Sign-in uses email + password against the same
+ * Supabase project; the session is persisted in AsyncStorage and auto-refreshed
+ * (see src/services/supabase.ts), so it survives app restarts.
  *
- * This is a session-only (in-memory) auth context: it tracks who is signed in
- * and which persona they chose, and exposes guards the route layouts use to
- * keep farmers and vets in their own areas of the app.
- *
- * Production note: swap `signIn` for the real OIDC exchange used by the web app
- * and persist the token in expo-secure-store. The `role` would then come from
- * the backend's user claims rather than a login-screen toggle. Everything that
- * consumes `useAuth()` (route guards, the login screen) stays unchanged.
+ * The app routes by persona using a simplified `Role`. The web DB role enum is
+ * `admin | farmer | veterinary | viewer`; here we collapse it to:
+ *   - 'vet'    when the user has the `veterinary` (or `admin`) role
+ *   - 'farmer' otherwise
+ * so the existing farmer/vet route guards keep working unchanged.
  */
 export type Role = 'farmer' | 'vet';
 
+export interface AuthUser {
+  id: string;
+  email: string;
+  fullName: string | null;
+  roles: string[];
+}
+
 interface AuthState {
+  user: AuthUser | null;
   role: Role | null;
   isAuthenticated: boolean;
-  signIn: (role: Role) => void;
-  signOut: () => void;
+  /** True while the initial session is being restored. Guards should wait. */
+  loading: boolean;
+  /** Email/password sign-in. Resolves with the persona role on success. */
+  signIn: (email: string, password: string) => Promise<{ error?: string; role?: Role }>;
+  /**
+   * Self-registration. New users get no role row (the DB trigger only seeds
+   * profiles), so they default to the farmer experience. `needsConfirmation`
+   * is true when the Supabase project requires email confirmation before a
+   * session is issued.
+   */
+  signUp: (
+    email: string,
+    password: string,
+    fullName: string,
+  ) => Promise<{ error?: string; needsConfirmation?: boolean }>;
+  signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
+/** Collapse the web DB role set onto the app's farmer/vet persona. */
+function roleFor(roles: string[]): Role {
+  return roles.includes('veterinary') || roles.includes('admin') ? 'vet' : 'farmer';
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [role, setRole] = useState<Role | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch the profile + roles for a signed-in Supabase user, mirroring the web
+  // app's useAuth: profiles.full_name + user_roles.role keyed on user_id.
+  const fetchUserProfile = useCallback(async (authUser: User): Promise<AuthUser> => {
+    try {
+      const [{ data: profile }, { data: roleRows }] = await Promise.all([
+        supabase.from('profiles').select('full_name').eq('user_id', authUser.id).maybeSingle(),
+        supabase.from('user_roles').select('role').eq('user_id', authUser.id),
+      ]);
+      return {
+        id: authUser.id,
+        email: authUser.email ?? '',
+        fullName:
+          (profile as { full_name?: string | null } | null)?.full_name ??
+          (authUser.user_metadata?.full_name as string | undefined) ??
+          null,
+        roles: (roleRows ?? []).map((r) => (r as { role: string }).role),
+      };
+    } catch {
+      // Network/RLS hiccup: keep the user signed in with no extra roles so they
+      // still land in the (default) farmer area rather than getting bounced out.
+      return {
+        id: authUser.id,
+        email: authUser.email ?? '',
+        fullName: (authUser.user_metadata?.full_name as string | undefined) ?? null,
+        roles: [],
+      };
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) {
+      // No backend configured — behave as signed-out without hanging on a spinner.
+      setLoading(false);
+      return;
+    }
+
+    // Set up the listener BEFORE getSession (web-app ordering) to avoid races.
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+      if (newSession?.user) {
+        // Defer the async profile fetch so we never block the auth callback.
+        setTimeout(() => {
+          fetchUserProfile(newSession.user).then(setUser);
+        }, 0);
+      } else {
+        setUser(null);
+      }
+    });
+
+    supabase.auth
+      .getSession()
+      .then(async ({ data: { session: existing } }) => {
+        setSession(existing);
+        if (existing?.user) setUser(await fetchUserProfile(existing.user));
+      })
+      .finally(() => setLoading(false));
+
+    return () => subscription.unsubscribe();
+  }, [fetchUserProfile]);
+
+  const signIn = useCallback<AuthState['signIn']>(async (email, password) => {
+    if (!isSupabaseConfigured()) {
+      return { error: 'Authentication is not configured. Set the Supabase env vars.' };
+    }
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+    if (error) return { error: error.message };
+    if (!data.user) return { error: 'Sign in failed' };
+    const profile = await fetchUserProfile(data.user);
+    setUser(profile);
+    return { role: roleFor(profile.roles) };
+  }, [fetchUserProfile]);
+
+  const signUp = useCallback<AuthState['signUp']>(async (email, password, fullName) => {
+    if (!isSupabaseConfigured()) {
+      return { error: 'Authentication is not configured. Set the Supabase env vars.' };
+    }
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      // full_name flows into raw_user_meta_data; the handle_new_user trigger
+      // copies it into public.profiles, matching the web app.
+      options: { data: { full_name: fullName.trim() } },
+    });
+    if (error) return { error: error.message };
+    if (data.user) {
+      const profile = await fetchUserProfile(data.user);
+      setUser(profile);
+    }
+    // No session means the project requires email confirmation first.
+    return { needsConfirmation: !data.session };
+  }, [fetchUserProfile]);
+
+  const signOut = useCallback(async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // ignore network errors on sign-out; we clear local state regardless
+    }
+    setUser(null);
+    setSession(null);
+  }, []);
 
   const value = useMemo<AuthState>(
     () => ({
-      role,
-      isAuthenticated: role !== null,
-      signIn: (r: Role) => setRole(r),
-      signOut: () => setRole(null),
+      user,
+      role: user ? roleFor(user.roles) : null,
+      isAuthenticated: !!session && !!user,
+      loading,
+      signIn,
+      signUp,
+      signOut,
     }),
-    [role],
+    [user, session, loading, signIn, signUp, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

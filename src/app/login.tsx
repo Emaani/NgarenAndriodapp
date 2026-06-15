@@ -3,12 +3,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { AppText, Button, GradientHeader, Icon, IconName, Input } from '@/ui';
-import { Role, useAuth } from '@/services/auth';
-
-const ROLES: { key: Role; label: string; icon: IconName }[] = [
-  { key: 'farmer', label: 'Farmer', icon: 'cow' },
-  { key: 'vet', label: 'Vet', icon: 'stethoscope' },
-];
+import { useAuth } from '@/services/auth';
 
 function SocialButton({ icon, color }: { icon: IconName; color: string }) {
   return (
@@ -35,10 +30,20 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
-  const [role, setRole] = useState<Role>('farmer');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const onLogin = () => {
-    signIn(role);
+  const onLogin = async () => {
+    if (!email.trim() || !password || submitting) return;
+    setSubmitting(true);
+    setError(null);
+    const { error: signInError, role } = await signIn(email, password);
+    setSubmitting(false);
+    if (signInError) {
+      setError(signInError);
+      return;
+    }
+    // Role comes from the user's Supabase roles; the guards also enforce this.
     router.replace(role === 'vet' ? '/vet' : '/(tabs)/home');
   };
 
@@ -77,44 +82,13 @@ export default function Login() {
         </View>
 
         <View style={{ width: 320, gap: spacing.md }}>
-          <View style={{ gap: spacing.sm }}>
-            <AppText variant="body" color={colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
-              I am signing in as
-            </AppText>
-            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              {ROLES.map((r) => {
-                const active = role === r.key;
-                return (
-                  <Pressable
-                    key={r.key}
-                    onPress={() => setRole(r.key)}
-                    style={{
-                      flex: 1,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: spacing.sm,
-                      paddingVertical: spacing.mdMinus,
-                      borderRadius: radius.md,
-                      backgroundColor: active ? colors.primary : colors.surface,
-                      borderWidth: 1,
-                      borderColor: active ? colors.primary : colors.divider,
-                    }}>
-                    <Icon name={r.icon} size={20} color={active ? '#fff' : colors.onSurfaceVariant} />
-                    <AppText variant="bodyLarge" color={active ? '#fff' : colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
-                      {r.label}
-                    </AppText>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
           <Input
             label="Email address"
             value={email}
             onChangeText={setEmail}
             placeholder="patrickE@ngarendigital.com"
             keyboardType="email-address"
+            autoCapitalize="none"
             icon="email-outline"
           />
           <Input
@@ -137,7 +111,19 @@ export default function Login() {
             }
           />
 
-          <Button label="Login" onPress={onLogin} style={{ marginTop: spacing.sm }} />
+          {error && (
+            <AppText variant="body" color={colors.error}>
+              {error}
+            </AppText>
+          )}
+
+          <Button
+            label={submitting ? 'Signing in…' : 'Login'}
+            onPress={onLogin}
+            loading={submitting}
+            disabled={!email.trim() || !password || submitting}
+            style={{ marginTop: spacing.sm }}
+          />
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginVertical: spacing.md }}>
             <View style={{ flex: 1, height: 1, backgroundColor: colors.divider }} />

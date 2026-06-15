@@ -53,12 +53,22 @@ function MenuRow({ row, onPress, last }: { row: Row; onPress: () => void; last?:
   );
 }
 
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 export default function Profile() {
   const router = useRouter();
-  const { signOut } = useAuth();
+  const { user, signOut } = useAuth();
 
-  const onLogout = () => {
-    signOut();
+  const displayName = user?.fullName?.trim() || user?.email?.split('@')[0] || 'Ngaren user';
+  const displayEmail = user?.email ?? '';
+
+  const onLogout = async () => {
+    await signOut();
     router.replace('/login');
   };
 
@@ -75,14 +85,16 @@ export default function Profile() {
               alignItems: 'center',
               justifyContent: 'center',
             }}>
-            <AppText style={{ color: '#fff', fontWeight: '700', fontSize: 28 }}>PE</AppText>
+            <AppText style={{ color: '#fff', fontWeight: '700', fontSize: 28 }}>{initials(displayName)}</AppText>
           </View>
           <AppText variant="title" color="#fff">
-            Patrick Etyang
+            {displayName}
           </AppText>
-          <AppText variant="body" color="rgba(255,255,255,0.92)">
-            patrick.etyang@ngaren.com
-          </AppText>
+          {!!displayEmail && (
+            <AppText variant="body" color="rgba(255,255,255,0.92)">
+              {displayEmail}
+            </AppText>
+          )}
         </View>
       </GradientHeader>
 

@@ -12,8 +12,11 @@ const tab = (name: Mdi) =>
     <MaterialCommunityIcons name={name} size={size} color={color as string} />;
 
 export default function TabsLayout() {
-  const { isAuthenticated, role } = useAuth();
+  const { isAuthenticated, role, loading } = useAuth();
 
+  // Wait for the persisted session to restore before redirecting, otherwise a
+  // returning user briefly flashes the login screen on launch.
+  if (loading) return null;
   // Farmer area: require a signed-in farmer. Vets get sent to their dashboard.
   if (!isAuthenticated) return <Redirect href="/login" />;
   if (role === 'vet') return <Redirect href="/vet" />;
