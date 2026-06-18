@@ -1,21 +1,27 @@
-import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { Redirect } from 'expo-router';
 import { colors, radius, spacing } from '@/theme';
 import { AppText, Icon } from '@/ui';
+import { useAuth } from '@/services/auth';
 
 /**
- * Splash / auth handoff. In the backend phase this checks the OIDC token;
- * for now it brands and routes to onboarding.
+ * Splash / auth handoff. While the persisted Supabase session is being
+ * restored we show the brand splash, then hand off:
+ *   - signed-in vet    -> /vet
+ *   - signed-in farmer -> /(tabs)/home
+ *   - signed-out        -> /onboarding
+ * This keeps returning users out of the onboarding/login flow on every launch.
  */
 export default function Splash() {
-  const router = useRouter();
+  const { loading, isAuthenticated, role } = useAuth();
 
-  useEffect(() => {
-    const t = setTimeout(() => router.replace('/onboarding'), 1400);
-    return () => clearTimeout(t);
-  }, [router]);
+  if (!loading) {
+    if (isAuthenticated) {
+      return <Redirect href={role === 'vet' ? '/vet' : '/(tabs)/home'} />;
+    }
+    return <Redirect href="/onboarding" />;
+  }
 
   return (
     <LinearGradient
