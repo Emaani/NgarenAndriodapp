@@ -2,7 +2,15 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { summary } from '@/data/mock';
+import { useAuth } from '@/services/auth';
 import { AppText, GradientHeader, Icon, IconName, NotificationBell } from '@/ui';
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 type Action = { icon: IconName; label: string; route: string; tint: string };
 
@@ -30,6 +38,8 @@ function Stat({ value, label }: { value: number; label: string }) {
 
 export default function Home() {
   const router = useRouter();
+  const { user } = useAuth();
+  const displayName = user?.fullName?.trim() || user?.email?.split('@')[0] || 'Ngaren user';
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -47,7 +57,7 @@ export default function Home() {
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}>
-                <AppText style={{ color: '#fff', fontWeight: '700' }}>PE</AppText>
+                <AppText style={{ color: '#fff', fontWeight: '700' }}>{initials(displayName)}</AppText>
               </View>
             </Pressable>
           </View>
@@ -57,7 +67,7 @@ export default function Home() {
             Welcome back,
           </AppText>
           <AppText variant="headline" color="#fff">
-            Patrick Etyang
+            {displayName}
           </AppText>
         </View>
         <View style={{ flexDirection: 'row', marginTop: spacing.md }}>

@@ -50,6 +50,8 @@ interface AuthState {
     password: string,
     fullName: string,
   ) => Promise<{ error?: string; needsConfirmation?: boolean }>;
+  /** Persist editable profile fields (currently full_name) to public.profiles. */
+  updateProfile: (fields: { fullName: string }) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
 }
 
@@ -162,6 +164,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { needsConfirmation: !data.session };
   }, [fetchUserProfile]);
 
+  const updateProfile = useCallback<AuthState['updateProfile']>(
+    async ({ fullName }) => {
+      if (!user) return { error: 'You are not signed in.' };
+      if (!isSupabaseConfigured()) {
+        return { error: 'Authentication is not configured. Set the Supabase env vars.' };
+      }
+      const name = fullName.trim();
+      // public.profiles is keyed on user_id and exposes full_name (see the web
+      // app schema + fetchUserProfile above). RLS lets a user update their row.
+      const { error } = await supabase
+        .from('profiles')
+        .update({ full_name: name })
+        .eq('user_id', user.id);
+      if (error) return { error: error.message };
+      setUser({ ...user, fullName: name });
+      return {};
+    },
+    [user],
+  );
+
   const signOut = useCallback(async () => {
     try {
       await supabase.auth.signOut();
@@ -180,9 +202,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       signIn,
       signUp,
+      updateProfile,
       signOut,
     }),
-    [user, session, loading, signIn, signUp, signOut],
+    [user, session, loading, signIn, signUp, updateProfile, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

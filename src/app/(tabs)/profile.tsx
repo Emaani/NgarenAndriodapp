@@ -10,9 +10,9 @@ const SECTIONS: { title: string; rows: Row[] }[] = [
   {
     title: 'Account',
     rows: [
-      { icon: 'account-outline', label: 'Edit Profile' },
-      { icon: 'map-marker-outline', label: 'My Locations' },
-      { icon: 'tag-outline', label: 'My Devices' },
+      { icon: 'account-outline', label: 'Edit Profile', route: '/edit-profile' },
+      { icon: 'map-marker-outline', label: 'My Locations', route: '/locations' },
+      { icon: 'tag-outline', label: 'My Devices', route: '/devices' },
     ],
   },
   {
@@ -27,7 +27,7 @@ const SECTIONS: { title: string; rows: Row[] }[] = [
     rows: [
       { icon: 'bell-outline', label: 'Notifications', route: '/notifications' },
       { icon: 'cog-outline', label: 'Notification Preferences', route: '/notification-settings' },
-      { icon: 'help-circle-outline', label: 'Help & Support' },
+      { icon: 'help-circle-outline', label: 'Help & Support', route: '/help' },
     ],
   },
 ];

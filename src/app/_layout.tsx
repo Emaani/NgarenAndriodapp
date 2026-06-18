@@ -38,6 +38,10 @@ export default function RootLayout() {
           <Stack.Screen name="signup" />
           <Stack.Screen name="signup-success" />
           <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="edit-profile" />
+          <Stack.Screen name="locations" />
+          <Stack.Screen name="devices" />
+          <Stack.Screen name="help" />
           <Stack.Screen name="find-vet/index" />
           <Stack.Screen name="find-vet/request" />
           <Stack.Screen name="register-animal" />

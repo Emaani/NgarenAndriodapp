@@ -18,6 +18,7 @@ export function Input({
   autoCapitalize = 'none',
   helper,
   onIconPress,
+  editable = true,
 }: {
   label?: string;
   value: string;
@@ -29,6 +30,7 @@ export function Input({
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   helper?: React.ReactNode;
   onIconPress?: () => void;
+  editable?: boolean;
 }) {
   return (
     <View style={{ gap: spacing.sm, width: '100%' }}>
@@ -45,13 +47,13 @@ export function Input({
             gap: spacing.mdMinus,
             height: 50,
             paddingHorizontal: 14,
-            backgroundColor: colors.surface,
+            backgroundColor: editable ? colors.surface : colors.background,
             borderRadius: radius.md,
           },
           shadow[1],
         ]}>
         <TextInput
-          style={{ flex: 1, fontSize: 14, color: colors.onSurface }}
+          style={{ flex: 1, fontSize: 14, color: editable ? colors.onSurface : colors.onSurfaceVariant }}
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
@@ -59,6 +61,7 @@ export function Input({
           secureTextEntry={secureTextEntry}
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize}
+          editable={editable}
         />
         {icon &&
           (onIconPress ? (
