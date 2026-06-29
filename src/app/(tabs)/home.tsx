@@ -1,7 +1,9 @@
 import { Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { summary } from '@/data/mock';
+import { summary as summaryFallback } from '@/data/mock';
+import { getSummary } from '@/data/api';
+import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { AppText, GradientHeader, Icon, IconName, NotificationBell } from '@/ui';
 
@@ -40,6 +42,7 @@ export default function Home() {
   const router = useRouter();
   const { user } = useAuth();
   const displayName = user?.fullName?.trim() || user?.email?.split('@')[0] || 'Ngaren user';
+  const { data: summary } = useResource(getSummary, summaryFallback);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>

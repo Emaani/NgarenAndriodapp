@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { animals, locations, vets } from '@/data/mock';
-import { submitCalloutRequest } from '@/data/api';
+import { animals as animalsFallback, locations as locationsFallback, vets } from '@/data/mock';
+import { getAnimals, getLocations, submitCalloutRequest } from '@/data/api';
+import { useResource } from '@/data/hooks';
 import { CalloutUrgency } from '@/data/types';
 import { AppText, Button, GradientHeader, Icon, Screen, SelectField, TextField } from '@/ui';
 
@@ -13,9 +14,11 @@ export default function RequestCallout() {
   const router = useRouter();
   const { vetId } = useLocalSearchParams<{ vetId?: string }>();
   const vet = vetId ? vets.find((v) => v.id === Number(vetId)) : undefined;
+  const { data: animals } = useResource(() => getAnimals(), animalsFallback);
+  const { data: locations } = useResource(() => getLocations(), locationsFallback);
 
   const [animal, setAnimal] = useState('');
-  const [location, setLocation] = useState(locations[0]?.name ?? '');
+  const [location, setLocation] = useState(locationsFallback[0]?.name ?? '');
   const [urgency, setUrgency] = useState<(typeof URGENCY)[number]>('Routine');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -85,6 +88,7 @@ export default function RequestCallout() {
           value={animal}
           placeholder="Select an animal"
           onPress={() => {
+            if (animals.length === 0) return;
             const idx = animals.findIndex((a) => (a.name ?? a.tag) === animal);
             const next = animals[(idx + 1) % animals.length];
             setAnimal(next.name ?? next.tag);
@@ -95,6 +99,7 @@ export default function RequestCallout() {
           required
           value={location}
           onPress={() => {
+            if (locations.length === 0) return;
             const idx = locations.findIndex((l) => l.name === location);
             setLocation(locations[(idx + 1) % locations.length].name);
           }}

@@ -1,17 +1,20 @@
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, spacing } from '@/theme';
-import { devices } from '@/data/mock';
+import { devices as devicesFallback } from '@/data/mock';
+import { getDevices } from '@/data/api';
+import { useResource } from '@/data/hooks';
 import { AppText, Button, EmptyState, GradientHeader, DeviceCard, Screen } from '@/ui';
 
 /**
  * My Devices — the Ceres Tag devices on the account. Reads from the shared data
- * layer (mock until the platform-api devices endpoint is wired). Tapping a
- * linked device opens the animal it's attached to.
+ * layer via getDevices(): mock offline, GET /api/ngaren/devices when the backend
+ * env vars are set. Tapping a linked device opens the animal it's attached to.
  */
 export default function Devices() {
   const router = useRouter();
-  const linked = devices.filter((d) => d.linkedAnimalId !== null).length;
+  const { data: devices } = useResource(() => getDevices(), devicesFallback);
+  const linked = devices.filter((d) => d.linkedAnimalId !== null || d.linkedAnimalTag !== null).length;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>

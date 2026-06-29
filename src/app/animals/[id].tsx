@@ -1,13 +1,18 @@
 import { View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { animals } from '@/data/mock';
+import { animals as animalsFallback } from '@/data/mock';
+import { getAnimalById } from '@/data/api';
+import { useResource } from '@/data/hooks';
 import { ActionChip, AppText, Button, DetailRow, EmptyState, GradientHeader, Icon, Screen } from '@/ui';
 
 export default function AnimalDetail() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const animal = animals.find((a) => a.id === Number(id));
+  const { data: animal } = useResource(
+    () => getAnimalById(Number(id)),
+    animalsFallback.find((a) => a.id === Number(id)),
+  );
 
   if (!animal) {
     return (

@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { locations, markers } from '@/data/mock';
+import { locations as locationsFallback, markers as markersFallback } from '@/data/mock';
+import { getAnimalLocations, getLocations } from '@/data/api';
+import { useResource } from '@/data/hooks';
 import { AnimalMarker } from '@/data/types';
 import { ActionChip, AppText, BottomSheet, Button, GradientHeader, Icon } from '@/ui';
 import { MapPlaceholder } from '@/components/MapPlaceholder';
@@ -11,7 +13,14 @@ export default function TrackScreen() {
   const router = useRouter();
   const [selected, setSelected] = useState<AnimalMarker | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [checked, setChecked] = useState<number[]>(locations.map((l) => l.id));
+  const { data: locations } = useResource(() => getLocations(), locationsFallback);
+  const { data: markers } = useResource(() => getAnimalLocations(), markersFallback);
+  const [checked, setChecked] = useState<number[]>(locationsFallback.map((l) => l.id));
+
+  // Keep the location filter in sync as live locations arrive.
+  useEffect(() => {
+    setChecked(locations.map((l) => l.id));
+  }, [locations]);
 
   const toggle = (id: number) =>
     setChecked((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));

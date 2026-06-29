@@ -2,12 +2,15 @@ import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, spacing } from '@/theme';
-import { animals as allAnimals } from '@/data/mock';
+import { animals as animalsFallback } from '@/data/mock';
+import { getAnimals } from '@/data/api';
+import { useResource } from '@/data/hooks';
 import { AnimalListItem, EmptyState, Fab, GradientHeader, NotificationBell, Screen, SearchBar } from '@/ui';
 
 export default function AnimalsTab() {
   const router = useRouter();
   const [query, setQuery] = useState('');
+  const { data: allAnimals } = useResource(() => getAnimals(), animalsFallback);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase();

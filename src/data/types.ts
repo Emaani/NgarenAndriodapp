@@ -110,6 +110,120 @@ export interface Paginated<T> {
   };
 }
 
+/**
+ * Flat Spring page envelope as the platform-api actually returns it (the page
+ * metadata sits alongside `items`, not nested). The web app's stores read these
+ * top-level fields directly, so we mirror that shape for 1:1 parity.
+ */
+export interface PageResponse<T> {
+  items: T[];
+  pageNumber: number;
+  pageSize: number;
+  numberOfElements: number;
+  totalElements: number;
+  totalPages: number;
+}
+
+/* ----------------------------------------------------------------------------
+ * Raw backend payloads — parity-exact with the Nuxt web app's types/*.d.ts.
+ * The API client maps these into the UI-friendly types above so screen code
+ * never changes between mock and live mode.
+ * ------------------------------------------------------------------------- */
+
+/** GET /api/ngaren/summary — the Live Stock Command Center aggregate. */
+export interface SummaryData {
+  totalAnimals: number;
+  totalDevices: number;
+  totalUsers: number;
+  unlinkedDevices: number;
+  linkedAnimals: number;
+  totalLocations: number;
+}
+
+/** GET /api/ngaren/animals item (types/animal.d.ts AnimalResponsePayload). */
+export interface AnimalResponsePayload {
+  id: number;
+  locationId?: number;
+  deviceId?: number;
+  breedKey?: string;
+  breed?: { key: string; name: string };
+  dateOfBirth: string | null;
+  tag: string;
+  etag?: string;
+  status: string;
+  description?: string;
+  damId?: string;
+  sireId?: string;
+  dateCreated?: string;
+  location?: { id: number; name: string };
+  deviceAllocation?: { id: number | null; deviceSerialNumber: string };
+}
+
+/** GET /api/ngaren/breeds item (types/animal.d.ts Breed). */
+export interface BackendBreed {
+  key: number;
+  code?: string;
+  name: string;
+  note?: string;
+}
+
+/** GET /api/ngaren/devices item (types/device.d.ts Device). */
+export interface BackendDevice {
+  id: number;
+  serialNumber: string;
+  vid?: string;
+  brand: string;
+  model: { key?: number | null; code?: string; name: string };
+  family: string;
+  firmwareVersion: string;
+  chargeType: string;
+  dateCreated: string;
+  temperature?: number;
+  linkedToAnimal: boolean;
+  activationDate?: string;
+}
+
+/** POST /api/ngaren/devices body (types/device.d.ts DeviceInboundPayload). */
+export interface DeviceInboundPayload {
+  serialNumber: string;
+  modelKey: number | null;
+}
+
+/** GET /api/ngaren/locations item (types/location.d.ts LocationResponsePayload). */
+export interface LocationResponsePayload {
+  id: number;
+  name: string;
+  address?: string;
+  size: number;
+  description?: string;
+  features?: Array<{ id: number; label: string; featureType?: { key: number; name: string } }>;
+  dateCreated?: string;
+}
+
+/** GET /api/ngaren/locationFeatureTypes item. */
+export interface LocationFeatureType {
+  key: number;
+  name: string;
+}
+
+/** GET /api/ngaren/track item (types/animal.d.ts AnimalLocation). */
+export interface BackendAnimalLocation {
+  id: number;
+  animalId: number;
+  latitude: number;
+  longitude: number;
+  accuracy: string;
+  timestamp: string;
+}
+
+/** GET /api/settings (types/app.d.ts UserSetting). */
+export interface UserSetting {
+  partyId?: number;
+  deviceActivityConfig?: string;
+  deviceTempConfig?: string;
+  animalOutsideBoundaryConfig?: string;
+}
+
 export interface DashboardSummary {
   animals: number;
   devices: number;

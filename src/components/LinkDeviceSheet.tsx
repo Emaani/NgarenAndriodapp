@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { colors, radius, spacing } from '@/theme';
-import { animals } from '@/data/mock';
+import { animals as animalsFallback } from '@/data/mock';
+import { getAnimals, linkDeviceToAnimal } from '@/data/api';
+import { useResource } from '@/data/hooks';
 import { Device } from '@/data/types';
 import { AppText, BottomSheet, Button, SearchBar } from '@/ui';
 
@@ -9,7 +11,17 @@ import { AppText, BottomSheet, Button, SearchBar } from '@/ui';
 export function LinkDeviceSheet({ device, onClose }: { device: Device | null; onClose: () => void }) {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<number | null>(null);
+  const { data: animals } = useResource(() => getAnimals(), animalsFallback);
   const matches = animals.filter((a) => a.tag.toLowerCase().includes(query.toLowerCase()));
+
+  const onLink = async () => {
+    if (selected !== null && device) {
+      // Persists when the backend is configured (POST /api/animals/{id}/device-allocations);
+      // resolves immediately in mock mode.
+      await linkDeviceToAnimal(selected, device.id);
+    }
+    onClose();
+  };
 
   return (
     <BottomSheet visible={!!device} onClose={onClose} title="Link Device to Animal">
@@ -41,7 +53,7 @@ export function LinkDeviceSheet({ device, onClose }: { device: Device | null; on
       </View>
       <View style={{ flexDirection: 'row', gap: spacing.md }}>
         <Button label="Cancel" variant="outline" onPress={onClose} style={{ flex: 1 }} />
-        <Button label="Link" onPress={onClose} disabled={selected === null} style={{ flex: 1 }} />
+        <Button label="Link" onPress={onLink} disabled={selected === null} style={{ flex: 1 }} />
       </View>
     </BottomSheet>
   );

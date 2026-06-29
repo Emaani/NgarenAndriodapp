@@ -1,8 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { animals as allAnimals } from '@/data/mock';
+import { animals as animalsFallback } from '@/data/mock';
+import { getAnimals } from '@/data/api';
+import { useResource } from '@/data/hooks';
 import { Animal } from '@/data/types';
 import { AppText, Button, GradientHeader, Icon, IconChip, Screen } from '@/ui';
 
@@ -137,10 +139,20 @@ function SummaryStat({ value, label, color }: { value: number; label: string; co
 
 export default function StockTake() {
   const router = useRouter();
+  const { data: allAnimals } = useResource(() => getAnimals(), animalsFallback);
   const [marks, setMarks] = useState<Record<number, Mark>>(() =>
-    Object.fromEntries(allAnimals.map((a) => [a.id, 'pending' as Mark])),
+    Object.fromEntries(animalsFallback.map((a) => [a.id, 'pending' as Mark])),
   );
   const [phase, setPhase] = useState<Phase>('count');
+
+  // Add any newly-loaded animals to the count sheet as pending.
+  useEffect(() => {
+    setMarks((prev) => {
+      const next = { ...prev };
+      for (const a of allAnimals) if (!(a.id in next)) next[a.id] = 'pending';
+      return next;
+    });
+  }, [allAnimals]);
 
   const counted = useMemo(
     () => allAnimals.filter((a) => marks[a.id] !== 'pending').length,
@@ -262,7 +274,7 @@ export default function StockTake() {
 
       <Screen contentStyle={{ paddingTop: spacing.md, paddingBottom: spacing.xxl + 72 }}>
         {allAnimals.map((a) => (
-          <AnimalRow key={a.id} animal={a} mark={marks[a.id]} onMark={(m) => setMark(a.id, m)} />
+          <AnimalRow key={a.id} animal={a} mark={marks[a.id] ?? 'pending'} onMark={(m) => setMark(a.id, m)} />
         ))}
       </Screen>
 

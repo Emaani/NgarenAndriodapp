@@ -1,16 +1,39 @@
 /**
- * Ngaren API client.
+ * Ngaren API client — 1:1 parity with the Nuxt web app (ngaren-platform-webapp).
  *
- * Talks to the same BFF / platform-api endpoints the Nuxt web app uses, so the
- * mobile app stays 1:1 with the web app and the shared database:
- *   GET  /api/ngaren/notifications?pageNumber=&pageSize=
- *   GET  /api/ngaren/notifications/settings
- *   PUT  /api/ngaren/notifications/settings
- *   POST /api/ngaren/notifications/push-tokens   (mobile push registration)
- *   POST /api/sync/devices                       (server-side Ceres sync trigger)
+ * Every method hits the exact same BFF / platform-api endpoint, verb and query
+ * contract the web app's Pinia stores use, so the mobile app, the web app and
+ * the shared database stay in lock-step (the "Live Stock Command Center"):
+ *
+ *   Command Center / dashboard
+ *     GET  /api/ngaren/summary                                  (dashboardStore)
+ *   Animals
+ *     GET  /api/ngaren/animals?pageNumber=&pageSize=            (animalStore)
+ *     GET  /api/ngaren/animals/{id}
+ *     POST /api/ngaren/animals
+ *     GET  /api/ngaren/breeds
+ *   Track (live locations)
+ *     GET  /api/ngaren/track?pageNumber=&pageSize=&latestOnly=true&startDate=&endDate= (trackStore)
+ *   Devices
+ *     GET  /api/ngaren/devices?pageNumber=&pageSize=&allDevices= (deviceStore)
+ *     GET  /api/ngaren/devices/{id}
+ *     POST /api/ngaren/devices
+ *     GET  /api/device-models
+ *     POST /api/animals/{animalId}/device-allocations
+ *     GET  /api/sync/devices                                    (Ceres sync trigger)
+ *   Locations (farms)
+ *     GET  /api/ngaren/locations?pageNumber=&pageSize=          (locationStore)
+ *     GET  /api/ngaren/locationFeatureTypes
+ *   Notifications & settings
+ *     GET  /api/notifications?pageNumber=&pageSize=             (notificationStore)
+ *     GET  /api/settings                                        (configStore)
+ *     POST /api/settings/notifications                          (notificationStore)
+ *   Mobile-only additions (push + vet call-outs)
+ *     POST /api/ngaren/notifications/push-tokens
+ *     GET/POST/PATCH /api/ngaren/callouts
  *
  * Every request carries the `X-Ngaren-Consumer-Id` header (OIDC userid claim),
- * matching the web BFF proxy contract.
+ * matching the web BFF proxy contract (server/api/[...].ts).
  *
  * When no backend is configured (isBackendConfigured() === false) every method
  * resolves against src/data/mock.ts, so the UI is fully functional offline and
@@ -20,14 +43,29 @@ import { config, isBackendConfigured } from '../config';
 import * as mock from './mock';
 import {
   AlertChannel,
+  Animal,
+  AnimalMarker,
+  AnimalResponsePayload,
   AppNotification,
+  BackendAnimalLocation,
+  BackendBreed,
+  BackendDevice,
   BackendNotification,
   CalloutRequest,
   CalloutStatus,
   CalloutUrgency,
+  DashboardSummary,
+  Device,
+  DeviceInboundPayload,
+  Location,
+  LocationFeatureType,
+  LocationResponsePayload,
   NotificationCategory,
   NotificationSettings,
   Paginated,
+  PageResponse,
+  SummaryData,
+  UserSetting,
 } from './types';
 
 const DEFAULT_SETTINGS: NotificationSettings = {
@@ -67,6 +105,293 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
+/* ============================================================================
+ * Command Center / dashboard summary
+ * ========================================================================== */
+
+/**
+ * Maps the backend SummaryData onto the dashboard's DashboardSummary. The web
+ * app's home page reads these same six counters; we additionally derive the
+ * allocation/connectivity splits the mobile header visualises.
+ */
+export function mapSummary(s: SummaryData): DashboardSummary {
+  const connected = Math.max(0, (s.totalDevices ?? 0) - (s.unlinkedDevices ?? 0));
+  return {
+    animals: s.totalAnimals ?? 0,
+    devices: s.totalDevices ?? 0,
+    locations: s.totalLocations ?? 0,
+    users: s.totalUsers ?? 0,
+    allocation: { allocated: s.linkedAnimals ?? 0, free: s.unlinkedDevices ?? 0 },
+    connectivity: { connected, unconnected: s.unlinkedDevices ?? 0 },
+  };
+}
+
+/** Fetch the Live Stock Command Center summary. Falls back to mock offline. */
+export async function getSummary(): Promise<DashboardSummary> {
+  if (!isBackendConfigured()) return mock.summary;
+  const data = await request<SummaryData>('/api/ngaren/summary');
+  return mapSummary(data);
+}
+
+/* ============================================================================
+ * Animals
+ * ========================================================================== */
+
+/** Maps a raw backend animal onto the UI Animal type used across the screens. */
+export function mapAnimal(a: AnimalResponsePayload): Animal {
+  const status = (a.status ?? '').toLowerCase();
+  return {
+    id: a.id,
+    tag: a.tag,
+    name: a.description || a.tag,
+    breed: { key: a.breed?.key ?? a.breedKey ?? '', name: a.breed?.name ?? '—' },
+    locationId: a.location?.id ?? a.locationId,
+    locationName: a.location?.name,
+    deviceId: a.deviceId,
+    deviceSerial: a.deviceAllocation?.deviceSerialNumber || null,
+    dateOfBirth: typeof a.dateOfBirth === 'string' ? a.dateOfBirth : '',
+    status: status === 'inactive' ? 'inactive' : 'active',
+    description: a.description,
+    damTag: a.damId,
+    sireTag: a.sireId,
+  };
+}
+
+/** Fetch a page of animals. Falls back to mock data offline. */
+export async function getAnimals(pageNumber = 0, pageSize = 50): Promise<Animal[]> {
+  if (!isBackendConfigured()) return mock.animals;
+  const data = await request<PageResponse<AnimalResponsePayload>>(
+    `/api/ngaren/animals?pageNumber=${pageNumber}&pageSize=${pageSize}`,
+  );
+  return (data.items ?? []).map(mapAnimal);
+}
+
+/** Fetch a single animal by id. Falls back to the mock list offline. */
+export async function getAnimalById(id: number): Promise<Animal | undefined> {
+  if (!isBackendConfigured()) return mock.animals.find((a) => a.id === id);
+  const data = await request<AnimalResponsePayload>(`/api/ngaren/animals/${id}`);
+  return mapAnimal(data);
+}
+
+export interface RegisterAnimalPayload {
+  tag: string;
+  breedKey?: string;
+  locationId?: number;
+  dateOfBirth?: string | null;
+  description?: string;
+  damId?: string;
+  sireId?: string;
+}
+
+/** Register a new animal (POST /api/ngaren/animals). No-op resolve in mock mode. */
+export async function registerAnimal(payload: RegisterAnimalPayload): Promise<Animal | null> {
+  if (!isBackendConfigured()) return null;
+  const data = await request<AnimalResponsePayload>('/api/ngaren/animals', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return mapAnimal(data);
+}
+
+export interface BreedOption {
+  key: string;
+  name: string;
+}
+
+/**
+ * Fetch the breed catalogue as { key, name } options used by the registration
+ * picker. Mock mode synthesises keys from the names so the same submit path
+ * works offline and live.
+ */
+export async function getBreeds(): Promise<BreedOption[]> {
+  if (!isBackendConfigured()) {
+    return mock.breeds.map((name) => ({ key: name.toLowerCase(), name }));
+  }
+  const data = await request<BackendBreed[]>('/api/ngaren/breeds');
+  return (data ?? []).map((b) => ({ key: String(b.key), name: b.name }));
+}
+
+/* ============================================================================
+ * Track — live animal locations
+ * ========================================================================== */
+
+function mapAccuracy(raw: string): AnimalMarker['accuracy'] {
+  const v = (raw ?? '').toLowerCase();
+  if (v.includes('good') || v.includes('high')) return 'Good';
+  if (v.includes('poor') || v.includes('low')) return 'Poor';
+  return 'Fair';
+}
+
+function minutesSince(iso: string): number {
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return 0;
+  return Math.max(0, Math.round((Date.now() - t) / 60000));
+}
+
+/** Maps a backend animal-location ping onto the map's AnimalMarker. */
+export function mapAnimalLocation(loc: BackendAnimalLocation): AnimalMarker {
+  return {
+    animalId: loc.animalId,
+    tag: `#${loc.animalId}`,
+    lat: Number(loc.latitude),
+    lng: Number(loc.longitude),
+    accuracy: mapAccuracy(loc.accuracy),
+    lastSeenMins: minutesSince(loc.timestamp),
+    status: 'active',
+  };
+}
+
+/**
+ * Fetch the latest animal location for each animal, matching the web trackStore
+ * window (latest-only over the last 7 days). Falls back to mock markers offline.
+ */
+export async function getAnimalLocations(
+  pageNumber = 0,
+  pageSize = 100,
+  locationIds?: number[],
+): Promise<AnimalMarker[]> {
+  if (!isBackendConfigured()) return mock.markers;
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setDate(endDate.getDate() - 7);
+  const locParam = locationIds?.length ? `&locationIds=${locationIds.join(',')}` : '';
+  const data = await request<{ items: BackendAnimalLocation[] }>(
+    `/api/ngaren/track?pageNumber=${pageNumber}&pageSize=${pageSize}&latestOnly=true${locParam}` +
+      `&startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`,
+  );
+  return (data.items ?? []).map(mapAnimalLocation);
+}
+
+/* ============================================================================
+ * Devices
+ * ========================================================================== */
+
+/** Maps a raw backend device onto the UI Device type the cards render. */
+export function mapDevice(d: BackendDevice): Device {
+  return {
+    id: d.id,
+    serial: d.serialNumber,
+    model: d.model?.name ?? '—',
+    family: d.family,
+    brand: d.brand,
+    firmware: d.firmwareVersion,
+    chargeType: d.chargeType,
+    activatedAt: d.activationDate ?? d.dateCreated,
+    temperatureC: typeof d.temperature === 'number' ? d.temperature : null,
+    // The devices list endpoint exposes link state as a boolean, not the animal
+    // id (same as the web app). We surface the state; navigation to the animal
+    // only happens in mock mode where the id is known.
+    linkedAnimalId: null,
+    linkedAnimalTag: d.linkedToAnimal ? 'Linked' : null,
+  };
+}
+
+/** Fetch a page of devices. Falls back to mock data offline. */
+export async function getDevices(
+  pageNumber = 0,
+  pageSize = 50,
+  allDevices = true,
+): Promise<Device[]> {
+  if (!isBackendConfigured()) return mock.devices;
+  const data = await request<PageResponse<BackendDevice>>(
+    `/api/ngaren/devices?pageNumber=${pageNumber}&pageSize=${pageSize}&allDevices=${allDevices}`,
+  );
+  return (data.items ?? []).map(mapDevice);
+}
+
+/** Fetch a single device by id. Falls back to mock offline. */
+export async function getDeviceById(id: number): Promise<Device | undefined> {
+  if (!isBackendConfigured()) return mock.devices.find((d) => d.id === id);
+  const data = await request<BackendDevice>(`/api/ngaren/devices/${id}`);
+  return mapDevice(data);
+}
+
+/** Register a new device (POST /api/ngaren/devices). No-op resolve in mock mode. */
+export async function saveDevice(payload: DeviceInboundPayload): Promise<Device | null> {
+  if (!isBackendConfigured()) return null;
+  const data = await request<BackendDevice>('/api/ngaren/devices', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return mapDevice(data);
+}
+
+/** Fetch the device-model catalogue (GET /api/device-models). */
+export async function getDeviceModels(
+  pageNumber = 0,
+  pageSize = 50,
+): Promise<Array<{ key: number; name: string }>> {
+  if (!isBackendConfigured()) return [];
+  const data = await request<PageResponse<{ key: number; name: string }>>(
+    `/api/device-models?pageNumber=${pageNumber}&pageSize=${pageSize}`,
+  );
+  return data.items ?? [];
+}
+
+/** Link a device to an animal (POST /api/animals/{animalId}/device-allocations). */
+export async function linkDeviceToAnimal(animalId: number, deviceId: number): Promise<void> {
+  if (!isBackendConfigured()) return;
+  await request<void>(`/api/animals/${animalId}/device-allocations`, {
+    method: 'POST',
+    body: JSON.stringify({ deviceId }),
+  });
+}
+
+/**
+ * Trigger the server-side Ceres Tag device sync. The actual Ceres satellite
+ * integration is entirely server-side; the client only asks the backend to pull
+ * the latest device/telemetry data into the shared DB. Mirrors the web app's
+ * GET /api/sync/devices exactly.
+ */
+export async function syncDevices(): Promise<void> {
+  if (!isBackendConfigured()) return;
+  await request<void>('/api/sync/devices', { method: 'GET' });
+}
+
+/* ============================================================================
+ * Locations (farms)
+ * ========================================================================== */
+
+/** Maps a backend location onto the UI Location type the cards render. */
+export function mapLocation(l: LocationResponsePayload): Location {
+  const name = (l.name ?? '').toLowerCase();
+  const kind: Location['kind'] = name.includes('water')
+    ? 'water'
+    : name.includes('yard')
+      ? 'yard'
+      : 'paddock';
+  return {
+    id: l.id,
+    name: l.name,
+    address: l.address ?? '',
+    sizeHa: Number(l.size ?? 0),
+    // The list endpoint doesn't carry a per-location animal count; the map and
+    // detail screens resolve that from the track/animals data when live.
+    animalCount: 0,
+    kind,
+  };
+}
+
+/** Fetch a page of locations. Falls back to mock data offline. */
+export async function getLocations(pageNumber = 0, pageSize = 50): Promise<Location[]> {
+  if (!isBackendConfigured()) return mock.locations;
+  const data = await request<PageResponse<LocationResponsePayload>>(
+    `/api/ngaren/locations?pageNumber=${pageNumber}&pageSize=${pageSize}`,
+  );
+  return (data.items ?? []).map(mapLocation);
+}
+
+/** Fetch the location-feature-type catalogue. Empty offline. */
+export async function getLocationFeatureTypes(): Promise<LocationFeatureType[]> {
+  if (!isBackendConfigured()) return [];
+  const data = await request<PageResponse<LocationFeatureType>>('/api/ngaren/locationFeatureTypes');
+  return data.items ?? [];
+}
+
+/* ============================================================================
+ * Notifications & settings
+ * ========================================================================== */
+
 /**
  * Maps a raw backend notification onto the UI-friendly AppNotification.
  * Backend `type` (DEVICE_ACTIVITY | BOUNDARY_CHECK) drives the category, icon
@@ -101,8 +426,8 @@ export async function getNotifications(
   if (!isBackendConfigured()) {
     return mock.notifications;
   }
-  const data = await request<Paginated<BackendNotification>>(
-    `/api/ngaren/notifications?pageNumber=${pageNumber}&pageSize=${pageSize}`,
+  const data = await request<PageResponse<BackendNotification>>(
+    `/api/notifications?pageNumber=${pageNumber}&pageSize=${pageSize}`,
   );
   return (data.items ?? []).map(mapNotification);
 }
@@ -113,15 +438,20 @@ export async function getUnreadCount(): Promise<number> {
   return list.filter((n) => n.unread).length;
 }
 
-/** Fetch the current per-alert-type channel preferences. */
+/** Fetch the current per-alert-type channel preferences (GET /api/settings). */
 export async function getNotificationSettings(): Promise<NotificationSettings> {
   if (!isBackendConfigured()) {
     return { ...mockSettings };
   }
-  return request<NotificationSettings>('/api/ngaren/notifications/settings');
+  const s = await request<UserSetting>('/api/settings');
+  return {
+    deviceActivityConfig: (s.deviceActivityConfig as AlertChannel) ?? DEFAULT_SETTINGS.deviceActivityConfig,
+    boundaryCheckAlertConfig:
+      (s.animalOutsideBoundaryConfig as AlertChannel) ?? DEFAULT_SETTINGS.boundaryCheckAlertConfig,
+  };
 }
 
-/** Persist updated channel preferences. */
+/** Persist updated channel preferences (POST /api/settings/notifications). */
 export async function updateNotificationSettings(
   payload: NotificationSettings,
 ): Promise<NotificationSettings> {
@@ -129,10 +459,11 @@ export async function updateNotificationSettings(
     mockSettings = { ...payload };
     return { ...mockSettings };
   }
-  return request<NotificationSettings>('/api/ngaren/notifications/settings', {
-    method: 'PUT',
+  await request<unknown>('/api/settings/notifications', {
+    method: 'POST',
     body: JSON.stringify(payload),
   });
+  return { ...payload };
 }
 
 /**
@@ -150,24 +481,10 @@ export async function registerPushToken(
   });
 }
 
-/**
- * Trigger the server-side Ceres Tag device sync. The actual Ceres satellite
- * integration is entirely server-side; the client only asks the backend to
- * pull the latest device/telemetry data into the shared DB.
- */
-export async function syncDevices(): Promise<void> {
-  if (!isBackendConfigured()) return;
-  await request<void>('/api/sync/devices', { method: 'POST' });
-}
+/* ============================================================================
+ * Vet call-outs (mobile-first work queue)
+ * ========================================================================== */
 
-/**
- * Vet call-out requests — the work queue powering the vet persona, and the
- * sink for a farmer's "Request a Call-out" submission.
- *   GET   /api/ngaren/callouts?pageNumber=&pageSize=   (vet inbox)
- *   POST  /api/ngaren/callouts                          (farmer submits)
- *   PATCH /api/ngaren/callouts/{id}                     (vet accepts/declines)
- * All env-gated with mock fallback, identical to the notifications client.
- */
 export interface CalloutRequestPayload {
   vetId?: number;
   animal: string;

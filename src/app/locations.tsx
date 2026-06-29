@@ -1,16 +1,19 @@
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, spacing } from '@/theme';
-import { locations } from '@/data/mock';
+import { locations as locationsFallback } from '@/data/mock';
+import { getLocations } from '@/data/api';
+import { useResource } from '@/data/hooks';
 import { AppText, EmptyState, GradientHeader, LocationCard, Screen } from '@/ui';
 
 /**
  * My Locations — the farmer's registered paddocks, water points and yards.
- * Reads from the shared data layer (mock until the platform-api locations
- * endpoint is wired); tapping a card jumps to the live map.
+ * Reads from the shared data layer via getLocations(): mock offline,
+ * GET /api/ngaren/locations when live; tapping a card jumps to the live map.
  */
 export default function Locations() {
   const router = useRouter();
+  const { data: locations } = useResource(() => getLocations(), locationsFallback);
   const totalHa = locations.reduce((sum, l) => sum + l.sizeHa, 0);
 
   return (
