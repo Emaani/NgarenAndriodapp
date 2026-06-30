@@ -14,7 +14,7 @@ export default function TrackScreen() {
   const [selected, setSelected] = useState<AnimalMarker | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const { data: locations } = useResource(() => getLocations(), locationsFallback);
-  const { data: markers } = useResource(() => getAnimalLocations(), markersFallback);
+  const { data: markers, reload: reloadMarkers } = useResource(() => getAnimalLocations(), markersFallback);
   const [checked, setChecked] = useState<number[]>(locationsFallback.map((l) => l.id));
 
   // Keep the location filter in sync as live locations arrive.
@@ -67,7 +67,11 @@ export default function TrackScreen() {
             },
             shadow[2],
           ]}
-          onPress={() => {}}>
+          onPress={() => {
+            // Recenter: clear any open marker and refresh the latest positions.
+            setSelected(null);
+            reloadMarkers();
+          }}>
           <Icon name="crosshairs-gps" size={24} color={colors.primary} />
         </Pressable>
 

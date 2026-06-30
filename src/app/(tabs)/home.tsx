@@ -25,6 +25,14 @@ const ACTIONS: Action[] = [
   { icon: 'wallet-outline', label: 'Payments', route: '/payments', tint: '#9333EA' },
 ];
 
+/** Extra action shown to admins/vets so they can open the vet call-out queue. */
+const VET_ACTION: Action = {
+  icon: 'clipboard-pulse-outline',
+  label: 'Vet Call-outs',
+  route: '/vet',
+  tint: '#EF4444',
+};
+
 function Stat({ value, label }: { value: number; label: string }) {
   return (
     <View style={{ flex: 1, alignItems: 'center' }}>
@@ -40,9 +48,10 @@ function Stat({ value, label }: { value: number; label: string }) {
 
 export default function Home() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, canVet } = useAuth();
   const displayName = user?.fullName?.trim() || user?.email?.split('@')[0] || 'Ngaren user';
   const { data: summary } = useResource(getSummary, summaryFallback);
+  const actions = canVet ? [...ACTIONS, VET_ACTION] : ACTIONS;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -85,7 +94,7 @@ export default function Home() {
           Quick actions
         </AppText>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
-          {ACTIONS.map((a) => (
+          {actions.map((a) => (
             <Pressable
               key={a.label}
               onPress={() => router.push(a.route as never)}

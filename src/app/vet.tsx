@@ -107,7 +107,7 @@ function RequestCard({
 
 export default function VetDashboard() {
   const router = useRouter();
-  const { role, isAuthenticated, loading, user, signOut } = useAuth();
+  const { canVet, isAuthenticated, loading, user, signOut } = useAuth();
   const [requests, setRequests] = useState<CalloutRequest[]>([]);
   const [filter, setFilter] = useState<Filter>('pending');
 
@@ -132,11 +132,12 @@ export default function VetDashboard() {
     return requests.filter((r) => r.status === 'accepted');
   }, [requests, filter]);
 
-  // Vet area: only signed-in vets. Farmers go back to their home.
+  // Vet call-out queue: open to vets (their home) and admins (who reach it from
+  // the dashboard). Plain farmers go back to their home.
   // (Declared after all hooks to keep hook order stable across renders.)
   if (loading) return null;
   if (!isAuthenticated) return <Redirect href="/login" />;
-  if (role !== 'vet') return <Redirect href="/(tabs)/home" />;
+  if (!canVet) return <Redirect href="/(tabs)/home" />;
 
   const setStatus = (id: number, status: CalloutStatus) => {
     setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));

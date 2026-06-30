@@ -34,6 +34,8 @@ export interface AuthUser {
 interface AuthState {
   user: AuthUser | null;
   role: Role | null;
+  /** True when the user may open the vet call-out queue (veterinary or admin). */
+  canVet: boolean;
   isAuthenticated: boolean;
   /** True while the initial session is being restored. Guards should wait. */
   loading: boolean;
@@ -57,9 +59,22 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
-/** Collapse the web DB role set onto the app's farmer/vet persona. */
+/**
+ * Default landing persona. Only veterinary users land in the vet call-out
+ * queue; everyone else — including admins — lands in the full farmer app
+ * (Dashboard + tabs). Admins are superusers, not vets, so they must not be
+ * trapped on the vet screen.
+ */
 function roleFor(roles: string[]): Role {
-  return roles.includes('veterinary') || roles.includes('admin') ? 'vet' : 'farmer';
+  return roles.includes('veterinary') ? 'vet' : 'farmer';
+}
+
+/**
+ * Who may open the vet call-out queue. Vets reach it as their home; admins can
+ * open it from the dashboard while still having full farmer-app access.
+ */
+function canAccessVet(roles: string[]): boolean {
+  return roles.includes('veterinary') || roles.includes('admin');
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -198,6 +213,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       role: user ? roleFor(user.roles) : null,
+      canVet: user ? canAccessVet(user.roles) : false,
       isAuthenticated: !!session && !!user,
       loading,
       signIn,
