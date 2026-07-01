@@ -1,9 +1,11 @@
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, Image, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Redirect } from 'expo-router';
 import { colors, radius, spacing } from '@/theme';
-import { AppText, Icon } from '@/ui';
+import { AppText } from '@/ui';
 import { useAuth } from '@/services/auth';
+
+const ngarenLogo = require('@/assets/images/ngaren-logo.png');
 
 /**
  * Splash / auth handoff. While the persisted Supabase session is being
@@ -39,7 +41,12 @@ export default function Splash() {
             alignItems: 'center',
             justifyContent: 'center',
           }}>
-          <Icon name="cow" size={60} color={colors.primary} />
+          <Image
+            source={ngarenLogo}
+            style={{ width: 90, height: 90 }}
+            resizeMode="contain"
+            accessibilityLabel="Ngaren logo"
+          />
         </View>
         <AppText variant="display" color="#fff">
           Ngaren

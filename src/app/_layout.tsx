@@ -10,7 +10,8 @@ import {
   Inter_600SemiBold,
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
-import { addNotificationResponseListener } from '@/services/push';
+import { addNotificationResponseListener, routeColdStartNotification } from '@/services/push';
+import { registerBackgroundSyncAsync } from '@/services/backgroundSync';
 import { AuthProvider } from '@/services/auth';
 
 export default function RootLayout() {
@@ -23,6 +24,16 @@ export default function RootLayout() {
 
   // Deep-link taps on push notifications into the right screen.
   useEffect(() => addNotificationResponseListener(), []);
+  // Handle the case where a notification tap launched the app from killed
+  // (not just backgrounded), which addNotificationResponseListener alone misses.
+  useEffect(() => {
+    routeColdStartNotification();
+  }, []);
+  // Periodic Ceres Tag sync while the app is backgrounded (no-op in mock mode
+  // or where background tasks aren't supported, e.g. web/simulator).
+  useEffect(() => {
+    registerBackgroundSyncAsync();
+  }, []);
 
   if (!fontsLoaded) return null;
 

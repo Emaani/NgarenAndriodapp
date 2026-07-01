@@ -9,6 +9,7 @@ import {
 } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { isSupabaseConfigured, supabase } from './supabase';
+import { unregisterBackgroundSyncAsync } from './backgroundSync';
 
 /**
  * Supabase-backed auth, sharing one identity with the Ngaren web app
@@ -205,6 +206,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // ignore network errors on sign-out; we clear local state regardless
     }
+    await unregisterBackgroundSyncAsync();
     setUser(null);
     setSession(null);
   }, []);

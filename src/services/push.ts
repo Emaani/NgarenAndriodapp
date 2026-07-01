@@ -80,23 +80,40 @@ export async function registerForPushNotifications(): Promise<string | null> {
   }
 }
 
+/** Boundary alerts open the map; everything else opens the notification center. */
+function routeForNotification(data: { type?: string } | undefined): void {
+  if (data?.type === 'BOUNDARY_CHECK') {
+    router.push('/(tabs)/track');
+  } else {
+    router.push('/notifications');
+  }
+}
+
 /**
- * Wire a listener so tapping a notification deep-links into the app. Returns an
- * unsubscribe function. Boundary alerts open the map; everything else opens the
- * notification center.
+ * Wire a listener so tapping a notification deep-links into the app while the
+ * app is running (foregrounded or backgrounded). Returns an unsubscribe function.
  */
 export function addNotificationResponseListener(): () => void {
-  const sub = Notifications.addNotificationResponseReceivedListener(
-    (response) => {
-      const data = response.notification.request.content.data as
-        | { type?: string }
-        | undefined;
-      if (data?.type === 'BOUNDARY_CHECK') {
-        router.push('/(tabs)/track');
-      } else {
-        router.push('/notifications');
-      }
-    },
-  );
+  const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+    const data = response.notification.request.content.data as { type?: string } | undefined;
+    routeForNotification(data);
+  });
   return () => sub.remove();
+}
+
+/**
+ * Handle the case where tapping a notification launched the app from fully
+ * killed (not just backgrounded) — addNotificationResponseListener's callback
+ * never fires for that launch since it's registered after the tap already
+ * happened. Call once on root mount.
+ */
+export async function routeColdStartNotification(): Promise<void> {
+  try {
+    const response = await Notifications.getLastNotificationResponseAsync();
+    if (!response) return;
+    const data = response.notification.request.content.data as { type?: string } | undefined;
+    routeForNotification(data);
+  } catch (error) {
+    console.warn('Cold-start notification routing skipped:', error);
+  }
 }

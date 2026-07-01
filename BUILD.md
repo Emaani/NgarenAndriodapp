@@ -37,6 +37,33 @@ Output: `android/app/build/outputs/apk/release/app-release.apk`. It is signed wi
 the debug keystore (sideloadable for internal testing). Min Android 7.0 (API 24),
 runs through Android 17 (API 37) — verified on an `android-37` emulator.
 
+## Brand assets
+
+`assets/images/ngaren-logo.png` is the canonical brand mark (transparent,
+1024x1024) — used on the login screen and the splash hand-off. Every other
+icon file is derived from it by `scripts/generate-brand-assets.py`: flattened
+onto white for `icon.png`/`favicon.png`, inset to Android's adaptive-icon safe
+zone (~62% diameter) for `android-icon-foreground.png` and
+`android-icon-monochrome.png` (alpha-only silhouette for Android 13+ themed
+icons), solid white for `android-icon-background.png`.
+
+To update the brand mark, replace `assets/images/ngaren-logo.png` (or pass a
+new source path as an argument) and regenerate:
+
+```bash
+python scripts/generate-brand-assets.py
+npx expo prebuild --clean   # native android/ must pick up the new icons/splash
+```
+
+## Background sync
+
+`src/services/backgroundSync.ts` registers a periodic `expo-background-task`
+(`expo-task-manager` under the hood) that calls the same
+`GET /api/sync/devices` the web app's "Sync Devices" button triggers, so device
+telemetry stays fresh even when the app isn't open. No-ops in mock mode and on
+web/simulators. Registered once in `_layout.tsx` on app start; unregistered on
+sign-out (`src/services/auth.tsx`).
+
 ## Production / device builds — EAS (recommended)
 
 The supported way to produce distributable arm64 / universal binaries is **EAS Build**

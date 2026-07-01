@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Image, Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { AppText, Button, GradientHeader, Icon, IconName, Input } from '@/ui';
 import { useAuth } from '@/services/auth';
+
+const ngarenLogo = require('@/assets/images/ngaren-logo.png');
 
 function SocialButton({ icon, color }: { icon: IconName; color: string }) {
   return (
@@ -55,19 +57,22 @@ export default function Login() {
         <View
           style={[
             {
-              width: 78,
-              height: 78,
+              width: 84,
+              height: 84,
               borderRadius: radius.full,
               backgroundColor: colors.surface,
               alignItems: 'center',
               justifyContent: 'center',
               marginTop: -28,
-              borderWidth: 2,
-              borderColor: colors.primary,
             },
             shadow[1],
           ]}>
-          <Icon name="cow" size={44} color={colors.primary} />
+          <Image
+            source={ngarenLogo}
+            style={{ width: 68, height: 68 }}
+            resizeMode="contain"
+            accessibilityLabel="Ngaren logo"
+          />
         </View>
 
         <View style={{ flexDirection: 'row', marginTop: spacing.mdMinus, marginBottom: spacing.lg }}>
