@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "ngaren-connect-mobile",
-    "slug": "ngaren-connect-mobile",
+    "slug": "ngarendigital",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -55,6 +55,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "e12d6253-e833-4df1-ab0e-7dd6108c0cfa"
+      }
+    },
+    "owner": "ngarens-team"
   }
 }
