@@ -216,6 +216,19 @@ export interface BackendAnimalLocation {
   timestamp: string;
 }
 
+/**
+ * GET /api/ngaren/animals/{id}/data?dataKey=&startDate=&endDate= item
+ * (types/animal.d.ts AnimalData). This is the raw Ceres Tag behaviour/telemetry
+ * time series — grazing/resting/walking/drinking minutes, methane production,
+ * dry matter intake — keyed by `dataKey` (see ANIMAL_DATA_KEYS in data/api.ts).
+ */
+export interface BackendAnimalData {
+  id: number;
+  value: string | number;
+  type: string;
+  timestamp: string;
+}
+
 /** GET /api/settings (types/app.d.ts UserSetting). */
 export interface UserSetting {
   partyId?: number;

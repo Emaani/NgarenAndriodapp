@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
@@ -9,6 +9,33 @@ import { AnimalMarker } from '@/data/types';
 import { ActionChip, AppText, BottomSheet, Button, GradientHeader, Icon } from '@/ui';
 import { MapPlaceholder } from '@/components/MapPlaceholder';
 
+/**
+ * Projects each marker's real Ceres Tag lat/lng onto the placeholder canvas as
+ * a percentage position, so relative spacing reflects actual GPS positions
+ * (closer animals render closer together) instead of an arbitrary index-based
+ * layout. This is a stand-in for true map tiles — swap for react-native-maps'
+ * own camera/marker positioning once a Google Maps API key is available.
+ */
+function projectMarkers(
+  markers: AnimalMarker[],
+): Array<AnimalMarker & { leftPct: number; topPct: number }> {
+  if (markers.length === 0) return [];
+  const lats = markers.map((m) => m.lat);
+  const lngs = markers.map((m) => m.lng);
+  const latSpan = Math.max(...lats) - Math.min(...lats) || 1;
+  const lngSpan = Math.max(...lngs) - Math.min(...lngs) || 1;
+  const minLat = Math.min(...lats);
+  const minLng = Math.min(...lngs);
+  const MARGIN = 15;
+  const SPAN = 100 - MARGIN * 2;
+  return markers.map((m) => {
+    const xFrac = (m.lng - minLng) / lngSpan;
+    // Invert latitude: further north (higher lat) renders higher on screen.
+    const yFrac = 1 - (m.lat - minLat) / latSpan;
+    return { ...m, leftPct: MARGIN + xFrac * SPAN, topPct: MARGIN + yFrac * SPAN };
+  });
+}
+
 export default function TrackScreen() {
   const router = useRouter();
   const [selected, setSelected] = useState<AnimalMarker | null>(null);
@@ -16,6 +43,7 @@ export default function TrackScreen() {
   const { data: locations } = useResource(() => getLocations(), locationsFallback);
   const { data: markers, reload: reloadMarkers } = useResource(() => getAnimalLocations(), markersFallback);
   const [checked, setChecked] = useState<number[]>(locationsFallback.map((l) => l.id));
+  const projectedMarkers = useMemo(() => projectMarkers(markers), [markers]);
 
   // Keep the location filter in sync as live locations arrive.
   useEffect(() => {
@@ -38,14 +66,14 @@ export default function TrackScreen() {
       />
       <View style={{ flex: 1 }}>
         <MapPlaceholder>
-          {markers.map((m, i) => (
+          {projectedMarkers.map((m) => (
             <Pressable
               key={m.animalId}
               onPress={() => setSelected(m)}
               style={{
                 position: 'absolute',
-                left: 60 + i * 90,
-                top: 160 + i * 120,
+                left: `${m.leftPct}%`,
+                top: `${m.topPct}%`,
                 alignItems: 'center',
               }}>
               <View style={[{ backgroundColor: colors.surface, borderRadius: radius.full, padding: 6 }, shadow[2]]}>

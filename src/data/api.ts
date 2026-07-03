@@ -12,6 +12,7 @@
  *     GET  /api/ngaren/animals/{id}
  *     POST /api/ngaren/animals
  *     GET  /api/ngaren/breeds
+ *     GET  /api/ngaren/animals/{id}/data?dataKey=&startDate=&endDate=  (Ceres behaviour telemetry)
  *   Track (live locations)
  *     GET  /api/ngaren/track?pageNumber=&pageSize=&latestOnly=true&startDate=&endDate= (trackStore)
  *   Devices
@@ -47,10 +48,12 @@ import {
   AnimalMarker,
   AnimalResponsePayload,
   AppNotification,
+  BackendAnimalData,
   BackendAnimalLocation,
   BackendBreed,
   BackendDevice,
   BackendNotification,
+  BehaviourSeries,
   CalloutRequest,
   CalloutStatus,
   CalloutUrgency,
@@ -209,6 +212,97 @@ export async function getBreeds(): Promise<BreedOption[]> {
   }
   const data = await request<BackendBreed[]>('/api/ngaren/breeds');
   return (data ?? []).map((b) => ({ key: String(b.key), name: b.name }));
+}
+
+/**
+ * Ceres Tag behaviour-data keys (types/animal.d.ts AnimalAttributes + the
+ * `dataKey` numbers the web app's animalStore.ts actually sends). "PFI" is the
+ * platform's benchmark/prior-farm-index comparison series shown alongside the
+ * animal's actual values.
+ */
+const ANIMAL_DATA_KEYS = {
+  grazingMinutes: 1,
+  restingMinutes: 2,
+  walkingMinutes: 3,
+  otherMinutes: 4,
+  drinkingMinutes: 11,
+  dryMatterIntake: 12,
+  methaneProduction: 13,
+  grazingMinutesPFI: 14,
+  restingMinutesPFI: 15,
+  walkingMinutesPFI: 16,
+  drinkingMinutesPFI: 17,
+  dryMatterIntakePFI: 18,
+  methaneProductionPFI: 19,
+} as const;
+
+/** Fetch one raw Ceres data series for an animal. Empty array offline or on error. */
+async function getAnimalDataSeries(
+  animalId: number,
+  dataKey: number,
+  startDate: Date,
+  endDate: Date,
+): Promise<BackendAnimalData[]> {
+  if (!isBackendConfigured()) return [];
+  try {
+    const data = await request<{ items: BackendAnimalData[] }>(
+      `/api/ngaren/animals/${animalId}/data?dataKey=${dataKey}` +
+        `&startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`,
+    );
+    return data.items ?? [];
+  } catch {
+    // A given series (e.g. no PFI benchmark configured yet) failing shouldn't
+    // blank out the rest of the animal's behaviour data.
+    return [];
+  }
+}
+
+function toSortedValues(items: BackendAnimalData[]): number[] {
+  return [...items]
+    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+    .map((i) => Number(i.value));
+}
+
+/**
+ * Fetch the animal's Ceres Tag behaviour telemetry — grazing/resting/walking/
+ * drinking minutes, methane production, dry matter intake, each with its PFI
+ * benchmark — as the six BehaviourSeries the animal detail screen's ChartCards
+ * render. Falls back to mock.behaviourSeries offline (or if the animal simply
+ * has no synced data yet, in which case every series comes back empty and the
+ * screen should show its own "no Ceres data yet" empty state).
+ */
+export async function getAnimalBehaviour(animalId: number, days = 14): Promise<BehaviourSeries[]> {
+  if (!isBackendConfigured()) return mock.behaviourSeries;
+
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setDate(endDate.getDate() - days);
+
+  const fetchPair = async (actualKey: number, pfiKey: number) => {
+    const [actual, pfi] = await Promise.all([
+      getAnimalDataSeries(animalId, actualKey, startDate, endDate),
+      getAnimalDataSeries(animalId, pfiKey, startDate, endDate),
+    ]);
+    return { actual: toSortedValues(actual), pfi: toSortedValues(pfi) };
+  };
+
+  const [grazing, resting, walking, drinking, methane, dryMatter] = await Promise.all([
+    fetchPair(ANIMAL_DATA_KEYS.grazingMinutes, ANIMAL_DATA_KEYS.grazingMinutesPFI),
+    fetchPair(ANIMAL_DATA_KEYS.restingMinutes, ANIMAL_DATA_KEYS.restingMinutesPFI),
+    fetchPair(ANIMAL_DATA_KEYS.walkingMinutes, ANIMAL_DATA_KEYS.walkingMinutesPFI),
+    fetchPair(ANIMAL_DATA_KEYS.drinkingMinutes, ANIMAL_DATA_KEYS.drinkingMinutesPFI),
+    fetchPair(ANIMAL_DATA_KEYS.methaneProduction, ANIMAL_DATA_KEYS.methaneProductionPFI),
+    fetchPair(ANIMAL_DATA_KEYS.dryMatterIntake, ANIMAL_DATA_KEYS.dryMatterIntakePFI),
+  ]);
+
+  return [
+    { label: 'Grazing Minutes', unit: 'min', ...grazing },
+    { label: 'Resting Minutes', unit: 'min', ...resting },
+    { label: 'Walking Minutes', unit: 'min', ...walking },
+    { label: 'Drinking Minutes', unit: 'min', ...drinking },
+    { label: 'Methane Production', unit: 'g/day', ...methane },
+    { label: 'Dry Matter Intake', unit: 'kg/day', ...dryMatter },
+  ];
 }
 
 /* ============================================================================

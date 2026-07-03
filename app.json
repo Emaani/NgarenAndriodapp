@@ -21,7 +21,8 @@
       "package": "com.emaanidev.ngarenconnectmobile",
       "compileSdkVersion": 36,
       "targetSdkVersion": 36,
-      "buildToolsVersion": "36.1.0"
+      "buildToolsVersion": "36.1.0",
+      "versionCode": 2
     },
     "web": {
       "output": "static",

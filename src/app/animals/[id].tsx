@@ -1,10 +1,10 @@
 import { View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { animals as animalsFallback } from '@/data/mock';
-import { getAnimalById } from '@/data/api';
+import { animals as animalsFallback, behaviourSeries as behaviourFallback } from '@/data/mock';
+import { getAnimalBehaviour, getAnimalById } from '@/data/api';
 import { useResource } from '@/data/hooks';
-import { ActionChip, AppText, Button, DetailRow, EmptyState, GradientHeader, Icon, Screen } from '@/ui';
+import { ActionChip, AppText, Button, ChartCard, DetailRow, EmptyState, GradientHeader, Icon, Screen } from '@/ui';
 
 export default function AnimalDetail() {
   const router = useRouter();
@@ -13,6 +13,14 @@ export default function AnimalDetail() {
     () => getAnimalById(Number(id)),
     animalsFallback.find((a) => a.id === Number(id)),
   );
+  const { data: behaviour, loading: behaviourLoading } = useResource(
+    () => getAnimalBehaviour(Number(id)),
+    behaviourFallback,
+  );
+  // A Ceres Tag device reports on every series at once, so if every series is
+  // empty it means this animal has no synced telemetry yet (unlinked device,
+  // device not yet synced, or too new) rather than one chart failing alone.
+  const hasBehaviourData = behaviour.some((s) => s.actual.length > 0 || s.pfi.length > 0);
 
   if (!animal) {
     return (
@@ -54,10 +62,25 @@ export default function AnimalDetail() {
           {animal.description ? <DetailRow label="Notes" value={animal.description} last /> : null}
         </View>
 
-        <View style={{ gap: spacing.sm, marginTop: spacing.lg }}>
+        <View style={{ gap: spacing.sm, marginTop: spacing.lg, marginBottom: spacing.lg }}>
           <Button label="Track on Map" icon="map-marker-radius" onPress={() => router.push('/(tabs)/track')} />
           <Button label="Request a Vet" icon="stethoscope" variant="outline" onPress={() => router.push('/find-vet')} />
         </View>
+
+        <AppText variant="title" style={{ marginBottom: spacing.md }}>
+          Ceres Tag activity
+        </AppText>
+        {!behaviourLoading && !hasBehaviourData ? (
+          <EmptyState
+            icon="chart-line"
+            title="No Ceres Tag data yet"
+            subtitle="This animal's device may not be linked or hasn't synced yet."
+            actionLabel="Go to Devices"
+            onAction={() => router.push('/devices')}
+          />
+        ) : (
+          behaviour.map((series) => <ChartCard key={series.label} series={series} />)
+        )}
       </Screen>
     </View>
   );
