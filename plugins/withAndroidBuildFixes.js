@@ -16,6 +16,13 @@ const { withAppBuildGradle, withGradleProperties } = require('@expo/config-plugi
  *  2. Pin the shipped ABIs to arm64-v8a (every real Android 7–17 device) and
  *     x86_64 (emulators / Chromebooks). This cuts native build time versus the
  *     all-four-ABI default and shrinks the CMake output surface.
+ *
+ *  3. Raise the Gradle daemon's heap from Expo's 2048m default to 4096m. Seen
+ *     locally as "Unable to connect to the child process 'Gradle Worker
+ *     Daemon'" under memory pressure on this many native modules (reanimated,
+ *     worklets, screens, svg, gesture-handler, expo-ui, ...) compiled for two
+ *     ABIs at once; the same class of failure is the leading suspect for the
+ *     generic EAS_BUILD_UNKNOWN_GRADLE_ERROR seen on EAS's own build workers.
  */
 
 function addLintDisable(contents) {
@@ -53,6 +60,7 @@ const withAndroidBuildFixes = (config) => {
       }
     };
     setProperty('reactNativeArchitectures', 'arm64-v8a,x86_64');
+    setProperty('org.gradle.jvmargs', '-Xmx4096m -XX:MaxMetaspaceSize=1024m');
     return cfg;
   });
 
