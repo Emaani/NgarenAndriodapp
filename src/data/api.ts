@@ -118,14 +118,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
  * allocation/connectivity splits the mobile header visualises.
  */
 export function mapSummary(s: SummaryData): DashboardSummary {
-  const connected = Math.max(0, (s.totalDevices ?? 0) - (s.unlinkedDevices ?? 0));
+  // Same derivations as the web dashboard (pages/index.vue): allocation splits
+  // devices (allocated vs free), connectivity splits animals (linked vs not).
+  const allocatedDevices = Math.max(0, (s.totalDevices ?? 0) - (s.unlinkedDevices ?? 0));
+  const connectedAnimals = s.linkedAnimals ?? 0;
+  const unconnectedAnimals = Math.max(0, (s.totalAnimals ?? 0) - connectedAnimals);
   return {
     animals: s.totalAnimals ?? 0,
     devices: s.totalDevices ?? 0,
     locations: s.totalLocations ?? 0,
     users: s.totalUsers ?? 0,
-    allocation: { allocated: s.linkedAnimals ?? 0, free: s.unlinkedDevices ?? 0 },
-    connectivity: { connected, unconnected: s.unlinkedDevices ?? 0 },
+    allocation: { allocated: allocatedDevices, free: s.unlinkedDevices ?? 0 },
+    connectivity: { connected: connectedAnimals, unconnected: unconnectedAnimals },
   };
 }
 
@@ -310,7 +314,13 @@ export async function getAnimalBehaviour(animalId: number, days = 14): Promise<B
  * ========================================================================== */
 
 function mapAccuracy(raw: string): AnimalMarker['accuracy'] {
+  // The platform API reports Ceres GPS accuracy as enums (LESS_THAN_2_METERS …
+  // GREATER_THAN_100_METERS, NO_GPS_ACCURACY), same values the web track page maps.
   const v = (raw ?? '').toLowerCase();
+  if (v.includes('less_than_2') || v.includes('less_than_5') || v.includes('less_than_10')) return 'Good';
+  if (v.includes('less_than_25') || v.includes('less_than_50')) return 'Fair';
+  if (v.includes('less_than_100') || v.includes('greater_than_100') || v.includes('no_gps')) return 'Poor';
+  // Fallback for any free-text accuracy values
   if (v.includes('good') || v.includes('high')) return 'Good';
   if (v.includes('poor') || v.includes('low')) return 'Poor';
   return 'Fair';
