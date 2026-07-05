@@ -19,16 +19,29 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import { config, isSupabaseConfigured } from '../config';
 
-// A single shared instance. When Supabase isn't configured (no env vars) the
-// client is still constructed with empty strings; auth calls simply fail and
-// the AuthProvider treats the user as signed-out, keeping the UI usable.
-export const supabase = createClient(config.supabaseUrl, config.supabaseAnonKey, {
-  auth: {
-    storage: AsyncStorage,
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: false,
+// A single shared instance. createClient THROWS on an empty URL
+// ("supabaseUrl is required.") and this module is evaluated from the root
+// layout — so constructing it with missing env vars kills the whole app at
+// startup before the first frame (exactly what happened in EAS builds, where
+// the gitignored .env never reaches the build server). When Supabase isn't
+// configured we construct the client against a syntactically valid
+// placeholder instead; it is never contacted because every call-site guards
+// with isSupabaseConfigured() first, and the AuthProvider treats the user as
+// signed-out, keeping the UI usable in mock mode.
+const PLACEHOLDER_URL = 'https://supabase-not-configured.invalid';
+const PLACEHOLDER_KEY = 'anon-key-not-configured';
+
+export const supabase = createClient(
+  isSupabaseConfigured() ? config.supabaseUrl : PLACEHOLDER_URL,
+  isSupabaseConfigured() ? config.supabaseAnonKey : PLACEHOLDER_KEY,
+  {
+    auth: {
+      storage: AsyncStorage,
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: false,
+    },
   },
-});
+);
 
 export { isSupabaseConfigured };
