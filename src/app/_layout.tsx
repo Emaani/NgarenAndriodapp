@@ -13,6 +13,7 @@ import {
 import { addNotificationResponseListener, routeColdStartNotification } from '@/services/push';
 import { registerBackgroundSyncAsync } from '@/services/backgroundSync';
 import { AuthProvider } from '@/services/auth';
+import { AppErrorBoundary } from '@/components/AppErrorBoundary';
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -39,8 +40,9 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <AuthProvider>
+      <AppErrorBoundary>
+        <SafeAreaProvider>
+          <AuthProvider>
           <StatusBar style="dark" />
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#F7F7F7' } }}>
             <Stack.Screen name="index" />
@@ -64,8 +66,9 @@ export default function RootLayout() {
           <Stack.Screen name="notifications" />
           <Stack.Screen name="notification-settings" />
           </Stack>
-        </AuthProvider>
-      </SafeAreaProvider>
+          </AuthProvider>
+        </SafeAreaProvider>
+      </AppErrorBoundary>
     </GestureHandlerRootView>
   );
 }

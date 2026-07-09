@@ -23,6 +23,15 @@ const { withAppBuildGradle, withGradleProperties } = require('@expo/config-plugi
  *     worklets, screens, svg, gesture-handler, expo-ui, ...) compiled for two
  *     ABIs at once; the same class of failure is the leading suspect for the
  *     generic EAS_BUILD_UNKNOWN_GRADLE_ERROR seen on EAS's own build workers.
+ *
+ *  4. Use legacy JNI packaging (extractNativeLibs=true). The modern default
+ *     (extractNativeLibs=false) stores .so files uncompressed and memory-maps
+ *     them straight out of the APK. That works on new Android but is a
+ *     well-known cause of "keeps stopping" startup crashes on older devices
+ *     (Android 8-era, notably Samsung/Exynos) that can't reliably dlopen an
+ *     uncompressed library directly from the APK. Extracting the libraries to
+ *     the app's private lib dir at install time is the universally-compatible
+ *     behaviour, at the cost of a slightly larger on-disk footprint.
  */
 
 function addLintDisable(contents) {
@@ -61,6 +70,8 @@ const withAndroidBuildFixes = (config) => {
     };
     setProperty('reactNativeArchitectures', 'arm64-v8a,x86_64');
     setProperty('org.gradle.jvmargs', '-Xmx4096m -XX:MaxMetaspaceSize=1024m');
+    // Extract native libs at install time (see #4 above) for old-device compat.
+    setProperty('expo.useLegacyPackaging', 'true');
     return cfg;
   });
 
