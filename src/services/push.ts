@@ -41,6 +41,44 @@ async function ensureAndroidChannel(): Promise<void> {
   });
 }
 
+export type PushPermission = 'granted' | 'denied' | 'undetermined';
+
+/** Current OS notification-permission status, without prompting. */
+export async function getPushPermissionStatus(): Promise<PushPermission> {
+  if (Platform.OS === 'web') return 'denied';
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status === 'granted') return 'granted';
+  if (status === 'denied') return 'denied';
+  return 'undetermined';
+}
+
+/**
+ * Turn push on: ensure the Android channel, request permission if needed, and
+ * (best-effort) register the Expo push token with the backend. Returns whether
+ * push is now enabled (permission granted) — decoupled from whether a token was
+ * obtained, so the toggle reflects the user's real permission state rather than
+ * flipping off just because there's no EAS projectId or backend yet.
+ */
+export async function enablePushNotifications(): Promise<PushPermission> {
+  if (Platform.OS === 'web') return 'denied';
+  await ensureAndroidChannel();
+
+  const existing = await Notifications.getPermissionsAsync();
+  let status = existing.status;
+  if (status !== 'granted') {
+    const req = await Notifications.requestPermissionsAsync();
+    status = req.status;
+  }
+  if (status !== 'granted') {
+    return status === 'denied' ? 'denied' : 'undetermined';
+  }
+
+  // Permission is granted — try to obtain and register the token, but never let
+  // a missing projectId / backend downgrade the user's enabled state.
+  registerForPushNotifications().catch(() => {});
+  return 'granted';
+}
+
 /**
  * Request permission, obtain the Expo push token and register it with the
  * backend. Returns the token when successful, otherwise null.

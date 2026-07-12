@@ -41,6 +41,7 @@
  * goes live the moment the env vars are set — no screen code changes needed.
  */
 import { config, isBackendConfigured } from '../config';
+import { formatDateTime } from '../lib/date';
 import * as mock from './mock';
 import {
   AlertChannel,
@@ -68,6 +69,8 @@ import {
   Paginated,
   PageResponse,
   SummaryData,
+  TeamMember,
+  UserRole,
   UserSetting,
 } from './types';
 
@@ -517,9 +520,9 @@ export function mapNotification(n: BackendNotification): AppNotification {
 }
 
 function formatTimestamp(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString();
+  // Explicit formatting — Hermes' Intl/toLocaleString is inconsistent across
+  // Android builds, so use the app's canonical formatter for a stable result.
+  return formatDateTime(iso);
 }
 
 /** Fetch a page of notifications. Falls back to mock data offline. */
@@ -634,3 +637,51 @@ export const CHANNEL_LABELS: Record<AlertChannel, string> = {
   SMS: 'SMS',
   EMAIL_AND_SMS: 'Email & SMS',
 };
+
+/* ============================================================================
+ * Team / user management (admin only) — 1:1 with the web app's Users page
+ *   GET    /api/ngaren/users?pageNumber=&pageSize=   (list)
+ *   POST   /api/ngaren/users                          (invite/create)
+ *   GET    /api/ngaren/roles?pageNumber=&pageSize=    (assignable roles)
+ *   DELETE /api/user/{userId}                         (remove)
+ * ========================================================================== */
+
+/** List the team members on the account. Falls back to mock offline. */
+export async function getTeamMembers(pageNumber = 0, pageSize = 50): Promise<TeamMember[]> {
+  if (!isBackendConfigured()) return mock.teamMembers;
+  const data = await request<PageResponse<TeamMember>>(
+    `/api/ngaren/users?pageNumber=${pageNumber}&pageSize=${pageSize}`,
+  );
+  return data.items ?? [];
+}
+
+/** Assignable account roles. Falls back to mock offline. */
+export async function getUserRoles(pageNumber = 0, pageSize = 50): Promise<UserRole[]> {
+  if (!isBackendConfigured()) return mock.userRoles;
+  const data = await request<PageResponse<UserRole>>(
+    `/api/ngaren/roles?pageNumber=${pageNumber}&pageSize=${pageSize}`,
+  );
+  return data.items ?? [];
+}
+
+export interface CreateTeamMemberPayload {
+  firstName: string;
+  lastName: string;
+  email: string;
+  roleKey: number;
+}
+
+/** Invite/create a team member. No-op resolve in mock mode. */
+export async function createTeamMember(payload: CreateTeamMemberPayload): Promise<TeamMember | null> {
+  if (!isBackendConfigured()) return null;
+  return request<TeamMember>('/api/ngaren/users', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+/** Remove a team member. No-op in mock mode. */
+export async function deleteTeamMember(userId: number): Promise<void> {
+  if (!isBackendConfigured()) return;
+  await request<void>(`/api/user/${userId}`, { method: 'DELETE' });
+}

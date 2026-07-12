@@ -55,6 +55,27 @@ export interface User {
   role: 'Admin' | 'Operator' | 'Viewer';
 }
 
+/**
+ * A team member on the account (admin-managed). Mirrors the web app's
+ * types/location.d.ts `User` for /api/ngaren/users 1:1.
+ */
+export interface TeamMember {
+  userId: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+  roleKey?: number;
+}
+
+/** An assignable account role. Mirrors the web app's `UserRole`. */
+export interface UserRole {
+  key: number;
+  name: string;
+  code?: string;
+  note?: string;
+}
+
 export type NotificationCategory = 'device' | 'boundary';
 
 export interface AppNotification {

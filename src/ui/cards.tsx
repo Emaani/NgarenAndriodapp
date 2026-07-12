@@ -1,5 +1,6 @@
 import { Pressable, View } from 'react-native';
 import { colors, radius, spacing } from '@/theme';
+import { formatDate } from '@/lib/date';
 import { Animal, AppNotification, Device, Location, User } from '@/data/types';
 import { Card } from './Card';
 import { AppText } from './AppText';
@@ -44,7 +45,7 @@ export function AnimalListItem({
           <AppText variant="title">{animal.name ?? animal.tag}</AppText>
           <Line icon="dna" text={`Breed: ${animal.breed.name}`} />
           <Line icon="map-marker" text={animal.locationName ?? '—'} />
-          <Line icon="calendar" text={`DOB: ${animal.dateOfBirth}`} />
+          <Line icon="calendar" text={`DOB: ${formatDate(animal.dateOfBirth)}`} />
           {connected ? (
             <Line icon="tag" text={animal.deviceSerial!} color={colors.success} />
           ) : (
@@ -118,7 +119,7 @@ export function DeviceCard({
             )}
           </View>
           <AppText variant="caption" color={colors.onSurfaceVariant}>
-            Activated: {device.activatedAt}
+            Activated: {formatDate(device.activatedAt)}
           </AppText>
           {device.linkedAnimalTag ? (
             <Line icon="cow" text={`Linked to ${device.linkedAnimalTag}`} color={colors.success} />

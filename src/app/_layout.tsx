@@ -63,6 +63,7 @@ export default function RootLayout() {
           <Stack.Screen name="payments" />
           <Stack.Screen name="rate-vet" />
           <Stack.Screen name="vet" />
+          <Stack.Screen name="users" />
           <Stack.Screen name="notifications" />
           <Stack.Screen name="notification-settings" />
           </Stack>

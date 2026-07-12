@@ -9,9 +9,25 @@ import {
   Invoice,
   Location,
   Plan,
+  TeamMember,
   User,
+  UserRole,
   Vet,
 } from './types';
+
+export const userRoles: UserRole[] = [
+  { key: 1, name: 'Administrator', code: 'admin' },
+  { key: 2, name: 'Farmer', code: 'farmer' },
+  { key: 3, name: 'Veterinarian', code: 'veterinary' },
+  { key: 4, name: 'Viewer', code: 'viewer' },
+];
+
+export const teamMembers: TeamMember[] = [
+  { userId: 1, firstName: 'Alice', lastName: 'Kagawa', email: 'alice@ngaren.com', role: 'Administrator', roleKey: 1 },
+  { userId: 2, firstName: 'Patrick', lastName: 'Etyang', email: 'patrick@ngaren.com', role: 'Farmer', roleKey: 2 },
+  { userId: 3, firstName: 'Dr. Sarah', lastName: 'Mwangi', email: 'sarah@ngaren.com', role: 'Veterinarian', roleKey: 3 },
+  { userId: 4, firstName: 'Pam', lastName: 'Karanja', email: 'pam@ngaren.com', role: 'Viewer', roleKey: 4 },
+];
 
 export const summary: DashboardSummary = {
   animals: 48,

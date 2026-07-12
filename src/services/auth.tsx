@@ -37,6 +37,10 @@ interface AuthState {
   role: Role | null;
   /** True when the user may open the vet call-out queue (veterinary or admin). */
   canVet: boolean;
+  /** True for platform administrators — unlocks Team/User management. */
+  isAdmin: boolean;
+  /** Human-readable role for display (e.g. "Administrator", "Farmer", "Veterinarian"). */
+  displayRole: string;
   isAuthenticated: boolean;
   /** True while the initial session is being restored. Guards should wait. */
   loading: boolean;
@@ -76,6 +80,22 @@ function roleFor(roles: string[]): Role {
  */
 function canAccessVet(roles: string[]): boolean {
   return roles.includes('veterinary') || roles.includes('admin');
+}
+
+function isAdminRole(roles: string[]): boolean {
+  return roles.includes('admin');
+}
+
+/**
+ * Human-readable role label matching the Command Center's role vocabulary
+ * (admin | farmer | veterinary | viewer). Admin takes precedence when a user
+ * carries multiple roles.
+ */
+function displayRoleFor(roles: string[]): string {
+  if (roles.includes('admin')) return 'Administrator';
+  if (roles.includes('veterinary')) return 'Veterinarian';
+  if (roles.includes('viewer')) return 'Viewer';
+  return 'Farmer';
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -216,6 +236,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       role: user ? roleFor(user.roles) : null,
       canVet: user ? canAccessVet(user.roles) : false,
+      isAdmin: user ? isAdminRole(user.roles) : false,
+      displayRole: user ? displayRoleFor(user.roles) : '',
       isAuthenticated: !!session && !!user,
       loading,
       signIn,

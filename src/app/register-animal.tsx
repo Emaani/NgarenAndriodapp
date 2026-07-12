@@ -1,11 +1,15 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, spacing } from '@/theme';
-import { breeds as breedsFallback, locations as locationsFallback } from '@/data/mock';
-import { getBreeds, getLocations, registerAnimal } from '@/data/api';
+import {
+  breeds as breedsFallback,
+  devices as devicesFallback,
+  locations as locationsFallback,
+} from '@/data/mock';
+import { getBreeds, getDevices, getLocations, registerAnimal } from '@/data/api';
 import { useResource } from '@/data/hooks';
-import { AppText, Button, GradientHeader, Screen, SelectField, TextField } from '@/ui';
+import { AppText, Button, DatePickerField, GradientHeader, PickerField, Screen, TextField } from '@/ui';
 
 export default function RegisterAnimal() {
   const router = useRouter();
@@ -14,21 +18,31 @@ export default function RegisterAnimal() {
     breedsFallback.map((name) => ({ key: name.toLowerCase(), name })),
   );
   const { data: locations } = useResource(() => getLocations(), locationsFallback);
+  const { data: devices } = useResource(() => getDevices(), devicesFallback);
 
   const [tag, setTag] = useState('');
   const [name, setName] = useState('');
-  const [breed, setBreed] = useState('');
-  const [location, setLocation] = useState('');
+  const [breedKey, setBreedKey] = useState('');
+  const [locationId, setLocationId] = useState('');
   const [dob, setDob] = useState('');
-  const [device, setDevice] = useState('');
+  const [deviceSerial, setDeviceSerial] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const cycle = (current: string, options: string[], set: (v: string) => void) => {
-    if (options.length === 0) return;
-    const idx = options.indexOf(current);
-    set(options[(idx + 1) % options.length]);
-  };
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const breedOptions = useMemo(() => breeds.map((b) => ({ label: b.name, value: b.key })), [breeds]);
+  const locationOptions = useMemo(
+    () => locations.map((l) => ({ label: l.name, value: String(l.id) })),
+    [locations],
+  );
+  // Only devices not already linked to an animal can be attached here.
+  const deviceOptions = useMemo(
+    () =>
+      devices
+        .filter((d) => d.linkedAnimalId === null && d.linkedAnimalTag === null)
+        .map((d) => ({ label: `${d.serial} · ${d.model}`, value: d.serial })),
+    [devices],
+  );
 
   const onSubmit = async () => {
     setSubmitting(true);
@@ -37,8 +51,8 @@ export default function RegisterAnimal() {
       // keeping the existing offline UX intact.
       await registerAnimal({
         tag,
-        breedKey: breeds.find((b) => b.name === breed)?.key,
-        locationId: locations.find((l) => l.name === location)?.id,
+        breedKey: breedKey || undefined,
+        locationId: locationId ? Number(locationId) : undefined,
         dateOfBirth: dob || null,
         description: notes || name || undefined,
       });
@@ -54,34 +68,47 @@ export default function RegisterAnimal() {
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         <TextField label="Tag ID" required value={tag} onChangeText={setTag} placeholder="e.g. A-073" />
         <TextField label="Name" value={name} onChangeText={setName} placeholder="Optional friendly name" />
-        <SelectField
+        <PickerField
           label="Breed"
           required
-          value={breed}
+          value={breedKey}
           placeholder="Select a breed"
-          onPress={() => cycle(breed, breeds.map((b) => b.name), setBreed)}
+          options={breedOptions}
+          onSelect={setBreedKey}
         />
-        <SelectField
+        <PickerField
           label="Location"
           required
-          value={location}
+          value={locationId}
           placeholder="Select a location"
-          onPress={() => cycle(location, locations.map((l) => l.name), setLocation)}
+          options={locationOptions}
+          onSelect={setLocationId}
         />
-        <SelectField label="Date of Birth" value={dob} placeholder="YYYY-MM-DD" icon="calendar" onPress={() => setDob('2024-01-15')} />
-        <SelectField
+        <DatePickerField
+          label="Date of Birth"
+          value={dob}
+          placeholder="Select date of birth"
+          maximumIso={today}
+          onSelect={setDob}
+        />
+        <PickerField
           label="Link a Device"
-          value={device}
-          placeholder="Scan or select a tag"
-          icon="tag"
-          onPress={() => setDevice('CRS-00231')}
+          value={deviceSerial}
+          placeholder={deviceOptions.length ? 'Select an available tag' : 'No unlinked devices'}
+          options={deviceOptions}
+          onSelect={setDeviceSerial}
         />
         <TextField label="Notes" value={notes} onChangeText={setNotes} placeholder="Any additional details..." multiline />
 
         <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.md }}>
           Fields marked * are required.
         </AppText>
-        <Button label="Register Animal" loading={submitting} onPress={onSubmit} />
+        <Button
+          label="Register Animal"
+          loading={submitting}
+          disabled={!tag.trim() || !breedKey || !locationId}
+          onPress={onSubmit}
+        />
       </Screen>
     </View>
   );

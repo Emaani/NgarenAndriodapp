@@ -5,32 +5,43 @@ import { useAuth } from '@/services/auth';
 import { AppText, GradientHeader, Icon, IconName, Screen } from '@/ui';
 
 type Row = { icon: IconName; label: string; route?: string; tint?: string };
+type Section = { title: string; rows: Row[] };
 
-const SECTIONS: { title: string; rows: Row[] }[] = [
-  {
-    title: 'Account',
-    rows: [
-      { icon: 'account-outline', label: 'Edit Profile', route: '/edit-profile' },
-      { icon: 'map-marker-outline', label: 'My Locations', route: '/locations' },
-      { icon: 'tag-outline', label: 'My Devices', route: '/devices' },
-    ],
-  },
-  {
-    title: 'Billing',
-    rows: [
-      { icon: 'wallet-outline', label: 'Payments & Subscription', route: '/payments', tint: '#9333EA' },
-      { icon: 'receipt', label: 'Billing History', route: '/payments' },
-    ],
-  },
-  {
-    title: 'Support',
-    rows: [
-      { icon: 'bell-outline', label: 'Notifications', route: '/notifications' },
-      { icon: 'cog-outline', label: 'Notification Preferences', route: '/notification-settings' },
-      { icon: 'help-circle-outline', label: 'Help & Support', route: '/help' },
-    ],
-  },
-];
+const ACCOUNT_SECTION: Section = {
+  title: 'Account',
+  rows: [
+    { icon: 'account-outline', label: 'Edit Profile', route: '/edit-profile' },
+    { icon: 'map-marker-outline', label: 'My Locations', route: '/locations' },
+    { icon: 'tag-outline', label: 'My Devices', route: '/devices' },
+  ],
+};
+
+// Admin-only: manage the team and the account subscription, mirroring the
+// Command Center's Users page and billing ownership.
+const ADMIN_SECTION: Section = {
+  title: 'Administration',
+  rows: [
+    { icon: 'account-group-outline', label: 'Team Management', route: '/users', tint: '#2563EB' },
+    { icon: 'clipboard-pulse-outline', label: 'Vet Call-outs', route: '/vet', tint: '#EF4444' },
+  ],
+};
+
+const BILLING_SECTION: Section = {
+  title: 'Billing',
+  rows: [
+    { icon: 'wallet-outline', label: 'Payments & Subscription', route: '/payments', tint: '#9333EA' },
+    { icon: 'receipt', label: 'Billing History', route: '/payments' },
+  ],
+};
+
+const SUPPORT_SECTION: Section = {
+  title: 'Support',
+  rows: [
+    { icon: 'bell-outline', label: 'Notifications', route: '/notifications' },
+    { icon: 'cog-outline', label: 'Notification Preferences', route: '/notification-settings' },
+    { icon: 'help-circle-outline', label: 'Help & Support', route: '/help' },
+  ],
+};
 
 function MenuRow({ row, onPress, last }: { row: Row; onPress: () => void; last?: boolean }) {
   return (
@@ -62,10 +73,16 @@ function initials(name: string): string {
 
 export default function Profile() {
   const router = useRouter();
-  const { user, signOut } = useAuth();
+  const { user, signOut, isAdmin, displayRole } = useAuth();
 
   const displayName = user?.fullName?.trim() || user?.email?.split('@')[0] || 'Ngaren user';
   const displayEmail = user?.email ?? '';
+
+  // Admins get the Administration section (team + vet queue) and billing
+  // ownership; a plain farmer sees neither, so the two profiles are distinct.
+  const sections: Section[] = isAdmin
+    ? [ACCOUNT_SECTION, ADMIN_SECTION, BILLING_SECTION, SUPPORT_SECTION]
+    : [ACCOUNT_SECTION, BILLING_SECTION, SUPPORT_SECTION];
 
   const onLogout = async () => {
     await signOut();
@@ -95,11 +112,29 @@ export default function Profile() {
               {displayEmail}
             </AppText>
           )}
+          {!!displayRole && (
+            <View
+              style={{
+                marginTop: spacing.xs,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: spacing.xs,
+                backgroundColor: 'rgba(255,255,255,0.22)',
+                paddingHorizontal: spacing.mdMinus,
+                paddingVertical: 4,
+                borderRadius: radius.full,
+              }}>
+              <Icon name="shield-account-outline" size={14} color="#fff" />
+              <AppText variant="caption" color="#fff" style={{ fontWeight: '600' }}>
+                {displayRole}
+              </AppText>
+            </View>
+          )}
         </View>
       </GradientHeader>
 
       <Screen contentStyle={{ paddingTop: spacing.md }}>
-        {SECTIONS.map((section) => (
+        {sections.map((section) => (
           <View key={section.title} style={{ marginBottom: spacing.lg }}>
             <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm, textTransform: 'uppercase' }}>
               {section.title}

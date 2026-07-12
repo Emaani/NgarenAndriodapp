@@ -4,6 +4,7 @@ import { colors, radius, shadow, spacing } from '@/theme';
 import { animals as animalsFallback, behaviourSeries as behaviourFallback } from '@/data/mock';
 import { getAnimalBehaviour, getAnimalById } from '@/data/api';
 import { useResource } from '@/data/hooks';
+import { formatDate } from '@/lib/date';
 import { ActionChip, AppText, Button, ChartCard, DetailRow, EmptyState, GradientHeader, Icon, Screen } from '@/ui';
 
 export default function AnimalDetail() {
@@ -57,7 +58,7 @@ export default function AnimalDetail() {
           <DetailRow label="Tag ID" value={animal.tag} />
           <DetailRow label="Breed" value={animal.breed.name} />
           <DetailRow label="Location" value={animal.locationName ?? '—'} />
-          <DetailRow label="Date of Birth" value={animal.dateOfBirth} />
+          <DetailRow label="Date of Birth" value={formatDate(animal.dateOfBirth)} />
           <DetailRow label="Device" value={animal.deviceSerial ?? 'Not connected'} />
           {animal.description ? <DetailRow label="Notes" value={animal.description} last /> : null}
         </View>

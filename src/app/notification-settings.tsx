@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Platform, Pressable, Switch, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, Switch, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import {
@@ -9,7 +9,7 @@ import {
 } from '@/data/api';
 import { AlertChannel, NotificationSettings } from '@/data/types';
 import { AppText, Button, Card, GradientHeader, Icon, IconName, Screen } from '@/ui';
-import { registerForPushNotifications } from '@/services/push';
+import { enablePushNotifications, getPushPermissionStatus } from '@/services/push';
 
 const CHANNELS: AlertChannel[] = ['EMAIL', 'SMS', 'EMAIL_AND_SMS'];
 
@@ -104,14 +104,38 @@ export default function NotificationSettingsScreen() {
     getNotificationSettings()
       .then(setSettings)
       .catch(() => {});
+    // Reflect the OS permission state so the toggle starts in the right position.
+    getPushPermissionStatus()
+      .then((status) => setPushEnabled(status === 'granted'))
+      .catch(() => {});
   }, []);
 
   const onTogglePush = async (next: boolean) => {
-    setPushEnabled(next);
-    if (next) {
-      const token = await registerForPushNotifications();
-      // On web/simulator no token is returned; reflect that push isn't active.
-      if (!token && Platform.OS !== 'web') setPushEnabled(false);
+    if (!next) {
+      // The OS won't let an app revoke its own permission, but honour the
+      // user's intent visually; they can fully disable it in system settings.
+      setPushEnabled(false);
+      return;
+    }
+    // Optimistically reflect the tap, then confirm against the real permission.
+    setPushEnabled(true);
+    const status = await enablePushNotifications();
+    if (status === 'granted') {
+      setPushEnabled(true);
+      return;
+    }
+    setPushEnabled(false);
+    if (status === 'denied') {
+      Alert.alert(
+        'Notifications are blocked',
+        'To receive instant alerts, enable notifications for Ngaren in your device settings.',
+        [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+        ],
+      );
+    } else if (Platform.OS === 'web') {
+      Alert.alert('Not supported', 'Push notifications are only available on the mobile app.');
     }
   };
 
