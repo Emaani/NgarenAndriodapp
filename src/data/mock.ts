@@ -158,6 +158,36 @@ export const markers: AnimalMarker[] = [
   { animalId: 4, tag: 'Cow #A-008', lat: 0.3489, lng: 32.5809, accuracy: 'Poor', lastSeenMins: 47, status: 'inactive' },
 ];
 
+/** Geofence boundaries (lat/lng rings) drawn on the live track map. */
+export interface Geofence {
+  id: number;
+  name: string;
+  ring: { lat: number; lng: number }[];
+}
+
+export const geofences: Geofence[] = [
+  {
+    id: 1,
+    name: 'North Paddock',
+    ring: [
+      { lat: 0.3495, lng: 32.5805 },
+      { lat: 0.3495, lng: 32.5835 },
+      { lat: 0.3468, lng: 32.5838 },
+      { lat: 0.3466, lng: 32.5808 },
+    ],
+  },
+  {
+    id: 3,
+    name: 'South Paddock',
+    ring: [
+      { lat: 0.3466, lng: 32.5828 },
+      { lat: 0.3466, lng: 32.5852 },
+      { lat: 0.3452, lng: 32.5852 },
+      { lat: 0.3452, lng: 32.5828 },
+    ],
+  },
+];
+
 const series = (label: string, unit: string, base: number, spread: number): BehaviourSeries => {
   const actual = Array.from({ length: 14 }, (_, i) =>
     Math.round(base + Math.sin(i / 2) * spread + (i % 3) * (spread / 4)),

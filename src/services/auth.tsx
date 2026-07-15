@@ -10,6 +10,7 @@ import {
 import type { Session, User } from '@supabase/supabase-js';
 import { isSupabaseConfigured, supabase } from './supabase';
 import { unregisterBackgroundSyncAsync } from './backgroundSync';
+import { AppRole, resolveAppRole } from '@/lib/roles';
 
 /**
  * Supabase-backed auth, sharing one identity with the Ngaren web app
@@ -35,6 +36,11 @@ export interface AuthUser {
 interface AuthState {
   user: AuthUser | null;
   role: Role | null;
+  /**
+   * Full role vocabulary (admin | farmer | veterinary) matching the Command
+   * Center. Drives role-differentiated dashboards, accents and titles.
+   */
+  appRole: AppRole;
   /** True when the user may open the vet call-out queue (veterinary or admin). */
   canVet: boolean;
   /** True for platform administrators — unlocks Team/User management. */
@@ -235,6 +241,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       role: user ? roleFor(user.roles) : null,
+      appRole: user ? resolveAppRole(user.roles) : 'farmer',
       canVet: user ? canAccessVet(user.roles) : false,
       isAdmin: user ? isAdminRole(user.roles) : false,
       displayRole: user ? displayRoleFor(user.roles) : '',
