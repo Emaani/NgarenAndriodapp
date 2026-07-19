@@ -17,6 +17,7 @@ export { StatusCard } from './StatusCard';
 export { ChartCard } from './ChartCard';
 export { TextField, SelectField } from './Field';
 export { PickerField, DatePickerField, formatIsoDate, type PickerOption } from './Pickers';
+export { PhotoField } from './PhotoField';
 export { GradientHeader } from './GradientHeader';
 export { NotificationBell } from './NotificationBell';
 export { Input } from './Input';

@@ -57,6 +57,7 @@ export default function RootLayout() {
           <Stack.Screen name="help" />
           <Stack.Screen name="find-vet/index" />
           <Stack.Screen name="find-vet/request" />
+          <Stack.Screen name="vet-requests" />
           <Stack.Screen name="register-animal" />
           <Stack.Screen name="animals/[id]" />
           <Stack.Screen name="stock-take" />
@@ -72,6 +73,7 @@ export default function RootLayout() {
           <Stack.Screen name="incidents" />
           <Stack.Screen name="messaging" />
           <Stack.Screen name="settings" />
+          <Stack.Screen name="farmers" />
           <Stack.Screen name="notifications" />
           <Stack.Screen name="notification-settings" />
           </Stack>

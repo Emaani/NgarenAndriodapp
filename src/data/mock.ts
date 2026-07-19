@@ -153,9 +153,9 @@ export const notifications: AppNotification[] = [
 ];
 
 export const markers: AnimalMarker[] = [
-  { animalId: 1, tag: 'Bull #A-042', lat: 0.3476, lng: 32.5825, accuracy: 'Good', lastSeenMins: 5, status: 'active' },
-  { animalId: 3, tag: 'Heifer #A-061', lat: 0.3461, lng: 32.5841, accuracy: 'Fair', lastSeenMins: 12, status: 'active' },
-  { animalId: 4, tag: 'Cow #A-008', lat: 0.3489, lng: 32.5809, accuracy: 'Poor', lastSeenMins: 47, status: 'inactive' },
+  { animalId: 1, tag: 'Bull #A-042', lat: 0.3476, lng: 32.5825, accuracy: 'Good', lastSeenMins: 5, status: 'active', provider: 'Ceres Tag' },
+  { animalId: 3, tag: 'Heifer #A-061', lat: 0.3461, lng: 32.5841, accuracy: 'Fair', lastSeenMins: 12, status: 'active', provider: 'Ceres Tag' },
+  { animalId: 4, tag: 'Cow #A-008', lat: 0.3489, lng: 32.5809, accuracy: 'Poor', lastSeenMins: 47, status: 'inactive', provider: 'Digitanimal' },
 ];
 
 /** Geofence boundaries (lat/lng rings) drawn on the live track map. */

@@ -6,10 +6,34 @@ import { animals as animalsFallback } from '@/data/mock';
 import { getAnimals } from '@/data/api';
 import { useResource } from '@/data/hooks';
 import { Animal } from '@/data/types';
-import { AppText, Button, GradientHeader, Icon, IconChip, Screen } from '@/ui';
+import { AppText, Button, GradientHeader, Icon, IconChip, IconName, Screen } from '@/ui';
 
 type Mark = 'pending' | 'present' | 'missing';
-type Phase = 'count' | 'summary';
+type Phase = 'method' | 'count' | 'summary';
+type StockMethod = 'bluetooth' | 'qr' | 'manual';
+
+// Stock take is a non-satellite verification: you confirm each animal in front
+// of you by whatever tag it carries (tester feedback Q9).
+const METHODS: { value: StockMethod; icon: IconName; title: string; blurb: string }[] = [
+  {
+    value: 'bluetooth',
+    icon: 'bluetooth',
+    title: 'Bluetooth (BLE) tags',
+    blurb: 'Scan for nearby active tags and accept the ones that respond as present.',
+  },
+  {
+    value: 'qr',
+    icon: 'qrcode-scan',
+    title: 'QR-code ear tags',
+    blurb: 'Scan each animal’s QR tag with the Ngaren app, one at a time.',
+  },
+  {
+    value: 'manual',
+    icon: 'gesture-tap',
+    title: 'Manual / visual tags',
+    blurb: 'No device — confirm each animal by eye and capture a photo where needed.',
+  },
+];
 
 function ProgressBar({ value }: { value: number }) {
   return (
@@ -143,7 +167,8 @@ export default function StockTake() {
   const [marks, setMarks] = useState<Record<number, Mark>>(() =>
     Object.fromEntries(animalsFallback.map((a) => [a.id, 'pending' as Mark])),
   );
-  const [phase, setPhase] = useState<Phase>('count');
+  const [phase, setPhase] = useState<Phase>('method');
+  const [method, setMethod] = useState<StockMethod>('bluetooth');
 
   // Add any newly-loaded animals to the count sheet as pending.
   useEffect(() => {
@@ -176,6 +201,83 @@ export default function StockTake() {
       for (const a of allAnimals) if (next[a.id] === 'pending') next[a.id] = m;
       return next;
     });
+
+  // BLE: associate every animal whose tag is broadcasting (has a linked, active
+  // device) as present in one pass — the "acceptance" step of a BLE round.
+  const associateBleTags = () =>
+    setMarks((prev) => {
+      const next = { ...prev };
+      for (const a of allAnimals) {
+        if (a.deviceSerial && a.status === 'active' && next[a.id] === 'pending') next[a.id] = 'present';
+      }
+      return next;
+    });
+
+  // QR: mark the next uncounted animal present, simulating scanning one tag.
+  const scanNextTag = () => {
+    const nextPending = allAnimals.find((a) => (marks[a.id] ?? 'pending') === 'pending');
+    if (nextPending) setMark(nextPending.id, 'present');
+  };
+
+  const activeMethod = METHODS.find((m) => m.value === method)!;
+
+  // Step 1 — choose how this herd is tagged before counting.
+  if (phase === 'method') {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <GradientHeader title="Stock Take" subtitle="How is this herd tagged?" showBack />
+        <Screen contentStyle={{ paddingTop: spacing.md }}>
+          <AppText variant="body" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.md }}>
+            Stock take confirms your animals in person. Pick the tag type you’re using so we can
+            guide the count.
+          </AppText>
+          {METHODS.map((m) => {
+            const selected = method === m.value;
+            return (
+              <Pressable
+                key={m.value}
+                onPress={() => setMethod(m.value)}
+                style={[
+                  {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: spacing.md,
+                    padding: spacing.md,
+                    marginBottom: spacing.sm,
+                    borderRadius: radius.md,
+                    backgroundColor: colors.surface,
+                    borderWidth: selected ? 2 : 1,
+                    borderColor: selected ? colors.primary : colors.divider,
+                  },
+                  shadow[1],
+                ]}>
+                <IconChip
+                  icon={m.icon}
+                  bg={selected ? colors.primaryTint : colors.background}
+                  fg={selected ? colors.primary : colors.onSurfaceVariant}
+                />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <AppText variant="bodyLarge" style={{ fontWeight: '600' }}>
+                    {m.title}
+                  </AppText>
+                  <AppText variant="caption" color={colors.onSurfaceVariant}>
+                    {m.blurb}
+                  </AppText>
+                </View>
+                {selected && <Icon name="check-circle" size={22} color={colors.primary} />}
+              </Pressable>
+            );
+          })}
+          <Button
+            label="Start count"
+            icon="arrow-right"
+            onPress={() => setPhase('count')}
+            style={{ marginTop: spacing.md }}
+          />
+        </Screen>
+      </View>
+    );
+  }
 
   if (phase === 'summary') {
     const missingAnimals = allAnimals.filter((a) => marks[a.id] === 'missing');
@@ -261,15 +363,34 @@ export default function StockTake() {
         </View>
       </GradientHeader>
 
-      <View style={{ flexDirection: 'row', gap: spacing.sm, padding: spacing.md, paddingBottom: 0 }}>
+      {/* Method banner + the method's primary scan/associate action. */}
+      <View style={{ paddingHorizontal: spacing.md, paddingTop: spacing.md, gap: spacing.sm }}>
         <Pressable
-          onPress={() => markRemaining('present')}
+          onPress={() => setPhase('method')}
           style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-          <Icon name="check-all" size={16} color={colors.success} />
-          <AppText variant="body" color={colors.success} style={{ fontWeight: '600' }}>
-            Mark remaining present
+          <Icon name={activeMethod.icon} size={16} color={colors.primary} />
+          <AppText variant="body" color={colors.primary} style={{ fontWeight: '600' }}>
+            {activeMethod.title}
           </AppText>
+          <Icon name="pencil-outline" size={13} color={colors.onSurfaceVariant} />
         </Pressable>
+
+        {method === 'bluetooth' && (
+          <Button label="Scan & accept active tags" icon="bluetooth" variant="outline" onPress={associateBleTags} />
+        )}
+        {method === 'qr' && (
+          <Button label="Scan next QR tag" icon="qrcode-scan" variant="outline" onPress={scanNextTag} />
+        )}
+        {method === 'manual' && (
+          <Pressable
+            onPress={() => markRemaining('present')}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+            <Icon name="check-all" size={16} color={colors.success} />
+            <AppText variant="body" color={colors.success} style={{ fontWeight: '600' }}>
+              Mark remaining present
+            </AppText>
+          </Pressable>
+        )}
       </View>
 
       <Screen contentStyle={{ paddingTop: spacing.md, paddingBottom: spacing.xxl + 72 }}>

@@ -1,10 +1,14 @@
 import { View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { animals as animalsFallback, behaviourSeries as behaviourFallback } from '@/data/mock';
-import { getAnimalBehaviour, getAnimalById } from '@/data/api';
+import {
+  animals as animalsFallback,
+  behaviourSeries as behaviourFallback,
+  calloutRequests as calloutFallback,
+} from '@/data/mock';
+import { getAnimalBehaviour, getAnimalById, getCalloutRequests } from '@/data/api';
 import { useResource } from '@/data/hooks';
-import { formatDate } from '@/lib/date';
+import { ageFromDate, formatDate } from '@/lib/date';
 import { ActionChip, AppText, Button, ChartCard, DetailRow, EmptyState, GradientHeader, Icon, Screen } from '@/ui';
 
 export default function AnimalDetail() {
@@ -18,6 +22,7 @@ export default function AnimalDetail() {
     () => getAnimalBehaviour(Number(id)),
     behaviourFallback,
   );
+  const { data: callouts } = useResource(() => getCalloutRequests(), calloutFallback);
   // A Ceres Tag device reports on every series at once, so if every series is
   // empty it means this animal has no synced telemetry yet (unlinked device,
   // device not yet synced, or too new) rather than one chart failing alone.
@@ -31,6 +36,15 @@ export default function AnimalDetail() {
       </View>
     );
   }
+
+  // Services consumed — derived from what the animal record actually carries.
+  const hasTag = !!animal.deviceSerial;
+  const tagActive = hasTag && animal.status === 'active';
+  // Vet visits booked against this animal (matched by name or tag).
+  const needle = (animal.name ?? animal.tag).toLowerCase();
+  const vetVisits = callouts.filter(
+    (c) => c.animal.toLowerCase().includes(needle) || c.animal.toLowerCase().includes(animal.tag.toLowerCase()),
+  ).length;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -54,13 +68,31 @@ export default function AnimalDetail() {
           />
         </View>
 
+        {/* Static record — the animal's own identity that doesn't change. */}
+        <AppText variant="title" style={{ marginBottom: spacing.sm }}>
+          Static record
+        </AppText>
         <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.md }, shadow[1]]}>
           <DetailRow label="Tag ID" value={animal.tag} />
           <DetailRow label="Breed" value={animal.breed.name} />
           <DetailRow label="Location" value={animal.locationName ?? '—'} />
           <DetailRow label="Date of Birth" value={formatDate(animal.dateOfBirth)} />
-          <DetailRow label="Device" value={animal.deviceSerial ?? 'Not connected'} />
+          <DetailRow label="Age" value={ageFromDate(animal.dateOfBirth)} />
+          <DetailRow label="Dam (mother)" value={animal.damTag ?? '—'} />
+          <DetailRow label="Sire (father)" value={animal.sireTag ?? '—'} last={!animal.description} />
           {animal.description ? <DetailRow label="Notes" value={animal.description} last /> : null}
+        </View>
+
+        {/* Services consumed — the connected services running on this animal. */}
+        <AppText variant="title" style={{ marginTop: spacing.lg, marginBottom: spacing.sm }}>
+          Services consumed
+        </AppText>
+        <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.md }, shadow[1]]}>
+          <DetailRow label="Tag associated" value={animal.deviceSerial ?? 'None'} />
+          <DetailRow label="Tag status" value={hasTag ? (tagActive ? 'Active' : 'Inactive') : 'Not connected'} />
+          <DetailRow label="Telemetry" value={hasBehaviourData ? 'Syncing' : hasTag ? 'Awaiting sync' : 'No device'} />
+          <DetailRow label="Vet visits" value={vetVisits === 0 ? 'None booked' : String(vetVisits)} />
+          <DetailRow label="Alerts monitoring" value={tagActive ? 'On' : 'Off'} last />
         </View>
 
         <View style={{ gap: spacing.sm, marginTop: spacing.lg, marginBottom: spacing.lg }}>

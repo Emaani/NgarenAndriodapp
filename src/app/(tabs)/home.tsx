@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { summary as summaryFallback } from '@/data/mock';
 import { getSummary } from '@/data/api';
+import { getFarmerPortfolio, portfolioTotals } from '@/data/portfolio';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { roleTheme } from '@/lib/roles';
@@ -22,6 +23,7 @@ type Action = { icon: IconName; label: string; route: string; tint: string };
 // Farmer "Herd Operations Console" — day-to-day herd work.
 const FARMER_ACTIONS: Action[] = [
   { icon: 'stethoscope', label: 'Find a Vet', route: '/find-vet', tint: '#21C45D' },
+  { icon: 'clipboard-pulse-outline', label: 'Vet Requests', route: '/vet-requests', tint: '#EF4444' },
   { icon: 'plus-circle-outline', label: 'Register Animal', route: '/register-animal', tint: '#6D874F' },
   { icon: 'dna', label: 'Breeding', route: '/breeding', tint: '#EC4899' },
   { icon: 'heart-pulse', label: 'Managed Health', route: '/health', tint: '#EF4444' },
@@ -35,9 +37,10 @@ const FARMER_ACTIONS: Action[] = [
 // Admin "Enterprise Control Center" — organisation-wide oversight tools that a
 // farmer does not get (mirrors the Command Center's adminNav superset).
 const ADMIN_ACTIONS: Action[] = [
+  { icon: 'account-multiple-outline', label: 'Farmers Portfolio', route: '/farmers', tint: '#6D874F' },
   { icon: 'cow', label: 'Livestock', route: '/(tabs)/animals', tint: '#2563EB' },
   { icon: 'map-marker-radius', label: 'Track', route: '/(tabs)/track', tint: '#16A34A' },
-  { icon: 'chart-box-outline', label: 'Insights', route: '/insights', tint: '#6D874F' },
+  { icon: 'chart-box-outline', label: 'Insights', route: '/insights', tint: '#0D9488' },
   { icon: 'cloud-alert', label: 'Alert History', route: '/alerts', tint: '#EF4444' },
   { icon: 'dna', label: 'Breeding', route: '/breeding', tint: '#EC4899' },
   { icon: 'heart-pulse', label: 'Managed Health', route: '/health', tint: '#DC2626' },
@@ -105,11 +108,16 @@ export default function Home() {
   const { user, appRole } = useAuth();
   const displayName = user?.fullName?.trim() || user?.email?.split('@')[0] || 'Ngaren user';
   const { data: summary } = useResource(getSummary, summaryFallback);
+  const { data: portfolio } = useResource(getFarmerPortfolio, []);
 
   const theme = roleTheme(appRole);
   const isAdmin = appRole === 'admin';
   const actions = isAdmin ? ADMIN_ACTIONS : FARMER_ACTIONS;
   const linkedDevices = Math.max(0, summary.devices - summary.connectivity.unconnected);
+  const totals = portfolioTotals(portfolio);
+  // Farmer tag health for the "My Farm" insight band.
+  const activeTags = summary.allocation.allocated;
+  const inactiveTags = Math.max(0, summary.devices - activeTags);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -160,27 +168,45 @@ export default function Home() {
         </View>
 
         <View style={{ flexDirection: 'row', marginTop: spacing.md }}>
-          <HeaderStat value={summary.animals} label={isAdmin ? 'Animals' : 'My Animals'} />
-          <HeaderStat value={summary.devices} label="Devices" />
-          <HeaderStat value={summary.locations} label={isAdmin ? 'Farms' : 'Locations'} />
-          {isAdmin && <HeaderStat value={summary.users} label="Users" />}
+          {isAdmin ? (
+            <>
+              <HeaderStat value={totals.farmers} label="Farmers" />
+              <HeaderStat value={totals.animals} label="Animals" />
+              <HeaderStat value={totals.devices} label="Devices" />
+              <HeaderStat value={totals.activeTags} label="Active tags" />
+            </>
+          ) : (
+            <>
+              <HeaderStat value={summary.animals} label="My Animals" />
+              <HeaderStat value={summary.devices} label="Devices" />
+              <HeaderStat value={summary.locations} label="Locations" />
+            </>
+          )}
         </View>
       </LinearGradient>
 
       <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: spacing.xxl }}>
-        {/* Admin-only executive KPI band — organisation-wide health. */}
+        {/* Admin-only portfolio KPI band — health across all farmers. */}
         {isAdmin && (
           <>
             <AppText variant="title" style={{ marginBottom: spacing.md }}>
-              Executive overview
+              Portfolio overview
             </AppText>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.lg }}>
-              <KpiTile value={summary.allocation.allocated} label="Linked animals" icon="link-variant" tint="#2563EB" />
-              <KpiTile value={summary.allocation.free} label="Unlinked devices" icon="link-variant-off" tint="#F59E0B" />
-              <KpiTile value={linkedDevices} label="Devices online" icon="access-point" tint="#16A34A" />
+              <KpiTile value={totals.farmers} label="Farmers" icon="account-multiple-outline" tint="#6D874F" />
+              <KpiTile value={totals.needAttention} label="Need attention" icon="alert-outline" tint="#F59E0B" />
+              <KpiTile value={totals.activeTags} label="Active tags" icon="access-point" tint="#16A34A" />
               <KpiTile value={summary.connectivity.unconnected} label="Devices offline" icon="access-point-off" tint="#EF4444" />
             </View>
           </>
+        )}
+
+        {/* Farmer-only tag-health insight band (per tester feedback). */}
+        {!isAdmin && (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.lg }}>
+            <KpiTile value={activeTags} label="Active tags" icon="access-point" tint="#16A34A" />
+            <KpiTile value={inactiveTags} label="Inactive tags" icon="access-point-off" tint="#F59E0B" />
+          </View>
         )}
 
         <AppText variant="title" style={{ marginBottom: spacing.md }}>

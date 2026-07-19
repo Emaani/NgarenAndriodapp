@@ -33,6 +33,28 @@ export function formatDate(input?: string | number | Date | null): string {
   return `${String(d.getDate()).padStart(2, '0')} ${MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+/**
+ * Human age from a date of birth: "3 yr 4 mo", "5 mo", or "12 days".
+ * Returns '—' for empty/invalid or future dates.
+ */
+export function ageFromDate(input?: string | number | Date | null): string {
+  const dob = toDate(input);
+  if (!dob) return '—';
+  const now = new Date();
+  if (dob.getTime() > now.getTime()) return '—';
+  let months =
+    (now.getFullYear() - dob.getFullYear()) * 12 + (now.getMonth() - dob.getMonth());
+  if (now.getDate() < dob.getDate()) months -= 1;
+  if (months < 1) {
+    const days = Math.max(0, Math.floor((now.getTime() - dob.getTime()) / 86_400_000));
+    return days === 1 ? '1 day' : `${days} days`;
+  }
+  const years = Math.floor(months / 12);
+  const rem = months % 12;
+  if (years === 0) return rem === 1 ? '1 mo' : `${rem} mo`;
+  return rem === 0 ? `${years} yr` : `${years} yr ${rem} mo`;
+}
+
 /** Full ISO datetime -> "12 Mar 2024, 14:30". Returns '—' for empty/invalid. */
 export function formatDateTime(input?: string | number | Date | null): string {
   const d = toDate(input);

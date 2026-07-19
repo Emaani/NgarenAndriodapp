@@ -267,6 +267,10 @@ export interface DashboardSummary {
   connectivity: { connected: number; unconnected: number };
 }
 
+// Tracking is satellite-based; a herd may mix providers. The map is a common
+// view across providers, while each provider can offer an enhanced view.
+export type SatelliteProvider = 'Ceres Tag' | 'Digitanimal' | 'Other';
+
 export interface AnimalMarker {
   animalId: number;
   tag: string;
@@ -275,6 +279,7 @@ export interface AnimalMarker {
   accuracy: 'Good' | 'Fair' | 'Poor';
   lastSeenMins: number;
   status: 'active' | 'inactive';
+  provider?: SatelliteProvider;
 }
 
 export interface Vet {

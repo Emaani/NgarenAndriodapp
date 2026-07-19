@@ -68,19 +68,36 @@ export default function TrackScreen() {
                 <Icon name="close" size={20} color={colors.onSurfaceVariant} />
               </Pressable>
             </View>
-            <ActionChip label={selected.status === 'active' ? 'Active' : 'Inactive'} variant={selected.status === 'active' ? 'success' : 'neutral'} />
+            <View style={{ flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' }}>
+              <ActionChip label={selected.status === 'active' ? 'Active' : 'Inactive'} variant={selected.status === 'active' ? 'success' : 'neutral'} />
+              <ActionChip label={`Satellite · ${selected.provider ?? 'Unknown'}`} variant="info" />
+            </View>
             <AppText variant="body" color={colors.onSurfaceVariant}>
               GPS Accuracy: {selected.accuracy}
             </AppText>
             <AppText variant="body" color={colors.onSurfaceVariant}>
               Last seen: {selected.lastSeenMins} minutes ago
             </AppText>
-            <Button
-              label="View Animal Detail"
-              variant="outline"
-              onPress={() => router.push(`/animals/${selected.animalId}`)}
-              style={{ marginTop: spacing.sm }}
-            />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+              <Icon name="vector-polygon" size={15} color={colors.primary} />
+              <AppText variant="caption" color={colors.onSurfaceVariant}>
+                Geofence alerts on for this animal’s farm boundary
+              </AppText>
+            </View>
+            <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
+              <Button
+                label="Detail"
+                variant="outline"
+                onPress={() => router.push(`/animals/${selected.animalId}`)}
+                style={{ flex: 1 }}
+              />
+              <Button
+                label={`${selected.provider ?? 'Provider'} view`}
+                icon="satellite-variant"
+                onPress={() => router.push(`/animals/${selected.animalId}`)}
+                style={{ flex: 1 }}
+              />
+            </View>
           </View>
         )}
       </View>

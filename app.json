@@ -48,7 +48,14 @@
           "color": "#6D874F"
         }
       ],
-      "expo-background-task"
+      "expo-background-task",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Ngaren needs access to your photos to attach an animal picture.",
+          "cameraPermission": "Ngaren needs camera access to photograph an animal or scan a tag."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
