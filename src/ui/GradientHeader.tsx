@@ -15,6 +15,7 @@ export function GradientHeader({
   title,
   subtitle,
   showBack,
+  onBack,
   right,
   children,
   compact,
@@ -22,6 +23,8 @@ export function GradientHeader({
   title?: string;
   subtitle?: string;
   showBack?: boolean;
+  /** Custom back handler; defaults to router.back(). */
+  onBack?: () => void;
   right?: ReactNode;
   children?: ReactNode;
   compact?: boolean;
@@ -50,7 +53,7 @@ export function GradientHeader({
             minHeight: 32,
           }}>
           {showBack ? (
-            <Pressable onPress={() => router.back()} hitSlop={8}>
+            <Pressable onPress={() => (onBack ? onBack() : router.back())} hitSlop={8}>
               <Icon name="chevron-left" size={28} color="#fff" />
             </Pressable>
           ) : (

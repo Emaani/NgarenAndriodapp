@@ -69,6 +69,9 @@ export default function RootLayout() {
           <Stack.Screen name="breeding" />
           <Stack.Screen name="health" />
           <Stack.Screen name="calendar" />
+          <Stack.Screen name="incidents" />
+          <Stack.Screen name="messaging" />
+          <Stack.Screen name="settings" />
           <Stack.Screen name="notifications" />
           <Stack.Screen name="notification-settings" />
           </Stack>

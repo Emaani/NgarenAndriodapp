@@ -16,12 +16,13 @@ const ACCOUNT_SECTION: Section = {
   ],
 };
 
-// Admin-only: manage the team and the account subscription, mirroring the
-// Command Center's Users page and billing ownership.
+// Admin-only: manage the team, incidents and the account subscription,
+// mirroring the Command Center's Users / Incidents pages and billing ownership.
 const ADMIN_SECTION: Section = {
   title: 'Administration',
   rows: [
     { icon: 'account-group-outline', label: 'Team Management', route: '/users', tint: '#2563EB' },
+    { icon: 'alert-octagon-outline', label: 'Incidents & SLA', route: '/incidents', tint: '#DC2626' },
     { icon: 'clipboard-pulse-outline', label: 'Vet Call-outs', route: '/vet', tint: '#EF4444' },
   ],
 };
@@ -37,8 +38,9 @@ const BILLING_SECTION: Section = {
 const SUPPORT_SECTION: Section = {
   title: 'Support',
   rows: [
+    { icon: 'message-outline', label: 'Messages', route: '/messaging' },
     { icon: 'bell-outline', label: 'Notifications', route: '/notifications' },
-    { icon: 'cog-outline', label: 'Notification Preferences', route: '/notification-settings' },
+    { icon: 'cog-outline', label: 'Settings', route: '/settings' },
     { icon: 'help-circle-outline', label: 'Help & Support', route: '/help' },
   ],
 };
