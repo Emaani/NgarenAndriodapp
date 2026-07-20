@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { Redirect } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { FarmerPortfolioItem, getFarmerPortfolio, portfolioTotals } from '@/data/portfolio';
 import { useResource } from '@/data/hooks';
@@ -27,6 +27,7 @@ function TotalTile({ value, label, tint }: { value: number; label: string; tint:
 }
 
 export default function Farmers() {
+  const router = useRouter();
   const { isAdmin, loading, isAuthenticated } = useAuth();
   const { data: portfolio } = useResource(getFarmerPortfolio, []);
   const [query, setQuery] = useState('');
@@ -93,6 +94,15 @@ export default function Farmers() {
                   <Metric icon="access-point" label="Active tags" value={`${f.activeTags} (${tagPct}%)`} />
                   <Metric icon="heart-pulse" label="Health" value={f.healthScore ? `${f.healthScore}%` : '—'} />
                 </View>
+
+                <Pressable
+                  onPress={() => router.push(`/admin-mirror/${f.id}` as never)}
+                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingVertical: spacing.xs, borderTopWidth: 1, borderTopColor: colors.divider, marginTop: spacing.xs }}>
+                  <Icon name="eye-outline" size={14} color={colors.primary} />
+                  <AppText variant="caption" color={colors.primary} style={{ fontWeight: '600' }}>
+                    View as farmer
+                  </AppText>
+                </Pressable>
               </View>
             );
           })

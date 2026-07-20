@@ -46,6 +46,8 @@ const ADMIN_ACTIONS: Action[] = [
   { icon: 'chart-timeline-variant', label: 'Telemetry', route: '/telemetry', tint: '#0EA5E9' },
   { icon: 'file-chart-outline', label: 'Reports', route: '/reports', tint: '#6D874F' },
   { icon: 'storefront-outline', label: 'Marketplace', route: '/marketplace', tint: '#0D9488' },
+  { icon: 'webhook', label: 'Webhook Monitor', route: '/webhook-monitor', tint: '#7C3AED' },
+  { icon: 'shield-check-outline', label: 'Linkage Health', route: '/linkage-health', tint: '#0891B2' },
   { icon: 'cloud-alert', label: 'Alert History', route: '/alerts', tint: '#EF4444' },
   { icon: 'dna', label: 'Breeding', route: '/breeding', tint: '#EC4899' },
   { icon: 'heart-pulse', label: 'Managed Health', route: '/health', tint: '#DC2626' },

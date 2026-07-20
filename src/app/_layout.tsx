@@ -77,6 +77,10 @@ export default function RootLayout() {
           <Stack.Screen name="reports" />
           <Stack.Screen name="telemetry" />
           <Stack.Screen name="marketplace" />
+          <Stack.Screen name="webhook-monitor" />
+          <Stack.Screen name="webhook-monitor/[id]" />
+          <Stack.Screen name="linkage-health" />
+          <Stack.Screen name="admin-mirror/[farmerId]" />
           <Stack.Screen name="notifications" />
           <Stack.Screen name="notification-settings" />
           </Stack>
