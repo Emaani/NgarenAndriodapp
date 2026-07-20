@@ -74,6 +74,9 @@ export default function RootLayout() {
           <Stack.Screen name="messaging" />
           <Stack.Screen name="settings" />
           <Stack.Screen name="farmers" />
+          <Stack.Screen name="reports" />
+          <Stack.Screen name="telemetry" />
+          <Stack.Screen name="marketplace" />
           <Stack.Screen name="notifications" />
           <Stack.Screen name="notification-settings" />
           </Stack>

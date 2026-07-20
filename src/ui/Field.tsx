@@ -1,4 +1,4 @@
-import { Pressable, TextInput, View } from 'react-native';
+import { KeyboardTypeOptions, Pressable, TextInput, View } from 'react-native';
 import { colors, radius, spacing } from '@/theme';
 import { AppText } from './AppText';
 import { Icon, IconName } from './Icon';
@@ -29,6 +29,7 @@ export function TextField({
   onChangeText,
   placeholder,
   multiline,
+  keyboardType,
 }: {
   label: string;
   required?: boolean;
@@ -36,6 +37,7 @@ export function TextField({
   onChangeText: (t: string) => void;
   placeholder?: string;
   multiline?: boolean;
+  keyboardType?: KeyboardTypeOptions;
 }) {
   return (
     <View style={{ marginBottom: spacing.md }}>
@@ -46,6 +48,7 @@ export function TextField({
         placeholder={placeholder}
         placeholderTextColor={colors.onSurfaceVariant}
         multiline={multiline}
+        keyboardType={keyboardType}
         style={[
           boxStyle,
           {
