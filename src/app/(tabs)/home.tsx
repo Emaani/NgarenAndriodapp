@@ -6,6 +6,7 @@ import { colors, radius, shadow, spacing } from '@/theme';
 import { summary as summaryFallback } from '@/data/mock';
 import { getSummary } from '@/data/api';
 import { getFarmerPortfolio, portfolioTotals } from '@/data/portfolio';
+import { VET_METRICS_FALLBACK, getVetMetrics } from '@/data/vet';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { roleTheme } from '@/lib/roles';
@@ -53,6 +54,19 @@ const ADMIN_ACTIONS: Action[] = [
   { icon: 'clipboard-pulse-outline', label: 'Vet Call-outs', route: '/vet', tint: '#F59E0B' },
   { icon: 'tag-outline', label: 'Devices', route: '/devices', tint: '#9333EA' },
   { icon: 'map-marker-outline', label: 'Locations', route: '/locations', tint: '#0D9488' },
+];
+
+// Vet "Health Intelligence System" — clinical oversight across assigned farms.
+const VET_ACTIONS: Action[] = [
+  { icon: 'clipboard-pulse-outline', label: 'Call-out Queue', route: '/vet', tint: '#3D99F5' },
+  { icon: 'heart-pulse', label: 'Managed Health', route: '/health', tint: '#EF4444' },
+  { icon: 'cow', label: 'Livestock', route: '/(tabs)/animals', tint: '#2563EB' },
+  { icon: 'dna', label: 'Breeding', route: '/breeding', tint: '#EC4899' },
+  { icon: 'calendar-month-outline', label: 'Calendar', route: '/calendar', tint: '#0EA5E9' },
+  { icon: 'file-chart-outline', label: 'Reports', route: '/reports', tint: '#6D874F' },
+  { icon: 'tag-outline', label: 'Devices', route: '/devices', tint: '#9333EA' },
+  { icon: 'storefront-outline', label: 'Marketplace', route: '/marketplace', tint: '#0D9488' },
+  { icon: 'message-text-outline', label: 'Messages', route: '/messaging', tint: '#F59E0B' },
 ];
 
 function HeaderStat({ value, label }: { value: number; label: string }) {
@@ -113,10 +127,12 @@ export default function Home() {
   const displayName = user?.fullName?.trim() || user?.email?.split('@')[0] || 'Ngaren user';
   const { data: summary } = useResource(getSummary, summaryFallback);
   const { data: portfolio } = useResource(getFarmerPortfolio, []);
+  const { data: vetMetrics } = useResource(getVetMetrics, VET_METRICS_FALLBACK);
 
   const theme = roleTheme(appRole);
   const isAdmin = appRole === 'admin';
-  const actions = isAdmin ? ADMIN_ACTIONS : FARMER_ACTIONS;
+  const isVet = appRole === 'veterinary';
+  const actions = isAdmin ? ADMIN_ACTIONS : isVet ? VET_ACTIONS : FARMER_ACTIONS;
   const linkedDevices = Math.max(0, summary.devices - summary.connectivity.unconnected);
   const totals = portfolioTotals(portfolio);
   // Farmer tag health for the "My Farm" insight band.
@@ -127,7 +143,7 @@ export default function Home() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Role-accented header (olive for admin, green for farmer). */}
       <LinearGradient
-        colors={[theme.accent, '#698A3B']}
+        colors={[theme.accent, theme.accentDeep]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={{
@@ -139,7 +155,11 @@ export default function Home() {
         }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-            <Icon name={isAdmin ? 'shield-crown-outline' : 'sprout-outline'} size={16} color="#fff" />
+            <Icon
+              name={isAdmin ? 'shield-crown-outline' : isVet ? 'stethoscope' : 'sprout-outline'}
+              size={16}
+              color="#fff"
+            />
             <AppText variant="caption" color="#fff" style={{ fontWeight: '700', letterSpacing: 0.5 }}>
               {theme.label.toUpperCase()} · {theme.consoleTitle}
             </AppText>
@@ -179,6 +199,12 @@ export default function Home() {
               <HeaderStat value={totals.devices} label="Devices" />
               <HeaderStat value={totals.activeTags} label="Active tags" />
             </>
+          ) : isVet ? (
+            <>
+              <HeaderStat value={vetMetrics.immediateAttention} label="Urgent" />
+              <HeaderStat value={vetMetrics.openCases} label="Open cases" />
+              <HeaderStat value={vetMetrics.pendingRequests} label="Requests" />
+            </>
           ) : (
             <>
               <HeaderStat value={summary.animals} label="My Animals" />
@@ -205,8 +231,23 @@ export default function Home() {
           </>
         )}
 
+        {/* Vet-only clinical triage band. */}
+        {isVet && (
+          <>
+            <AppText variant="title" style={{ marginBottom: spacing.md }}>
+              Clinical overview
+            </AppText>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.lg }}>
+              <KpiTile value={vetMetrics.immediateAttention} label="Immediate attention" icon="alert-decagram-outline" tint="#EF4444" />
+              <KpiTile value={vetMetrics.pendingRequests} label="Pending requests" icon="clipboard-clock-outline" tint="#F59E0B" />
+              <KpiTile value={vetMetrics.openCases} label="Open cases" icon="folder-heart-outline" tint="#3D99F5" />
+              <KpiTile value={vetMetrics.recentlyReviewed} label="Reviewed" icon="check-decagram-outline" tint="#16A34A" />
+            </View>
+          </>
+        )}
+
         {/* Farmer-only tag-health insight band (per tester feedback). */}
-        {!isAdmin && (
+        {!isAdmin && !isVet && (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.lg }}>
             <KpiTile value={activeTags} label="Active tags" icon="access-point" tint="#16A34A" />
             <KpiTile value={inactiveTags} label="Inactive tags" icon="access-point-off" tint="#F59E0B" />
@@ -214,7 +255,7 @@ export default function Home() {
         )}
 
         <AppText variant="title" style={{ marginBottom: spacing.md }}>
-          {isAdmin ? 'Control center' : 'Quick actions'}
+          {isAdmin ? 'Control center' : isVet ? 'Clinical tools' : 'Quick actions'}
         </AppText>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
           {actions.map((a) => (

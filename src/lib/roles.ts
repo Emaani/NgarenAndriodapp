@@ -14,6 +14,8 @@ export type AppRole = 'admin' | 'farmer' | 'veterinary';
 export interface RoleTheme {
   /** Primary accent (hex). */
   accent: string;
+  /** Deeper shade of the accent — the far end of the header gradient. */
+  accentDeep: string;
   /** Subtle tinted background for cards/badges. */
   tint: string;
   /** Short badge label. */
@@ -27,6 +29,7 @@ export interface RoleTheme {
 export const ROLE_THEME: Record<AppRole, RoleTheme> = {
   admin: {
     accent: '#6D874F', // hsl(88 26% 42%) — olive-gold, brand primary
+    accentDeep: '#698A3B',
     tint: '#EAF0DD',
     label: 'Admin',
     consoleTitle: 'Enterprise Control Center',
@@ -34,6 +37,7 @@ export const ROLE_THEME: Record<AppRole, RoleTheme> = {
   },
   farmer: {
     accent: '#21C45D', // hsl(142 71% 45%) — earth-green
+    accentDeep: '#0F9B48',
     tint: '#E4F7EC',
     label: 'Farmer',
     consoleTitle: 'Herd Operations Console',
@@ -41,6 +45,7 @@ export const ROLE_THEME: Record<AppRole, RoleTheme> = {
   },
   veterinary: {
     accent: '#3D99F5', // hsl(210 90% 60%) — slate-blue
+    accentDeep: '#1F6FD0',
     tint: '#E4F0FE',
     label: 'Vet Doctor',
     consoleTitle: 'Health Intelligence System',
