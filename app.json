@@ -56,7 +56,13 @@
           "cameraPermission": "Ngaren needs camera access to photograph an animal or scan a tag."
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Ngaren uses your location to centre the herd map on where you are."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
