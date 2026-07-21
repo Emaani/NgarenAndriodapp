@@ -1,11 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { geofences as geofencesData, locations as locationsFallback, markers as markersFallback } from '@/data/mock';
 import { getAnimalLocations, getLocations } from '@/data/api';
+import { AnimalFenceStatus, evaluateGeofences } from '@/data/geofencing';
 import { useResource } from '@/data/hooks';
+import { useAuth } from '@/services/auth';
+import { formatDistance } from '@/lib/geo';
 import { AnimalMarker } from '@/data/types';
 import { ActionChip, AppText, BottomSheet, Button, GradientHeader, Icon, IconName } from '@/ui';
 import { LiveMap, LiveMapHandle } from '@/components/LiveMap';
@@ -36,8 +39,10 @@ function MapButton({ icon, onPress, label }: { icon: IconName; onPress: () => vo
 export default function TrackScreen() {
   const router = useRouter();
   const mapRef = useRef<LiveMapHandle>(null);
+  const { appRole } = useAuth();
   const [selected, setSelected] = useState<AnimalMarker | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [fenceOpen, setFenceOpen] = useState(false);
   const [locating, setLocating] = useState(false);
   const { data: locations } = useResource(() => getLocations(), locationsFallback);
   const { data: markers } = useResource(() => getAnimalLocations(), markersFallback);
@@ -52,7 +57,20 @@ export default function TrackScreen() {
     setChecked((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
 
   // Geofences follow the location filter so hiding a farm hides its boundary.
-  const visibleGeofences = geofencesData.filter((g) => checked.includes(g.id));
+  const visibleGeofences = useMemo(
+    () => geofencesData.filter((g) => checked.includes(g.id)),
+    [checked],
+  );
+
+  // Containment is derived from the live GPS already on screen. The marker set
+  // is role-scoped upstream, so admin sees the portfolio and a farmer sees only
+  // their own herd without any branching here.
+  const report = useMemo(
+    () => evaluateGeofences(markers, visibleGeofences),
+    [markers, visibleGeofences],
+  );
+  const breachedIds = useMemo(() => report.breaches.map((b) => b.animalId), [report.breaches]);
+  const isAdmin = appRole === 'admin';
 
   // Centre the map on the user's real position (foreground permission only).
   const goToMyLocation = async () => {
@@ -81,6 +99,14 @@ export default function TrackScreen() {
     mapRef.current?.flyTo(m.lat, m.lng, 17);
   };
 
+  // Jump from a breach row straight to the stray animal on the map.
+  const locateStatus = (s: AnimalFenceStatus) => {
+    setFenceOpen(false);
+    const marker = markers.find((m) => m.animalId === s.animalId);
+    if (marker) setSelected(marker);
+    mapRef.current?.flyTo(s.lat, s.lng, 17);
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <GradientHeader
@@ -98,8 +124,43 @@ export default function TrackScreen() {
           markers={markers}
           geofences={visibleGeofences}
           selectedId={selected?.animalId ?? null}
+          breachedIds={breachedIds}
           onSelectMarker={selectMarker}
         />
+
+        {/* Breach banner — only shown when animals are actually outside. */}
+        {report.breaches.length > 0 && (
+          <Pressable
+            onPress={() => setFenceOpen(true)}
+            style={({ pressed }) => [
+              {
+                position: 'absolute',
+                left: spacing.md,
+                right: 68,
+                top: spacing.md,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: spacing.sm,
+                paddingHorizontal: spacing.md,
+                paddingVertical: spacing.sm,
+                borderRadius: radius.md,
+                backgroundColor: colors.error,
+                opacity: pressed ? 0.92 : 1,
+              },
+              shadow[2],
+            ]}>
+            <Icon name="alert-decagram-outline" size={20} color="#fff" />
+            <View style={{ flex: 1 }}>
+              <AppText variant="body" color="#fff" style={{ fontWeight: '700' }}>
+                {report.breaches.length} {report.breaches.length === 1 ? 'animal' : 'animals'} outside boundary
+              </AppText>
+              <AppText variant="caption" color="rgba(255,255,255,0.9)">
+                Furthest {formatDistance(report.breaches[0].metersOutside)} out · tap to review
+              </AppText>
+            </View>
+            <Icon name="chevron-right" size={20} color="#fff" />
+          </Pressable>
+        )}
 
         {/* Map controls — zoom, fit-to-herd and my-location. */}
         <View
@@ -112,6 +173,7 @@ export default function TrackScreen() {
           <MapButton icon="plus" label="Zoom in" onPress={() => mapRef.current?.zoomIn()} />
           <MapButton icon="minus" label="Zoom out" onPress={() => mapRef.current?.zoomOut()} />
           <MapButton icon="fit-to-screen-outline" label="Fit herd" onPress={() => mapRef.current?.fitAll()} />
+          <MapButton icon="vector-polygon" label="Geofences" onPress={() => setFenceOpen(true)} />
           <MapButton
             icon={locating ? 'crosshairs' : 'crosshairs-gps'}
             label="My location"
@@ -150,12 +212,26 @@ export default function TrackScreen() {
             <AppText variant="body" color={colors.onSurfaceVariant}>
               Last seen: {selected.lastSeenMins} minutes ago
             </AppText>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-              <Icon name="vector-polygon" size={15} color={colors.primary} />
-              <AppText variant="caption" color={colors.onSurfaceVariant}>
-                Geofence alerts on for this animal’s farm boundary
-              </AppText>
-            </View>
+            {(() => {
+              const s = report.statuses.find((x) => x.animalId === selected.animalId);
+              const inside = s?.inside ?? true;
+              return (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                  <Icon
+                    name={inside ? 'vector-polygon' : 'alert-decagram-outline'}
+                    size={15}
+                    color={inside ? colors.primary : colors.error}
+                  />
+                  <AppText variant="caption" color={inside ? colors.onSurfaceVariant : colors.error}>
+                    {report.noFences
+                      ? 'No boundary drawn for this area'
+                      : inside
+                        ? `Inside ${s?.fenceName ?? 'boundary'}`
+                        : `${formatDistance(s?.metersOutside ?? 0)} outside ${s?.fenceName ?? 'boundary'}`}
+                  </AppText>
+                </View>
+              );
+            })()}
             <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
               <Button
                 label="Detail"
@@ -173,6 +249,95 @@ export default function TrackScreen() {
           </View>
         )}
       </View>
+
+      {/* Geofence status — occupancy per paddock and the breach worklist. */}
+      <BottomSheet visible={fenceOpen} onClose={() => setFenceOpen(false)} title="Geofencing">
+        <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.md }}>
+          {isAdmin ? 'Boundary status across the portfolio' : 'Boundary status for your herd'} ·{' '}
+          {report.insideCount} inside · {report.breaches.length} outside
+        </AppText>
+
+        <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+          {report.noFences ? (
+            <AppText variant="body" color={colors.onSurfaceVariant} style={{ paddingVertical: spacing.md }}>
+              No boundaries are visible. Enable a location in the filter to see its geofence.
+            </AppText>
+          ) : (
+            <>
+              {report.breaches.length > 0 && (
+                <>
+                  <AppText variant="overline" color={colors.error} style={{ marginBottom: spacing.sm }}>
+                    Outside boundary ({report.breaches.length})
+                  </AppText>
+                  {report.breaches.map((b) => (
+                    <Pressable
+                      key={b.animalId}
+                      onPress={() => locateStatus(b)}
+                      style={({ pressed }) => ({
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: spacing.sm,
+                        padding: spacing.md,
+                        marginBottom: spacing.sm,
+                        borderRadius: radius.md,
+                        backgroundColor: colors.errorTint,
+                        opacity: pressed ? 0.9 : 1,
+                      })}>
+                      <Icon name="cow-off" size={20} color={colors.error} />
+                      <View style={{ flex: 1 }}>
+                        <AppText variant="bodyLarge" style={{ fontWeight: '600' }}>
+                          {b.tag}
+                        </AppText>
+                        <AppText variant="caption" color={colors.onSurfaceVariant}>
+                          {formatDistance(b.metersOutside)} beyond {b.fenceName ?? 'the boundary'}
+                          {b.accuracy === 'Poor' ? ' · low GPS confidence' : ''}
+                        </AppText>
+                      </View>
+                      <Icon name="crosshairs-gps" size={18} color={colors.primary} />
+                    </Pressable>
+                  ))}
+                  <View style={{ height: spacing.md }} />
+                </>
+              )}
+
+              <AppText variant="overline" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>
+                Paddocks ({report.occupancy.length})
+              </AppText>
+              {report.occupancy.map(({ fence, animals }) => (
+                <View
+                  key={fence.id}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: spacing.sm,
+                    padding: spacing.md,
+                    marginBottom: spacing.sm,
+                    borderRadius: radius.md,
+                    backgroundColor: colors.background,
+                    borderWidth: 1,
+                    borderColor: colors.divider,
+                  }}>
+                  <Icon name="vector-polygon" size={20} color={colors.primary} />
+                  <View style={{ flex: 1 }}>
+                    <AppText variant="bodyLarge" style={{ fontWeight: '600' }}>
+                      {fence.name}
+                    </AppText>
+                    <AppText variant="caption" color={colors.onSurfaceVariant}>
+                      {animals.length === 0
+                        ? 'No animals inside'
+                        : animals.map((a) => a.tag).join(', ')}
+                    </AppText>
+                  </View>
+                  <ActionChip
+                    label={`${animals.length}`}
+                    variant={animals.length > 0 ? 'success' : 'neutral'}
+                  />
+                </View>
+              ))}
+            </>
+          )}
+        </ScrollView>
+      </BottomSheet>
 
       <BottomSheet visible={filterOpen} onClose={() => setFilterOpen(false)} title="Filter by Location">
         {locations.map((l) => (

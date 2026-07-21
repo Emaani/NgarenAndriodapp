@@ -41,7 +41,21 @@ const LEAFLET_HTML = `<!DOCTYPE html>
     width: 100%; height: 100%;
   }
   .pin.sel { box-shadow: 0 0 0 4px rgba(109,135,79,0.45), 0 1px 4px rgba(0,0,0,0.4); }
+  /* A breached animal gets a pulsing red halo so it reads instantly. */
+  .pin.breach { border-color: #fff; box-shadow: 0 0 0 3px rgba(239,68,68,0.55), 0 1px 4px rgba(0,0,0,0.4); animation: pulse 1.6s ease-out infinite; }
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 2px rgba(239,68,68,0.65), 0 1px 4px rgba(0,0,0,0.4); }
+    70%  { box-shadow: 0 0 0 12px rgba(239,68,68,0), 0 1px 4px rgba(0,0,0,0.4); }
+    100% { box-shadow: 0 0 0 2px rgba(239,68,68,0), 0 1px 4px rgba(0,0,0,0.4); }
+  }
   .lbl { font-size: 11px; font-weight: 700; }
+  /* Permanent paddock name labels — geofences are unusable if unnamed. */
+  .fence-lbl {
+    background: rgba(255,255,255,0.85); border: 1px solid rgba(109,135,79,0.5);
+    border-radius: 4px; color: #3F5227; font-size: 10px; font-weight: 700;
+    padding: 1px 5px; box-shadow: none;
+  }
+  .fence-lbl::before { display: none; }
   .userdot {
     width: 100%; height: 100%; border-radius: 50%;
     background: #1D4ED8; border: 3px solid #fff;
@@ -71,8 +85,10 @@ const LEAFLET_HTML = `<!DOCTYPE html>
   var byId = {};
   var selectedId = null;
   var bounds = null;
+  var breached = {};
 
   function colorFor(m) {
+    if (breached[m.animalId]) return '#EF4444';
     if (m.status !== 'active') return '#9AA0A6';
     if (m.accuracy === 'Good') return '#16A34A';
     if (m.accuracy === 'Fair') return '#F59E0B';
@@ -80,17 +96,21 @@ const LEAFLET_HTML = `<!DOCTYPE html>
   }
 
   function iconFor(m, selected) {
-    var size = selected ? 26 : 20;
+    var isBreach = !!breached[m.animalId];
+    var size = selected ? 26 : isBreach ? 24 : 20;
+    var cls = 'pin' + (selected ? ' sel' : '') + (isBreach ? ' breach' : '');
     return L.divIcon({
       className: '',
-      html: '<div class="pin' + (selected ? ' sel' : '') + '" style="background:' + colorFor(m) + '"></div>',
+      html: '<div class="' + cls + '" style="background:' + colorFor(m) + '"></div>',
       iconSize: [size, size],
       iconAnchor: [size / 2, size / 2]
     });
   }
 
-  window.setData = function (markers, fences, selId) {
+  window.setData = function (markers, fences, selId, breachIds) {
     selectedId = selId === undefined ? selectedId : selId;
+    breached = {};
+    (breachIds || []).forEach(function (id) { breached[id] = true; });
     markerLayer.clearLayers();
     fenceLayer.clearLayers();
     byId = {};
@@ -102,7 +122,9 @@ const LEAFLET_HTML = `<!DOCTYPE html>
       L.polygon(ring, {
         color: '#6D874F', weight: 2, opacity: 0.9,
         fillColor: '#6D874F', fillOpacity: 0.10, dashArray: '6 4'
-      }).bindTooltip(f.name, { permanent: false, direction: 'center' }).addTo(fenceLayer);
+      }).bindTooltip(f.name, {
+        permanent: true, direction: 'center', className: 'fence-lbl'
+      }).addTo(fenceLayer);
       ring.forEach(function (p) { pts.push(p); });
     });
 
@@ -155,9 +177,11 @@ export const LiveMap = forwardRef<
     markers: AnimalMarker[];
     geofences: Geofence[];
     selectedId?: number | null;
+    /** Animals outside every boundary — drawn red with a pulsing halo. */
+    breachedIds?: number[];
     onSelectMarker: (m: AnimalMarker) => void;
   }
->(function LiveMap({ markers, geofences, selectedId, onSelectMarker }, ref) {
+>(function LiveMap({ markers, geofences, selectedId, breachedIds, onSelectMarker }, ref) {
   const webRef = useRef<WebView>(null);
   const [ready, setReady] = useState(false);
   // Tiles and Leaflet come over the network. If either is unreachable (rural
@@ -184,15 +208,18 @@ export const LiveMap = forwardRef<
   }));
 
   // Push data whenever it changes (and once the map signals it's ready).
+  const breachKey = (breachedIds ?? []).join(',');
   useEffect(() => {
     if (!ready) return;
     const payload = JSON.stringify(markers);
     const fences = JSON.stringify(geofences);
-    run(`window.setData && window.setData(${payload}, ${fences}, ${selectedId ?? 'null'})`);
+    const breaches = JSON.stringify(breachedIds ?? []);
+    run(`window.setData && window.setData(${payload}, ${fences}, ${selectedId ?? 'null'}, ${breaches})`);
     // selectedId intentionally excluded — highlight is handled below so data
-    // isn't rebuilt on every selection.
+    // isn't rebuilt on every selection. breachKey stands in for breachedIds so
+    // a new array identity with the same contents doesn't force a rebuild.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, markers, geofences, run]);
+  }, [ready, markers, geofences, breachKey, run]);
 
   // Highlight the selected marker without rebuilding the layer.
   useEffect(() => {
