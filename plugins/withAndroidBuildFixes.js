@@ -13,9 +13,12 @@ const { withAppBuildGradle, withGradleProperties } = require('@expo/config-plugi
  *     static-analysis gate, not part of assembling the APK, so we skip it for
  *     release builds to unblock the distributable artifact.
  *
- *  2. Pin the shipped ABIs to arm64-v8a (every real Android 7–17 device) and
- *     x86_64 (emulators / Chromebooks). This cuts native build time versus the
- *     all-four-ABI default and shrinks the CMake output surface.
+ *  2. Ship armeabi-v7a (32-bit ARM: budget/older phones and tablets),
+ *     arm64-v8a (every modern device) and x86_64 (emulators / Chromebooks).
+ *     armeabi-v7a is required for universal installability — a 64-bit-only APK
+ *     simply cannot be installed on a 32-bit ARM device, which surfaces to
+ *     testers as an unexplained "app not installed". Only 32-bit x86 is
+ *     omitted, since those emulator images are long obsolete.
  *
  *  3. Raise the Gradle daemon's heap from Expo's 2048m default to 4096m. Seen
  *     locally as "Unable to connect to the child process 'Gradle Worker
@@ -68,7 +71,7 @@ const withAndroidBuildFixes = (config) => {
         cfg.modResults.push({ type: 'property', key, value });
       }
     };
-    setProperty('reactNativeArchitectures', 'arm64-v8a,x86_64');
+    setProperty('reactNativeArchitectures', 'armeabi-v7a,arm64-v8a,x86_64');
     setProperty('org.gradle.jvmargs', '-Xmx4096m -XX:MaxMetaspaceSize=1024m');
     // Extract native libs at install time (see #4 above) for old-device compat.
     setProperty('expo.useLegacyPackaging', 'true');
