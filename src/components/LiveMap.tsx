@@ -5,6 +5,7 @@ import { colors } from '@/theme';
 import { AnimalMarker } from '@/data/types';
 import { Geofence } from '@/data/mock';
 import { InteractiveMap } from './InteractiveMap';
+import { LEAFLET_CSS_B64, LEAFLET_JS_B64 } from './leafletAssets';
 
 export interface LiveMapHandle {
   zoomIn: () => void;
@@ -30,8 +31,18 @@ const LEAFLET_HTML = `<!DOCTYPE html>
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Leaflet bundled locally (base64) — no CDN, loads offline. Injected before
+     the map script so window.L is ready synchronously. -->
+<script>
+  (function () {
+    var css = document.createElement('style');
+    css.textContent = atob('${LEAFLET_CSS_B64}');
+    document.head.appendChild(css);
+    var js = document.createElement('script');
+    js.text = atob('${LEAFLET_JS_B64}');
+    document.head.appendChild(js);
+  })();
+</script>
 <style>
   html, body, #map { height: 100%; width: 100%; margin: 0; padding: 0; background: #E8EDE4; }
   .leaflet-container { font-family: -apple-system, Roboto, sans-serif; }

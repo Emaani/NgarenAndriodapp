@@ -13,6 +13,7 @@
  */
 import { supabase } from '../services/supabase';
 import { isSupabaseConfigured } from '../config';
+import { reportDataFailure, reportDataSuccess } from '../services/dataHealth';
 
 export interface BreedingRecord {
   id: string;
@@ -85,7 +86,11 @@ export async function getBreedingRecords(): Promise<BreedingRecord[]> {
       .from('breeding_records')
       .select('*')
       .order('mating_date', { ascending: false });
-    if (error || !data) return MOCK_BREEDING;
+    if (error || !data) {
+      reportDataFailure('breeding', error);
+      return MOCK_BREEDING;
+    }
+    reportDataSuccess();
     return data.map((r: Record<string, unknown>) => ({
       id: String(r.id),
       sireName: (r.sire_name as string) ?? '—',
@@ -100,7 +105,8 @@ export async function getBreedingRecords(): Promise<BreedingRecord[]> {
       status: (r.status as string) ?? 'pending',
       notes: (r.notes as string) ?? null,
     }));
-  } catch {
+  } catch (e) {
+    reportDataFailure('breeding', e);
     return MOCK_BREEDING;
   }
 }
@@ -113,7 +119,11 @@ export async function getHealthRecords(): Promise<HealthRecord[]> {
       .from('health_records')
       .select('*')
       .order('created_at', { ascending: false });
-    if (error || !data) return MOCK_HEALTH;
+    if (error || !data) {
+      reportDataFailure('health', error);
+      return MOCK_HEALTH;
+    }
+    reportDataSuccess();
     return data.map((r: Record<string, unknown>) => ({
       id: String(r.id),
       animalName: (r.animal_name as string) ?? '—',
@@ -127,7 +137,8 @@ export async function getHealthRecords(): Promise<HealthRecord[]> {
       notes: (r.notes as string) ?? null,
       createdAt: (r.created_at as string) ?? '',
     }));
-  } catch {
+  } catch (e) {
+    reportDataFailure('health', e);
     return MOCK_HEALTH;
   }
 }
@@ -167,9 +178,11 @@ export async function getCalendarEvents(): Promise<CalendarEvent[]> {
       });
     });
 
+    reportDataSuccess();
     if (events.length === 0) return MOCK_CALENDAR;
     return events.sort((a, b) => a.date.localeCompare(b.date));
-  } catch {
+  } catch (e) {
+    reportDataFailure('calendar', e);
     return MOCK_CALENDAR;
   }
 }

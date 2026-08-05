@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -13,9 +14,14 @@ import {
 import { addNotificationResponseListener, routeColdStartNotification } from '@/services/push';
 import { registerBackgroundSyncAsync } from '@/services/backgroundSync';
 import { AuthProvider } from '@/services/auth';
+import { initSentry, wrapWithSentry } from '@/services/sentry';
 import { AppErrorBoundary } from '@/components/AppErrorBoundary';
+import { StatusBanner } from '@/ui';
 
-export default function RootLayout() {
+// Initialise crash reporting before the tree mounts (no-op without a DSN).
+initSentry();
+
+function RootLayout() {
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -44,6 +50,9 @@ export default function RootLayout() {
         <SafeAreaProvider>
           <AuthProvider>
           <StatusBar style="dark" />
+          {/* Honest connectivity / stale-data strip above the whole app. */}
+          <StatusBanner />
+          <View style={{ flex: 1 }}>
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#F7F7F7' } }}>
             <Stack.Screen name="index" />
           <Stack.Screen name="onboarding" />
@@ -84,9 +93,14 @@ export default function RootLayout() {
           <Stack.Screen name="notifications" />
           <Stack.Screen name="notification-settings" />
           </Stack>
+          </View>
           </AuthProvider>
         </SafeAreaProvider>
       </AppErrorBoundary>
     </GestureHandlerRootView>
   );
 }
+
+// Wrap the root so uncaught render/runtime errors reach Sentry (no-op when a
+// DSN isn't configured).
+export default wrapWithSentry(RootLayout);

@@ -20,6 +20,8 @@ export const config = {
   supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL ?? '',
   /** Supabase publishable (anon) key — public, RLS-gated, safe to ship. */
   supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '',
+  /** Sentry DSN — empty => crash reporting disabled (no-op). Safe to ship. */
+  sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN ?? '',
 };
 
 /** True when a real backend base URL is present and the client should hit it. */
@@ -30,4 +32,9 @@ export function isBackendConfigured(): boolean {
 /** True when Supabase credentials are present and real auth should be used. */
 export function isSupabaseConfigured(): boolean {
   return config.supabaseUrl.trim().length > 0 && config.supabaseAnonKey.trim().length > 0;
+}
+
+/** True when a Sentry DSN is present and crash reporting should initialise. */
+export function isSentryConfigured(): boolean {
+  return config.sentryDsn.trim().length > 0;
 }

@@ -62,7 +62,8 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Ngaren uses your location to centre the herd map on where you are."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

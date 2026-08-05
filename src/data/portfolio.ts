@@ -10,6 +10,7 @@
  */
 import { supabase } from '../services/supabase';
 import { isSupabaseConfigured } from '../config';
+import { reportDataFailure, reportDataSuccess } from '../services/dataHealth';
 
 export interface FarmerPortfolioItem {
   id: string;
@@ -58,7 +59,11 @@ export async function getFarmerPortfolio(): Promise<FarmerPortfolioItem[]> {
     const { data, error } = await supabase
       .from('profiles')
       .select('user_id, full_name, farm_name, location');
-    if (error || !data || data.length === 0) return MOCK_PORTFOLIO;
+    if (error || !data || data.length === 0) {
+      reportDataFailure('portfolio', error);
+      return MOCK_PORTFOLIO;
+    }
+    reportDataSuccess();
     return data.map((p: Record<string, unknown>, i: number) => ({
       id: String(p.user_id ?? i),
       farmerName: (p.full_name as string) ?? 'Farmer',
@@ -70,7 +75,8 @@ export async function getFarmerPortfolio(): Promise<FarmerPortfolioItem[]> {
       healthScore: 0,
       status: 'active' as const,
     }));
-  } catch {
+  } catch (e) {
+    reportDataFailure('portfolio', e);
     return MOCK_PORTFOLIO;
   }
 }

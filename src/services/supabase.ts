@@ -15,9 +15,9 @@
  * key ever touches the device.
  */
 import 'react-native-url-polyfill/auto';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import { config, isSupabaseConfigured } from '../config';
+import { secureStorage } from './secureStorage';
 
 // A single shared instance. createClient THROWS on an empty URL
 // ("supabaseUrl is required.") and this module is evaluated from the root
@@ -36,7 +36,9 @@ export const supabase = createClient(
   isSupabaseConfigured() ? config.supabaseAnonKey : PLACEHOLDER_KEY,
   {
     auth: {
-      storage: AsyncStorage,
+      // Encrypted (Keystore/keychain) storage instead of plaintext
+      // AsyncStorage; migrates an existing session on first read.
+      storage: secureStorage,
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: false,
