@@ -4,13 +4,19 @@ import { useRouter } from 'expo-router';
 import { colors, spacing } from '@/theme';
 import { animals as animalsFallback } from '@/data/mock';
 import { getAnimals } from '@/data/api';
+import { getLocalAnimals } from '@/data/localAnimals';
 import { useResource } from '@/data/hooks';
 import { AnimalListItem, EmptyState, Fab, GradientHeader, NotificationBell, Screen, SearchBar } from '@/ui';
 
 export default function AnimalsTab() {
   const router = useRouter();
   const [query, setQuery] = useState('');
-  const { data: allAnimals } = useResource(() => getAnimals(), animalsFallback);
+  // Locally-onboarded animals (with their photo IDs) sit on top of the backend
+  // herd so a freshly registered animal appears immediately.
+  const { data: allAnimals } = useResource(async () => {
+    const [remote, local] = await Promise.all([getAnimals(), getLocalAnimals()]);
+    return [...local, ...remote];
+  }, animalsFallback);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
@@ -20,7 +26,7 @@ export default function AnimalsTab() {
         (a.name ?? '').toLowerCase().includes(q) ||
         a.breed.name.toLowerCase().includes(q),
     );
-  }, [query]);
+  }, [allAnimals, query]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>

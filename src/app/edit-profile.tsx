@@ -15,17 +15,20 @@ export default function EditProfile() {
   const router = useRouter();
   const { user, updateProfile } = useAuth();
   const [fullName, setFullName] = useState(user?.fullName ?? '');
+  const [farmName, setFarmName] = useState(user?.farmName ?? '');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const dirty = fullName.trim() !== (user?.fullName ?? '').trim();
+  const dirty =
+    fullName.trim() !== (user?.fullName ?? '').trim() ||
+    farmName.trim() !== (user?.farmName ?? '').trim();
   const canSave = !!fullName.trim() && dirty && !saving;
 
   const onSave = async () => {
     if (!canSave) return;
     setSaving(true);
     setError(null);
-    const { error: saveError } = await updateProfile({ fullName });
+    const { error: saveError } = await updateProfile({ fullName, farmName });
     setSaving(false);
     if (saveError) {
       setError(saveError);
@@ -46,6 +49,19 @@ export default function EditProfile() {
             placeholder="Your name"
             autoCapitalize="words"
             icon="account-outline"
+          />
+          <Input
+            label="Farm name"
+            value={farmName}
+            onChangeText={setFarmName}
+            placeholder="e.g. Nakasero Farm"
+            autoCapitalize="words"
+            icon="barn"
+            helper={
+              <AppText variant="body" color={colors.onSurfaceVariant}>
+                Synced to your web account.
+              </AppText>
+            }
           />
           <Input
             label="Email address"

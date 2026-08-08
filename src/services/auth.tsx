@@ -32,6 +32,8 @@ export interface AuthUser {
   id: string;
   email: string;
   fullName: string | null;
+  /** Farm name, synced to public.profiles.farm_id (read by the web backend). */
+  farmName: string | null;
   roles: string[];
 }
 
@@ -78,7 +80,7 @@ interface AuthState {
     fullName: string,
   ) => Promise<{ error?: string; needsConfirmation?: boolean }>;
   /** Persist editable profile fields (currently full_name) to public.profiles. */
-  updateProfile: (fields: { fullName: string }) => Promise<{ error?: string }>;
+  updateProfile: (fields: { fullName: string; farmName?: string }) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
 }
 
@@ -146,16 +148,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchUserProfile = useCallback(async (authUser: User): Promise<AuthUser> => {
     try {
       const [{ data: profile }, { data: roleRows }] = await Promise.all([
-        supabase.from('profiles').select('full_name').eq('user_id', authUser.id).maybeSingle(),
+        supabase.from('profiles').select('full_name, farm_id').eq('user_id', authUser.id).maybeSingle(),
         supabase.from('user_roles').select('role').eq('user_id', authUser.id),
       ]);
+      const p = profile as { full_name?: string | null; farm_id?: string | null } | null;
       return {
         id: authUser.id,
         email: authUser.email ?? '',
         fullName:
-          (profile as { full_name?: string | null } | null)?.full_name ??
-          (authUser.user_metadata?.full_name as string | undefined) ??
-          null,
+          p?.full_name ?? (authUser.user_metadata?.full_name as string | undefined) ?? null,
+        farmName: p?.farm_id ?? null,
         roles: (roleRows ?? []).map((r) => (r as { role: string }).role),
       };
     } catch {
@@ -165,6 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         id: authUser.id,
         email: authUser.email ?? '',
         fullName: (authUser.user_metadata?.full_name as string | undefined) ?? null,
+        farmName: null,
         roles: [],
       };
     }
@@ -239,20 +242,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchUserProfile]);
 
   const updateProfile = useCallback<AuthState['updateProfile']>(
-    async ({ fullName }) => {
+    async ({ fullName, farmName }) => {
       if (!user) return { error: 'You are not signed in.' };
       if (!isSupabaseConfigured()) {
         return { error: 'Authentication is not configured. Set the Supabase env vars.' };
       }
       const name = fullName.trim();
-      // public.profiles is keyed on user_id and exposes full_name (see the web
-      // app schema + fetchUserProfile above). RLS lets a user update their row.
-      const { error } = await supabase
-        .from('profiles')
-        .update({ full_name: name })
-        .eq('user_id', user.id);
+      // public.profiles is keyed on user_id (full_name + farm_id). This is the
+      // SAME row the web backend reads, so the profile syncs across mobile/web.
+      // RLS lets a user update their own row.
+      const patch: Record<string, unknown> = { full_name: name };
+      const farm = farmName?.trim();
+      if (farmName !== undefined) patch.farm_id = farm || null;
+      const { error } = await supabase.from('profiles').update(patch).eq('user_id', user.id);
       if (error) return { error: error.message };
-      setUser({ ...user, fullName: name });
+      setUser({ ...user, fullName: name, farmName: farmName !== undefined ? farm || null : user.farmName });
       return {};
     },
     [user],

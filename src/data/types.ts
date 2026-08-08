@@ -23,6 +23,8 @@ export interface Animal {
   description?: string;
   damTag?: string;
   sireTag?: string;
+  /** Photo URIs (front, side, back) — the prototype's primary animal ID. */
+  photos?: string[];
 }
 
 export interface Location {

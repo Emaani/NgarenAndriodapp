@@ -65,6 +65,7 @@ const ADMIN_ACTIONS: Action[] = [
 // Vet "Health Intelligence System" — clinical oversight across assigned farms.
 const VET_ACTIONS: Action[] = [
   { icon: 'clipboard-pulse-outline', label: 'Call-out Queue', route: '/vet', tint: '#3D99F5' },
+  { icon: 'clipboard-check-outline', label: 'Log a Visit', route: '/log-visit', tint: '#16A34A' },
   { icon: 'heart-pulse', label: 'Managed Health', route: '/health', tint: '#EF4444' },
   { icon: 'cow', label: 'Livestock', route: '/(tabs)/animals', tint: '#2563EB' },
   { icon: 'dna', label: 'Breeding', route: '/breeding', tint: '#EC4899' },

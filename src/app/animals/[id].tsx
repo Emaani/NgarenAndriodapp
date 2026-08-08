@@ -1,4 +1,4 @@
-import { View } from 'react-native';
+import { Image, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import {
@@ -7,6 +7,7 @@ import {
   calloutRequests as calloutFallback,
 } from '@/data/mock';
 import { getAnimalBehaviour, getAnimalById, getCalloutRequests } from '@/data/api';
+import { getLocalAnimalById } from '@/data/localAnimals';
 import { useResource } from '@/data/hooks';
 import { ageFromDate, formatDate } from '@/lib/date';
 import { ActionChip, AppText, Button, ChartCard, DetailRow, EmptyState, GradientHeader, Icon, Screen } from '@/ui';
@@ -14,8 +15,9 @@ import { ActionChip, AppText, Button, ChartCard, DetailRow, EmptyState, Gradient
 export default function AnimalDetail() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  // Locally-onboarded animals (with photo IDs) take precedence over the backend.
   const { data: animal } = useResource(
-    () => getAnimalById(Number(id)),
+    async () => (await getLocalAnimalById(Number(id))) ?? (await getAnimalById(Number(id))),
     animalsFallback.find((a) => a.id === Number(id)),
   );
   const { data: behaviour, loading: behaviourLoading } = useResource(
@@ -51,22 +53,51 @@ export default function AnimalDetail() {
       <GradientHeader title={animal.name ?? animal.tag} subtitle={animal.breed.name} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         <View style={{ alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md }}>
-          <View
-            style={{
-              width: 88,
-              height: 88,
-              borderRadius: radius.full,
-              backgroundColor: colors.primaryTint,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-            <Icon name="cow" size={44} color={colors.primary} />
-          </View>
+          {animal.photos && animal.photos.length > 0 ? (
+            <Image
+              source={{ uri: animal.photos[0] }}
+              style={{ width: 120, height: 120, borderRadius: radius.lg, backgroundColor: colors.primaryTint }}
+            />
+          ) : (
+            <View
+              style={{
+                width: 88,
+                height: 88,
+                borderRadius: radius.full,
+                backgroundColor: colors.primaryTint,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+              <Icon name="cow" size={44} color={colors.primary} />
+            </View>
+          )}
           <ActionChip
             label={animal.status === 'active' ? 'Active' : 'Inactive'}
             variant={animal.status === 'active' ? 'success' : 'neutral'}
           />
         </View>
+
+        {/* Photo ID gallery (front / side / back) — the primary identifier. */}
+        {animal.photos && animal.photos.length > 0 ? (
+          <>
+            <AppText variant="title" style={{ marginBottom: spacing.sm }}>
+              Photo ID
+            </AppText>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: spacing.sm }}
+              style={{ marginBottom: spacing.lg }}>
+              {animal.photos.map((uri, i) => (
+                <Image
+                  key={uri + i}
+                  source={{ uri }}
+                  style={{ width: 150, height: 150, borderRadius: radius.md, backgroundColor: colors.primaryTint }}
+                />
+              ))}
+            </ScrollView>
+          </>
+        ) : null}
 
         {/* Static record — the animal's own identity that doesn't change. */}
         <AppText variant="title" style={{ marginBottom: spacing.sm }}>

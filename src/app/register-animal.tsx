@@ -8,6 +8,7 @@ import {
   locations as locationsFallback,
 } from '@/data/mock';
 import { getBreeds, getDevices, getLocations, registerAnimal } from '@/data/api';
+import { addLocalAnimal } from '@/data/localAnimals';
 import { useResource } from '@/data/hooks';
 import { AppText, Button, DatePickerField, GradientHeader, PhotoField, PickerField, Screen, TextField } from '@/ui';
 
@@ -37,7 +38,11 @@ export default function RegisterAnimal() {
   const [dob, setDob] = useState('');
   const [taggingMethod, setTaggingMethod] = useState('');
   const [deviceSerial, setDeviceSerial] = useState('');
-  const [photo, setPhoto] = useState<string | null>(null);
+  // Photo-first identity (Horizon One): front is the primary ID; side & back
+  // are supporting angles.
+  const [photoFront, setPhotoFront] = useState<string | null>(null);
+  const [photoSide, setPhotoSide] = useState<string | null>(null);
+  const [photoBack, setPhotoBack] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -58,22 +63,49 @@ export default function RegisterAnimal() {
     [devices],
   );
 
+  const photos = useMemo(
+    () => [photoFront, photoSide, photoBack].filter((p): p is string => !!p),
+    [photoFront, photoSide, photoBack],
+  );
+
   const onSubmit = async () => {
     setSubmitting(true);
     try {
-      // Persists when the backend is configured; resolves to null in mock mode,
-      // keeping the existing offline UX intact.
-      // Fold the tagging method (and name) into the description until the
-      // backend exposes dedicated fields; the photo URI is captured locally.
       const methodLabel = TAGGING_METHODS.find((m) => m.value === taggingMethod)?.label;
       const descriptionParts = [name, methodLabel ? `Tagging: ${methodLabel}` : ''].filter(Boolean);
-      await registerAnimal({
-        tag,
-        breedKey: breedKey || undefined,
+
+      // Onboard locally first so the animal — with its photo ID — reliably
+      // appears in the herd and its digital record, even before the animal
+      // backend is wired.
+      const breedName = breedOptions.find((b) => b.value === breedKey)?.label ?? 'Unknown';
+      const locationName = locationOptions.find((l) => l.value === locationId)?.label;
+      await addLocalAnimal({
+        id: Date.now(),
+        tag: tag.trim(),
+        name: name.trim() || undefined,
+        breed: { key: breedKey || 'unknown', name: breedName },
         locationId: locationId ? Number(locationId) : undefined,
-        dateOfBirth: dob || null,
+        locationName,
+        dateOfBirth: dob || '',
+        status: 'active',
         description: notes || descriptionParts.join(' · ') || undefined,
+        deviceSerial: deviceSerial || null,
+        photos,
       });
+
+      // Best-effort backend persist (no-op in mock mode); never blocks onboarding.
+      try {
+        await registerAnimal({
+          tag,
+          breedKey: breedKey || undefined,
+          locationId: locationId ? Number(locationId) : undefined,
+          dateOfBirth: dob || null,
+          description: notes || descriptionParts.join(' · ') || undefined,
+        });
+      } catch {
+        // ignore — the animal is already saved locally
+      }
+
       router.replace('/(tabs)/animals');
     } catch {
       setSubmitting(false);
@@ -110,7 +142,16 @@ export default function RegisterAnimal() {
           onSelect={setDob}
         />
 
-        <PhotoField label="Animal photo" value={photo} onChange={setPhoto} />
+        {/* Photo ID — the prototype's primary way to identify an animal. */}
+        <AppText variant="title" style={{ marginTop: spacing.sm, marginBottom: spacing.xs }}>
+          Photo ID
+        </AppText>
+        <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>
+          Capture the animal from three angles. The front photo is its primary ID.
+        </AppText>
+        <PhotoField label="Front (required)" value={photoFront} onChange={setPhotoFront} />
+        <PhotoField label="Side" value={photoSide} onChange={setPhotoSide} />
+        <PhotoField label="Back" value={photoBack} onChange={setPhotoBack} />
 
         <PickerField
           label="Tagging method"
@@ -136,7 +177,7 @@ export default function RegisterAnimal() {
           />
         ) : taggingMethod === 'manual' ? (
           <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.md }}>
-            Manual tag — no device is linked. The photo above serves as the visual record.
+            Manual tag — no device is linked. The photo ID above is the animal’s record.
           </AppText>
         ) : null}
 
@@ -148,7 +189,7 @@ export default function RegisterAnimal() {
         <Button
           label="Register Animal"
           loading={submitting}
-          disabled={!tag.trim() || !breedKey || !locationId || !taggingMethod}
+          disabled={!tag.trim() || !breedKey || !locationId || !taggingMethod || !photoFront}
           onPress={onSubmit}
         />
       </Screen>
