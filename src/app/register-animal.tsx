@@ -123,6 +123,20 @@ export default function RegisterAnimal() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <GradientHeader title="Register Animal" subtitle="Add a new animal to your herd" showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
+        {/* Photo ID leads the form — it's the animal's primary identifier. */}
+        <AppText variant="title" style={{ marginBottom: spacing.xs }}>
+          Photo ID
+        </AppText>
+        <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>
+          Capture the animal from three angles. The front photo is its primary ID.
+        </AppText>
+        <PhotoField label="Front (required)" value={photoFront} onChange={setPhotoFront} />
+        <PhotoField label="Side" value={photoSide} onChange={setPhotoSide} />
+        <PhotoField label="Back" value={photoBack} onChange={setPhotoBack} />
+
+        <AppText variant="title" style={{ marginTop: spacing.sm, marginBottom: spacing.sm }}>
+          Details
+        </AppText>
         <TextField label="Tag ID" required value={tag} onChangeText={setTag} placeholder="e.g. A-073" />
         <TextField label="Name" value={name} onChangeText={setName} placeholder="Optional friendly name" />
         <PickerField
@@ -149,17 +163,6 @@ export default function RegisterAnimal() {
           maximumIso={today}
           onSelect={setDob}
         />
-
-        {/* Photo ID — the prototype's primary way to identify an animal. */}
-        <AppText variant="title" style={{ marginTop: spacing.sm, marginBottom: spacing.xs }}>
-          Photo ID
-        </AppText>
-        <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>
-          Capture the animal from three angles. The front photo is its primary ID.
-        </AppText>
-        <PhotoField label="Front (required)" value={photoFront} onChange={setPhotoFront} />
-        <PhotoField label="Side" value={photoSide} onChange={setPhotoSide} />
-        <PhotoField label="Back" value={photoBack} onChange={setPhotoBack} />
 
         <PickerField
           label="Tagging method"

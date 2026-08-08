@@ -85,27 +85,53 @@ export default function AnimalDetail() {
           />
         </View>
 
-        {/* Photo ID gallery (front / side / back) — the primary identifier. */}
-        {animal.photos && animal.photos.length > 0 ? (
-          <>
-            <AppText variant="title" style={{ marginBottom: spacing.sm }}>
-              Photo ID
+        {/* Photo ID gallery (front / side / back) — the primary identifier.
+            Always offer add/update so existing animals can be photographed. */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }}>
+          <AppText variant="title">Photo ID</AppText>
+          <Pressable
+            onPress={() => router.push(`/edit-animal-photos?id=${animal.id}` as never)}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+            <Icon name={animal.photos && animal.photos.length > 0 ? 'image-edit-outline' : 'camera-plus-outline'} size={18} color={colors.primary} />
+            <AppText variant="body" color={colors.primary} style={{ fontWeight: '600' }}>
+              {animal.photos && animal.photos.length > 0 ? 'Update' : 'Add photos'}
             </AppText>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: spacing.sm }}
-              style={{ marginBottom: spacing.lg }}>
-              {animal.photos.map((uri, i) => (
-                <Image
-                  key={uri + i}
-                  source={{ uri }}
-                  style={{ width: 150, height: 150, borderRadius: radius.md, backgroundColor: colors.primaryTint }}
-                />
-              ))}
-            </ScrollView>
-          </>
-        ) : null}
+          </Pressable>
+        </View>
+        {animal.photos && animal.photos.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: spacing.sm }}
+            style={{ marginBottom: spacing.lg }}>
+            {animal.photos.map((uri, i) => (
+              <Image
+                key={uri + i}
+                source={{ uri }}
+                style={{ width: 150, height: 150, borderRadius: radius.md, backgroundColor: colors.primaryTint }}
+              />
+            ))}
+          </ScrollView>
+        ) : (
+          <Pressable
+            onPress={() => router.push(`/edit-animal-photos?id=${animal.id}` as never)}
+            style={{
+              borderWidth: 1,
+              borderColor: colors.divider,
+              borderStyle: 'dashed',
+              borderRadius: radius.md,
+              backgroundColor: colors.surface,
+              paddingVertical: spacing.lg,
+              alignItems: 'center',
+              gap: spacing.xs,
+              marginBottom: spacing.lg,
+            }}>
+            <Icon name="camera-plus-outline" size={28} color={colors.primary} />
+            <AppText variant="body" color={colors.onSurfaceVariant}>
+              No photos yet — tap to capture front, side & back
+            </AppText>
+          </Pressable>
+        )}
 
         {/* Static record — the animal's own identity that doesn't change. */}
         <AppText variant="title" style={{ marginBottom: spacing.sm }}>

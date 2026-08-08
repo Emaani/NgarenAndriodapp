@@ -1,4 +1,4 @@
-import { Pressable, View } from 'react-native';
+import { Image, Pressable, View } from 'react-native';
 import { colors, radius, spacing } from '@/theme';
 import { formatDate } from '@/lib/date';
 import { Animal, AppNotification, Device, Location, User } from '@/data/types';
@@ -37,10 +37,15 @@ export function AnimalListItem({
   onMenu: () => void;
 }) {
   const connected = !!animal.deviceSerial;
+  const thumb = animal.photos?.[0];
   return (
     <Card onPress={onPress} style={{ marginBottom: spacing.mdMinus }}>
       <View style={{ flexDirection: 'row', gap: spacing.mdMinus }}>
-        <IconChip icon="cow" />
+        {thumb ? (
+          <Image source={{ uri: thumb }} style={{ width: 44, height: 44, borderRadius: radius.md }} />
+        ) : (
+          <IconChip icon="cow" />
+        )}
         <View style={{ flex: 1, gap: 2 }}>
           <AppText variant="title">{animal.name ?? animal.tag}</AppText>
           <Line icon="dna" text={`Breed: ${animal.breed.name}`} />
