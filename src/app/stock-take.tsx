@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { animals as animalsFallback } from '@/data/mock';
 import { getAnimals } from '@/data/api';
 import { useResource } from '@/data/hooks';
+import { useAuth } from '@/services/auth';
 import { Animal } from '@/data/types';
 import { AppText, Button, GradientHeader, Icon, IconChip, IconName, Screen } from '@/ui';
 
@@ -163,6 +164,7 @@ function SummaryStat({ value, label, color }: { value: number; label: string; co
 
 export default function StockTake() {
   const router = useRouter();
+  const { can } = useAuth();
   const { data: allAnimals } = useResource(() => getAnimals(), animalsFallback);
   const [marks, setMarks] = useState<Record<number, Mark>>(() =>
     Object.fromEntries(animalsFallback.map((a) => [a.id, 'pending' as Mark])),
@@ -220,6 +222,10 @@ export default function StockTake() {
   };
 
   const activeMethod = METHODS.find((m) => m.value === method)!;
+
+  // Defence in depth: a delegated member without stock-take rights can't reach
+  // this even via a deep link (the dashboard action is already hidden).
+  if (!can('stock_take')) return <Redirect href="/(tabs)/home" />;
 
   // Step 1 — choose how this herd is tagged before counting.
   if (phase === 'method') {

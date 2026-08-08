@@ -11,6 +11,8 @@ import type { Session, User } from '@supabase/supabase-js';
 import { isSupabaseConfigured, supabase } from './supabase';
 import { unregisterBackgroundSyncAsync } from './backgroundSync';
 import { AppRole, resolveAppRole } from '@/lib/roles';
+import { Permission, ROLE_FALLBACK_PERMISSIONS, SeatRole } from '@/lib/permissions';
+import { Membership, resolveMembership } from '@/data/seats';
 
 /**
  * Supabase-backed auth, sharing one identity with the Ngaren web app
@@ -45,6 +47,18 @@ interface AuthState {
   canVet: boolean;
   /** True for platform administrators — unlocks Team/User management. */
   isAdmin: boolean;
+  /** Effective delegated permissions (from org membership, or role fallback). */
+  permissions: Permission[];
+  /** Org seat role, or null when the user has no membership. */
+  seatRole: SeatRole | null;
+  /** Active organization id, or null when the user has no membership. */
+  orgId: string | null;
+  /** A delegated, non-owner seat member (rights are restricted). */
+  isSeatMember: boolean;
+  /** May manage the farm team & seats (owner, solo farmer, or platform admin). */
+  canManageTeam: boolean;
+  /** Whether the user holds a delegated capability. Admins pass everything. */
+  can: (permission: Permission) => boolean;
   /** Human-readable role for display (e.g. "Administrator", "Farmer", "Veterinarian"). */
   displayRole: string;
   isAuthenticated: boolean;
@@ -108,6 +122,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  // Org seat membership, resolved after sign-in. Null => no membership, so the
+  // user falls back to their role's default permissions (existing behaviour).
+  const [membership, setMembership] = useState<Membership | null>(null);
+
+  // Resolve delegated-seat membership whenever the signed-in user changes.
+  useEffect(() => {
+    let active = true;
+    if (!user) {
+      setMembership(null);
+      return;
+    }
+    resolveMembership(user.id).then((m) => {
+      if (active) setMembership(m);
+    });
+    return () => {
+      active = false;
+    };
+  }, [user]);
 
   // Fetch the profile + roles for a signed-in Supabase user, mirroring the web
   // app's useAuth: profiles.full_name + user_roles.role keyed on user_id.
@@ -237,13 +269,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
   }, []);
 
-  const value = useMemo<AuthState>(
-    () => ({
+  const value = useMemo<AuthState>(() => {
+    const appRole: AppRole = user ? resolveAppRole(user.roles) : 'farmer';
+    const isAdmin = user ? isAdminRole(user.roles) : false;
+    // Membership permissions when present, otherwise the role's defaults so
+    // current users (no membership) keep exactly the access they had.
+    const permissions = membership ? membership.permissions : ROLE_FALLBACK_PERMISSIONS[appRole];
+    const seatRole = membership?.seatRole ?? null;
+    const isSeatMember = !!membership && membership.seatRole !== 'owner';
+    // Owners, solo farmers and platform admins manage the team; delegated
+    // members and vets do not.
+    const canManageTeam = isAdmin || seatRole === 'owner' || (membership === null && appRole === 'farmer');
+
+    return {
       user,
       role: user ? roleFor(user.roles) : null,
-      appRole: user ? resolveAppRole(user.roles) : 'farmer',
+      appRole,
       canVet: user ? canAccessVet(user.roles) : false,
-      isAdmin: user ? isAdminRole(user.roles) : false,
+      isAdmin,
+      permissions,
+      seatRole,
+      orgId: membership?.orgId ?? null,
+      isSeatMember,
+      canManageTeam,
+      can: (permission: Permission) => isAdmin || permissions.includes(permission),
       displayRole: user ? displayRoleFor(user.roles) : '',
       isAuthenticated: !!session && !!user,
       loading,
@@ -251,9 +300,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signUp,
       updateProfile,
       signOut,
-    }),
-    [user, session, loading, signIn, signUp, updateProfile, signOut],
-  );
+    };
+  }, [user, membership, session, loading, signIn, signUp, updateProfile, signOut]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

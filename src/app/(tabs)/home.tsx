@@ -10,6 +10,7 @@ import { VET_METRICS_FALLBACK, getVetMetrics } from '@/data/vet';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { roleTheme } from '@/lib/roles';
+import { Permission } from '@/lib/permissions';
 import { AppText, Icon, IconName, NotificationBell } from '@/ui';
 
 function initials(name: string): string {
@@ -19,20 +20,23 @@ function initials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-type Action = { icon: IconName; label: string; route: string; tint: string };
+type Action = { icon: IconName; label: string; route: string; tint: string; perm?: Permission };
 
-// Farmer "Herd Operations Console" — day-to-day herd work.
+// Farmer "Herd Operations Console" — day-to-day herd work. `perm` gates the
+// action for delegated seat members; owners/solo farmers hold every permission
+// so they see the full grid unchanged. Team & Payments are owner-only.
 const FARMER_ACTIONS: Action[] = [
-  { icon: 'stethoscope', label: 'Find a Vet', route: '/find-vet', tint: '#21C45D' },
-  { icon: 'clipboard-pulse-outline', label: 'Vet Requests', route: '/vet-requests', tint: '#EF4444' },
-  { icon: 'plus-circle-outline', label: 'Register Animal', route: '/register-animal', tint: '#6D874F' },
-  { icon: 'dna', label: 'Breeding', route: '/breeding', tint: '#EC4899' },
-  { icon: 'heart-pulse', label: 'Managed Health', route: '/health', tint: '#EF4444' },
+  { icon: 'stethoscope', label: 'Find a Vet', route: '/find-vet', tint: '#21C45D', perm: 'book_vet' },
+  { icon: 'clipboard-pulse-outline', label: 'Vet Requests', route: '/vet-requests', tint: '#EF4444', perm: 'book_vet' },
+  { icon: 'plus-circle-outline', label: 'Register Animal', route: '/register-animal', tint: '#6D874F', perm: 'register_animal' },
+  { icon: 'dna', label: 'Breeding', route: '/breeding', tint: '#EC4899', perm: 'manage_breeding' },
+  { icon: 'heart-pulse', label: 'Managed Health', route: '/health', tint: '#EF4444', perm: 'view_health' },
   { icon: 'calendar-month-outline', label: 'Calendar', route: '/calendar', tint: '#0EA5E9' },
-  { icon: 'clipboard-check-outline', label: 'Stock Take', route: '/stock-take', tint: '#F59E0B' },
-  { icon: 'cow', label: 'View Animals', route: '/(tabs)/animals', tint: '#2563EB' },
-  { icon: 'map-marker-radius', label: 'Track Animals', route: '/(tabs)/track', tint: '#16A34A' },
+  { icon: 'clipboard-check-outline', label: 'Stock Take', route: '/stock-take', tint: '#F59E0B', perm: 'stock_take' },
+  { icon: 'cow', label: 'View Animals', route: '/(tabs)/animals', tint: '#2563EB', perm: 'view_animals' },
+  { icon: 'map-marker-radius', label: 'Track Animals', route: '/(tabs)/track', tint: '#16A34A', perm: 'view_track' },
   { icon: 'storefront-outline', label: 'Marketplace', route: '/marketplace', tint: '#0D9488' },
+  { icon: 'account-group-outline', label: 'Team & Seats', route: '/team', tint: '#0284C7' },
   { icon: 'wallet-outline', label: 'Payments', route: '/payments', tint: '#9333EA' },
 ];
 
@@ -125,7 +129,7 @@ function KpiTile({ value, label, icon, tint }: { value: number; label: string; i
 export default function Home() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user, appRole } = useAuth();
+  const { user, appRole, can, canManageTeam } = useAuth();
   const displayName = user?.fullName?.trim() || user?.email?.split('@')[0] || 'Ngaren user';
   const { data: summary } = useResource(getSummary, summaryFallback);
   const { data: portfolio } = useResource(getFarmerPortfolio, []);
@@ -134,7 +138,13 @@ export default function Home() {
   const theme = roleTheme(appRole);
   const isAdmin = appRole === 'admin';
   const isVet = appRole === 'veterinary';
-  const actions = isAdmin ? ADMIN_ACTIONS : isVet ? VET_ACTIONS : FARMER_ACTIONS;
+  const roleActions = isAdmin ? ADMIN_ACTIONS : isVet ? VET_ACTIONS : FARMER_ACTIONS;
+  // Hide actions a delegated seat member lacks the permission for; Team &
+  // Payments are owner-only. Owners/solo farmers/admins see the full grid.
+  const actions = roleActions.filter((a) => {
+    if (a.route === '/team' || a.route === '/payments') return canManageTeam;
+    return !a.perm || can(a.perm);
+  });
   const linkedDevices = Math.max(0, summary.devices - summary.connectivity.unconnected);
   const totals = portfolioTotals(portfolio);
   // Farmer tag health for the "My Farm" insight band.
