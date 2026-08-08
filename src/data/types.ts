@@ -25,6 +25,10 @@ export interface Animal {
   sireTag?: string;
   /** Photo URIs (front, side, back) — the prototype's primary animal ID. */
   photos?: string[];
+  /** App-assigned unique code (NGR-…), the animal's primary platform key. */
+  ngarenCode?: string;
+  /** Coat colour / markings text descriptor. */
+  color?: string;
 }
 
 export interface Location {

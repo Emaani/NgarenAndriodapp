@@ -1,18 +1,20 @@
 import { useMemo } from 'react';
 import { View } from 'react-native';
-import { Redirect } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { CalendarEvent, CalendarType, getCalendarEvents } from '@/data/clinical';
+import { getLocalEvents } from '@/data/localEvents';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { formatDate } from '@/lib/date';
-import { AppText, EmptyState, GradientHeader, Icon, IconName, Screen } from '@/ui';
+import { AppText, EmptyState, Fab, GradientHeader, Icon, IconName, Screen } from '@/ui';
 
 const TYPE_META: Record<CalendarType, { label: string; icon: IconName; tint: string }> = {
   vet_visit: { label: 'Vet Visit', icon: 'stethoscope', tint: '#3D99F5' },
   vaccination: { label: 'Vaccination', icon: 'needle', tint: '#16A34A' },
   follow_up: { label: 'Follow-up', icon: 'calendar-clock', tint: '#F59E0B' },
   tagging: { label: 'Tagging', icon: 'tag', tint: '#9333EA' },
+  stock_take: { label: 'Stock Take', icon: 'clipboard-check-outline', tint: '#F59E0B' },
 };
 
 function dayLabel(iso: string): string {
@@ -29,8 +31,13 @@ function dayLabel(iso: string): string {
 }
 
 export default function Calendar() {
+  const router = useRouter();
   const { loading, isAuthenticated } = useAuth();
-  const { data: events } = useResource(getCalendarEvents, []);
+  // Derived clinical events + farmer-scheduled events, shared across roles.
+  const { data: events } = useResource(async () => {
+    const [derived, scheduled] = await Promise.all([getCalendarEvents(), getLocalEvents()]);
+    return [...scheduled, ...derived];
+  }, []);
 
   // Group by date, upcoming first.
   const groups = useMemo(() => {
@@ -106,6 +113,7 @@ export default function Calendar() {
           ))
         )}
       </Screen>
+      <Fab icon="plus" onPress={() => router.push('/add-event' as never)} />
     </View>
   );
 }

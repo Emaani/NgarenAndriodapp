@@ -85,6 +85,8 @@ function RootLayout() {
           <Stack.Screen name="farmers" />
           <Stack.Screen name="team" />
           <Stack.Screen name="log-visit" />
+          <Stack.Screen name="add-health-record" />
+          <Stack.Screen name="add-event" />
           <Stack.Screen name="reports" />
           <Stack.Screen name="telemetry" />
           <Stack.Screen name="marketplace" />

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Image, Pressable, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Redirect, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { animals as animalsFallback } from '@/data/mock';
@@ -11,11 +12,17 @@ import { AppText, Button, GradientHeader, Icon, IconChip, IconName, Screen } fro
 
 type Mark = 'pending' | 'present' | 'missing';
 type Phase = 'method' | 'count' | 'summary';
-type StockMethod = 'bluetooth' | 'qr' | 'manual';
+type StockMethod = 'photo' | 'bluetooth' | 'qr' | 'manual';
 
 // Stock take is a non-satellite verification: you confirm each animal in front
 // of you by whatever tag it carries (tester feedback Q9).
 const METHODS: { value: StockMethod; icon: IconName; title: string; blurb: string }[] = [
+  {
+    value: 'photo',
+    icon: 'camera-outline',
+    title: 'Photo confirmation',
+    blurb: 'Take a current picture of each animal to verify its presence — no device needed.',
+  },
   {
     value: 'bluetooth',
     icon: 'bluetooth',
@@ -97,10 +104,16 @@ function AnimalRow({
   animal,
   mark,
   onMark,
+  photoMode,
+  photoUri,
+  onCapture,
 }: {
   animal: Animal;
   mark: Mark;
   onMark: (m: Mark) => void;
+  photoMode?: boolean;
+  photoUri?: string;
+  onCapture?: () => void;
 }) {
   return (
     <View
@@ -117,7 +130,11 @@ function AnimalRow({
         shadow[1],
       ]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.mdMinus }}>
-        <IconChip icon="cow" />
+        {photoUri ? (
+          <Image source={{ uri: photoUri }} style={{ width: 38, height: 38, borderRadius: radius.sm }} />
+        ) : (
+          <IconChip icon="cow" />
+        )}
         <View style={{ flex: 1, gap: 2 }}>
           <AppText variant="bodyLarge" style={{ fontWeight: '600' }}>
             {animal.name ?? animal.tag}
@@ -130,15 +147,20 @@ function AnimalRow({
         {mark === 'missing' && <Icon name="alert-circle" size={22} color={colors.error} />}
       </View>
       <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+        {/* Photo mode: confirming presence requires a current picture. */}
+        {photoMode && mark !== 'present' ? (
+          <MarkButton label="Photo to confirm" icon="check" active={false} activeColor={colors.success} onPress={() => onCapture?.()} />
+        ) : (
+          <MarkButton
+            label="Present"
+            icon="check"
+            active={mark === 'present'}
+            activeColor={colors.success}
+            onPress={() => onMark(mark === 'present' ? 'pending' : 'present')}
+          />
+        )}
         <MarkButton
-          label="Present"
-          icon="check"
-          active={mark === 'present'}
-          activeColor={colors.success}
-          onPress={() => onMark(mark === 'present' ? 'pending' : 'present')}
-        />
-        <MarkButton
-          label="Missing"
+          label="Absent"
           icon="close"
           active={mark === 'missing'}
           activeColor={colors.error}
@@ -170,7 +192,9 @@ export default function StockTake() {
     Object.fromEntries(animalsFallback.map((a) => [a.id, 'pending' as Mark])),
   );
   const [phase, setPhase] = useState<Phase>('method');
-  const [method, setMethod] = useState<StockMethod>('bluetooth');
+  const [method, setMethod] = useState<StockMethod>('photo');
+  // Confirmation photos captured in photo mode, keyed by animal id.
+  const [photos, setPhotos] = useState<Record<number, string>>({});
 
   // Add any newly-loaded animals to the count sheet as pending.
   useEffect(() => {
@@ -197,6 +221,21 @@ export default function StockTake() {
   const progress = allAnimals.length ? counted / allAnimals.length : 0;
 
   const setMark = (id: number, m: Mark) => setMarks((prev) => ({ ...prev, [id]: m }));
+
+  // Photo mode: taking a current picture is what confirms presence.
+  const captureFor = async (id: number) => {
+    try {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) return;
+      const res = await ImagePicker.launchCameraAsync({ quality: 0.5 });
+      if (!res.canceled && res.assets?.[0]) {
+        setPhotos((prev) => ({ ...prev, [id]: res.assets[0].uri }));
+        setMark(id, 'present');
+      }
+    } catch {
+      // camera unavailable — leave unmarked
+    }
+  };
   const markRemaining = (m: Mark) =>
     setMarks((prev) => {
       const next = { ...prev };
@@ -397,11 +436,24 @@ export default function StockTake() {
             </AppText>
           </Pressable>
         )}
+        {method === 'photo' && (
+          <AppText variant="caption" color={colors.onSurfaceVariant}>
+            Tap “Photo to confirm” on each animal to record a current picture as proof of presence.
+          </AppText>
+        )}
       </View>
 
       <Screen contentStyle={{ paddingTop: spacing.md, paddingBottom: spacing.xxl + 72 }}>
         {allAnimals.map((a) => (
-          <AnimalRow key={a.id} animal={a} mark={marks[a.id] ?? 'pending'} onMark={(m) => setMark(a.id, m)} />
+          <AnimalRow
+            key={a.id}
+            animal={a}
+            mark={marks[a.id] ?? 'pending'}
+            onMark={(m) => setMark(a.id, m)}
+            photoMode={method === 'photo'}
+            photoUri={photos[a.id]}
+            onCapture={() => captureFor(a.id)}
+          />
         ))}
       </Screen>
 

@@ -9,6 +9,7 @@ import {
 } from '@/data/mock';
 import { getBreeds, getDevices, getLocations, registerAnimal } from '@/data/api';
 import { addLocalAnimal } from '@/data/localAnimals';
+import { generateNgarenCode } from '@/lib/ngaren';
 import { useResource } from '@/data/hooks';
 import { AppText, Button, DatePickerField, GradientHeader, PhotoField, PickerField, Screen, TextField } from '@/ui';
 
@@ -33,6 +34,7 @@ export default function RegisterAnimal() {
 
   const [tag, setTag] = useState('');
   const [name, setName] = useState('');
+  const [color, setColor] = useState('');
   const [breedKey, setBreedKey] = useState('');
   const [locationId, setLocationId] = useState('');
   const [dob, setDob] = useState('');
@@ -79,6 +81,9 @@ export default function RegisterAnimal() {
       // backend is wired.
       const breedName = breedOptions.find((b) => b.value === breedKey)?.label ?? 'Unknown';
       const locationName = locationOptions.find((l) => l.value === locationId)?.label;
+      // Mint the animal's permanent Ngaren Asset Code at capture — its primary
+      // key, independent of any tag/device.
+      const ngarenCode = generateNgarenCode();
       await addLocalAnimal({
         id: Date.now(),
         tag: tag.trim(),
@@ -91,6 +96,8 @@ export default function RegisterAnimal() {
         description: notes || descriptionParts.join(' · ') || undefined,
         deviceSerial: deviceSerial || null,
         photos,
+        ngarenCode,
+        color: color.trim() || undefined,
       });
 
       // Best-effort backend persist (no-op in mock mode); never blocks onboarding.
@@ -126,6 +133,7 @@ export default function RegisterAnimal() {
           options={breedOptions}
           onSelect={setBreedKey}
         />
+        <TextField label="Colour / markings" value={color} onChangeText={setColor} placeholder="e.g. Brown with white patch" />
         <PickerField
           label="Location"
           required

@@ -46,7 +46,7 @@ export interface HealthRecord {
   createdAt: string;
 }
 
-export type CalendarType = 'vet_visit' | 'vaccination' | 'follow_up' | 'tagging';
+export type CalendarType = 'vet_visit' | 'vaccination' | 'follow_up' | 'tagging' | 'stock_take';
 
 export interface CalendarEvent {
   id: string;
