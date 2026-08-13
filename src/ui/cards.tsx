@@ -1,6 +1,7 @@
 import { Image, Pressable, View } from 'react-native';
 import { colors, radius, spacing } from '@/theme';
-import { formatDate } from '@/lib/date';
+import { ageFromDate, formatDate } from '@/lib/date';
+import { taggingMeta } from '@/lib/tagging';
 import { Animal, AppNotification, Device, Location, User } from '@/data/types';
 import { Card } from './Card';
 import { AppText } from './AppText';
@@ -36,7 +37,6 @@ export function AnimalListItem({
   onPress: () => void;
   onMenu: () => void;
 }) {
-  const connected = !!animal.deviceSerial;
   const thumb = animal.photos?.[0];
   return (
     <Card onPress={onPress} style={{ marginBottom: spacing.mdMinus }}>
@@ -50,14 +50,14 @@ export function AnimalListItem({
           <AppText variant="title">{animal.name ?? animal.tag}</AppText>
           <Line icon="dna" text={`Breed: ${animal.breed.name}`} />
           <Line icon="map-marker" text={animal.locationName ?? '—'} />
-          <Line icon="calendar" text={`DOB: ${formatDate(animal.dateOfBirth)}`} />
-          {connected ? (
-            <Line icon="tag" text={animal.deviceSerial!} color={colors.success} />
-          ) : (
-            <Line icon="alert-circle" text="Not connected" color={colors.warning} />
-          )}
+          {/* Privacy: age, not the date of birth. */}
+          <Line icon="calendar" text={`Age: ${ageFromDate(animal.dateOfBirth)}`} />
+          <Line icon={taggingMeta(animal.taggingMethod).icon} text={taggingMeta(animal.taggingMethod).short} />
         </View>
-        <Overflow onPress={onMenu} />
+        <View style={{ alignItems: 'flex-end', gap: spacing.xs }}>
+          <Overflow onPress={onMenu} />
+          {animal.approvalStatus === 'pending' ? <ActionChip label="Pending" variant="warning" /> : null}
+        </View>
       </View>
     </Card>
   );

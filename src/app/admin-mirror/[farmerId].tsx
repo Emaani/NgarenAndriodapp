@@ -5,6 +5,7 @@ import { colors, radius, shadow, spacing } from '@/theme';
 import { FarmerMirror, getFarmerMirror, logMirrorAccess } from '@/data/farmerMirror';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
+import { maskEmail } from '@/lib/privacy';
 import { ActionChip, AppText, EmptyState, GradientHeader, Icon, IconChip, Screen } from '@/ui';
 
 const FALLBACK: FarmerMirror = { farmer: null, animals: [], devices: [] };
@@ -78,7 +79,7 @@ export default function AdminMirror() {
                     {mirror.farmer.fullName ?? '(unnamed farmer)'}
                   </AppText>
                   <AppText variant="caption" color={colors.onSurfaceVariant}>
-                    {mirror.farmer.email ?? '—'}
+                    {maskEmail(mirror.farmer.email)}
                   </AppText>
                 </View>
               </View>

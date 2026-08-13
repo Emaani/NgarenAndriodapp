@@ -7,21 +7,12 @@ import {
   devices as devicesFallback,
   locations as locationsFallback,
 } from '@/data/mock';
-import { getBreeds, getDevices, getLocations, registerAnimal } from '@/data/api';
-import { addLocalAnimal } from '@/data/localAnimals';
+import { getAnimals, getBreeds, getDevices, getLocations, registerAnimal } from '@/data/api';
+import { addLocalAnimal, getLocalAnimals } from '@/data/localAnimals';
 import { generateNgarenCode } from '@/lib/ngaren';
+import { SMART_METHODS, TAGGING_METHOD_OPTIONS, taggingMeta } from '@/lib/tagging';
 import { useResource } from '@/data/hooks';
 import { AppText, Button, DatePickerField, GradientHeader, PhotoField, PickerField, Screen, TextField } from '@/ui';
-
-// Not every animal carries a smart tag — capture the tagging method so
-// non-smart / manual tagging is supported (tester feedback).
-const TAGGING_METHODS = [
-  { label: 'Satellite tag (Ceres Tag)', value: 'satellite' },
-  { label: 'Bluetooth (BLE) tag', value: 'bluetooth' },
-  { label: 'QR-code ear tag', value: 'qr' },
-  { label: 'Manual / visual tag (no device)', value: 'manual' },
-];
-const SMART_METHODS = ['satellite', 'bluetooth', 'qr'];
 
 export default function RegisterAnimal() {
   const router = useRouter();
@@ -31,6 +22,11 @@ export default function RegisterAnimal() {
   );
   const { data: locations } = useResource(() => getLocations(), locationsFallback);
   const { data: devices } = useResource(() => getDevices(), devicesFallback);
+  // Registered animals feed the lineage dropdowns (dam/sire).
+  const { data: herd } = useResource(async () => {
+    const [remote, local] = await Promise.all([getAnimals(), getLocalAnimals()]);
+    return [...local, ...remote];
+  }, []);
 
   const [tag, setTag] = useState('');
   const [name, setName] = useState('');
@@ -38,17 +34,19 @@ export default function RegisterAnimal() {
   const [breedKey, setBreedKey] = useState('');
   const [locationId, setLocationId] = useState('');
   const [dob, setDob] = useState('');
+  const [damTag, setDamTag] = useState('');
+  const [sireTag, setSireTag] = useState('');
   const [taggingMethod, setTaggingMethod] = useState('');
   const [deviceSerial, setDeviceSerial] = useState('');
-  // Photo-first identity (Horizon One): front is the primary ID; side & back
-  // are supporting angles.
+  // 360° photo ID: front is the primary; left/right/back complete the record.
   const [photoFront, setPhotoFront] = useState<string | null>(null);
-  const [photoSide, setPhotoSide] = useState<string | null>(null);
+  const [photoLeft, setPhotoLeft] = useState<string | null>(null);
+  const [photoRight, setPhotoRight] = useState<string | null>(null);
   const [photoBack, setPhotoBack] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const isSmartTag = SMART_METHODS.includes(taggingMethod);
+  const isSmartTag = SMART_METHODS.includes(taggingMethod as never);
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const breedOptions = useMemo(() => breeds.map((b) => ({ label: b.name, value: b.key })), [breeds]);
@@ -56,7 +54,6 @@ export default function RegisterAnimal() {
     () => locations.map((l) => ({ label: l.name, value: String(l.id) })),
     [locations],
   );
-  // Only devices not already linked to an animal can be attached here.
   const deviceOptions = useMemo(
     () =>
       devices
@@ -64,25 +61,26 @@ export default function RegisterAnimal() {
         .map((d) => ({ label: `${d.serial} · ${d.model}`, value: d.serial })),
     [devices],
   );
+  // Lineage: choose a registered parent, or leave "Unknown".
+  const parentOptions = useMemo(
+    () => [
+      { label: 'Unknown', value: '' },
+      ...herd.map((a) => ({ label: `${a.name ?? a.tag} · ${a.tag}`, value: a.tag })),
+    ],
+    [herd],
+  );
 
   const photos = useMemo(
-    () => [photoFront, photoSide, photoBack].filter((p): p is string => !!p),
-    [photoFront, photoSide, photoBack],
+    () => [photoFront, photoLeft, photoRight, photoBack].filter((p): p is string => !!p),
+    [photoFront, photoLeft, photoRight, photoBack],
   );
 
   const onSubmit = async () => {
     setSubmitting(true);
     try {
-      const methodLabel = TAGGING_METHODS.find((m) => m.value === taggingMethod)?.label;
-      const descriptionParts = [name, methodLabel ? `Tagging: ${methodLabel}` : ''].filter(Boolean);
-
-      // Onboard locally first so the animal — with its photo ID — reliably
-      // appears in the herd and its digital record, even before the animal
-      // backend is wired.
       const breedName = breedOptions.find((b) => b.value === breedKey)?.label ?? 'Unknown';
       const locationName = locationOptions.find((l) => l.value === locationId)?.label;
-      // Mint the animal's permanent Ngaren Asset Code at capture — its primary
-      // key, independent of any tag/device.
+      // Dual ID: an immutable system-generated NGR code + the user's custom tag.
       const ngarenCode = generateNgarenCode();
       await addLocalAnimal({
         id: Date.now(),
@@ -93,11 +91,17 @@ export default function RegisterAnimal() {
         locationName,
         dateOfBirth: dob || '',
         status: 'active',
-        description: notes || descriptionParts.join(' · ') || undefined,
+        description: notes.trim() || undefined,
         deviceSerial: deviceSerial || null,
+        damTag: damTag || undefined,
+        sireTag: sireTag || undefined,
         photos,
         ngarenCode,
         color: color.trim() || undefined,
+        taggingMethod: taggingMethod || 'manual',
+        // Maker-checker: a new registration is captured as pending until an
+        // approver signs it off.
+        approvalStatus: 'pending',
       });
 
       // Best-effort backend persist (no-op in mock mode); never blocks onboarding.
@@ -107,7 +111,7 @@ export default function RegisterAnimal() {
           breedKey: breedKey || undefined,
           locationId: locationId ? Number(locationId) : undefined,
           dateOfBirth: dob || null,
-          description: notes || descriptionParts.join(' · ') || undefined,
+          description: notes.trim() || `Tagging: ${taggingMeta(taggingMethod).label}`,
         });
       } catch {
         // ignore — the animal is already saved locally
@@ -123,21 +127,25 @@ export default function RegisterAnimal() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <GradientHeader title="Register Animal" subtitle="Add a new animal to your herd" showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
-        {/* Photo ID leads the form — it's the animal's primary identifier. */}
+        {/* 360° Photo ID leads the form — it's the animal's primary identifier. */}
         <AppText variant="title" style={{ marginBottom: spacing.xs }}>
-          Photo ID
+          360° Photo ID
         </AppText>
         <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>
-          Capture the animal from three angles. The front photo is its primary ID.
+          Capture the animal from four angles. The front photo is its primary ID.
         </AppText>
         <PhotoField label="Front (required)" value={photoFront} onChange={setPhotoFront} />
-        <PhotoField label="Side" value={photoSide} onChange={setPhotoSide} />
+        <PhotoField label="Left side" value={photoLeft} onChange={setPhotoLeft} />
+        <PhotoField label="Right side" value={photoRight} onChange={setPhotoRight} />
         <PhotoField label="Back" value={photoBack} onChange={setPhotoBack} />
 
         <AppText variant="title" style={{ marginTop: spacing.sm, marginBottom: spacing.sm }}>
           Details
         </AppText>
-        <TextField label="Tag ID" required value={tag} onChangeText={setTag} placeholder="e.g. A-073" />
+        <TextField label="Tag ID (your reference)" required value={tag} onChangeText={setTag} placeholder="e.g. A-073" />
+        <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginTop: -spacing.sm, marginBottom: spacing.md }}>
+          A permanent Ngaren code (NGR-…) is generated automatically as the system ID.
+        </AppText>
         <TextField label="Name" value={name} onChangeText={setName} placeholder="Optional friendly name" />
         <PickerField
           label="Breed"
@@ -164,20 +172,28 @@ export default function RegisterAnimal() {
           onSelect={setDob}
         />
 
+        {/* Lineage — select a registered parent or leave Unknown. */}
+        <AppText variant="title" style={{ marginTop: spacing.sm, marginBottom: spacing.sm }}>
+          Lineage
+        </AppText>
+        <PickerField label="Dam (mother)" value={damTag} placeholder="Unknown" options={parentOptions} onSelect={setDamTag} />
+        <PickerField label="Sire (father)" value={sireTag} placeholder="Unknown" options={parentOptions} onSelect={setSireTag} />
+
+        <AppText variant="title" style={{ marginTop: spacing.sm, marginBottom: spacing.sm }}>
+          Tagging
+        </AppText>
         <PickerField
           label="Tagging method"
           required
           value={taggingMethod}
           placeholder="How is this animal tagged?"
-          options={TAGGING_METHODS}
+          options={TAGGING_METHOD_OPTIONS}
           onSelect={(v) => {
             setTaggingMethod(v);
-            if (!SMART_METHODS.includes(v)) setDeviceSerial('');
+            if (!SMART_METHODS.includes(v as never)) setDeviceSerial('');
           }}
         />
 
-        {/* Only smart tags link to a device on the account. Manual / visual
-            tags are recorded without a device (tester feedback). */}
         {isSmartTag ? (
           <PickerField
             label="Link a Device"
@@ -195,10 +211,10 @@ export default function RegisterAnimal() {
         <TextField label="Notes" value={notes} onChangeText={setNotes} placeholder="Any additional details..." multiline />
 
         <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.md }}>
-          Fields marked * are required.
+          Fields marked * are required. The record is saved as pending until approved.
         </AppText>
         <Button
-          label="Register Animal"
+          label="Submit for approval"
           loading={submitting}
           disabled={!tag.trim() || !breedKey || !locationId || !taggingMethod || !photoFront}
           onPress={onSubmit}

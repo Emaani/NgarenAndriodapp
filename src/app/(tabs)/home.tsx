@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -5,12 +6,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { summary as summaryFallback } from '@/data/mock';
 import { getSummary } from '@/data/api';
+import { getLocalAnimals } from '@/data/localAnimals';
 import { getFarmerPortfolio, portfolioTotals } from '@/data/portfolio';
 import { VET_METRICS_FALLBACK, getVetMetrics } from '@/data/vet';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { roleTheme } from '@/lib/roles';
 import { Permission } from '@/lib/permissions';
+import { TAGGING_META, TaggingMethod, taggingMeta } from '@/lib/tagging';
 import { AppText, Icon, IconName, NotificationBell } from '@/ui';
 
 function initials(name: string): string {
@@ -29,6 +32,7 @@ const FARMER_ACTIONS: Action[] = [
   { icon: 'stethoscope', label: 'Find a Vet', route: '/find-vet', tint: '#21C45D', perm: 'book_vet' },
   { icon: 'clipboard-pulse-outline', label: 'Vet Requests', route: '/vet-requests', tint: '#EF4444', perm: 'book_vet' },
   { icon: 'plus-circle-outline', label: 'Register Animal', route: '/register-animal', tint: '#6D874F', perm: 'register_animal' },
+  { icon: 'clipboard-check-outline', label: 'Approvals', route: '/approvals', tint: '#F59E0B' },
   { icon: 'dna', label: 'Breeding', route: '/breeding', tint: '#EC4899', perm: 'manage_breeding' },
   { icon: 'heart-pulse', label: 'Managed Health', route: '/health', tint: '#EF4444', perm: 'view_health' },
   { icon: 'calendar-month-outline', label: 'Calendar', route: '/calendar', tint: '#0EA5E9' },
@@ -44,6 +48,7 @@ const FARMER_ACTIONS: Action[] = [
 // farmer does not get (mirrors the Command Center's adminNav superset).
 const ADMIN_ACTIONS: Action[] = [
   { icon: 'account-multiple-outline', label: 'Farmers Portfolio', route: '/farmers', tint: '#6D874F' },
+  { icon: 'clipboard-check-outline', label: 'Approvals', route: '/approvals', tint: '#F59E0B' },
   { icon: 'cow', label: 'Livestock', route: '/(tabs)/animals', tint: '#2563EB' },
   { icon: 'map-marker-radius', label: 'Track', route: '/(tabs)/track', tint: '#16A34A' },
   { icon: 'chart-box-outline', label: 'Insights', route: '/insights', tint: '#0D9488' },
@@ -135,6 +140,22 @@ export default function Home() {
   const { data: summary } = useResource(getSummary, summaryFallback);
   const { data: portfolio } = useResource(getFarmerPortfolio, []);
   const { data: vetMetrics } = useResource(getVetMetrics, VET_METRICS_FALLBACK);
+  const { data: localAnimals } = useResource(getLocalAnimals, []);
+
+  // Stock-take/validation reporting categorized by device type (management
+  // decision). Counts the animals onboarded through the app by tagging method.
+  const deviceBreakdown = useMemo(() => {
+    const counts: Record<TaggingMethod, number> = { satellite: 0, bluetooth: 0, qr: 0, manual: 0 };
+    for (const a of localAnimals) {
+      const m = (a.taggingMethod as TaggingMethod) ?? 'manual';
+      counts[m] = (counts[m] ?? 0) + 1;
+    }
+    return counts;
+  }, [localAnimals]);
+  const pendingCount = useMemo(
+    () => localAnimals.filter((a) => a.approvalStatus === 'pending').length,
+    [localAnimals],
+  );
 
   const theme = roleTheme(appRole);
   const isAdmin = appRole === 'admin';
@@ -143,7 +164,8 @@ export default function Home() {
   // Hide actions a delegated seat member lacks the permission for; Team &
   // Payments are owner-only. Owners/solo farmers/admins see the full grid.
   const actions = roleActions.filter((a) => {
-    if (a.route === '/team' || a.route === '/payments') return canManageTeam;
+    // Team, Payments and Approvals (the maker-checker step) are owner/admin only.
+    if (a.route === '/team' || a.route === '/payments' || a.route === '/approvals') return canManageTeam;
     return !a.perm || can(a.perm);
   });
   const linkedDevices = Math.max(0, summary.devices - summary.connectivity.unconnected);
@@ -265,6 +287,46 @@ export default function Home() {
             <KpiTile value={activeTags} label="Active tags" icon="access-point" tint="#16A34A" />
             <KpiTile value={inactiveTags} label="Inactive tags" icon="access-point-off" tint="#F59E0B" />
           </View>
+        )}
+
+        {/* Maker-checker: pending-approval prompt for approvers. */}
+        {canManageTeam && pendingCount > 0 && (
+          <Pressable
+            onPress={() => router.push('/approvals' as never)}
+            style={({ pressed }) => [
+              { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: '#F59E0B1A', borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.lg, borderWidth: 1, borderColor: '#F59E0B55', opacity: pressed ? 0.9 : 1 },
+            ]}>
+            <Icon name="clipboard-alert-outline" size={22} color="#B45309" />
+            <View style={{ flex: 1 }}>
+              <AppText variant="bodyLarge" style={{ fontWeight: '700' }}>
+                {pendingCount} animal{pendingCount === 1 ? '' : 's'} awaiting approval
+              </AppText>
+              <AppText variant="caption" color={colors.onSurfaceVariant}>
+                Review and approve newly captured records.
+              </AppText>
+            </View>
+            <Icon name="chevron-right" size={22} color={colors.onSurfaceVariant} />
+          </Pressable>
+        )}
+
+        {/* Reporting categorized by device type (management decision). */}
+        {!isVet && localAnimals.length > 0 && (
+          <>
+            <AppText variant="title" style={{ marginBottom: spacing.md }}>
+              By device type
+            </AppText>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.lg }}>
+              {(Object.keys(TAGGING_META) as TaggingMethod[]).map((m) => (
+                <KpiTile
+                  key={m}
+                  value={deviceBreakdown[m]}
+                  label={taggingMeta(m).short}
+                  icon={taggingMeta(m).icon}
+                  tint={m === 'satellite' ? '#16A34A' : m === 'bluetooth' ? '#0EA5E9' : m === 'qr' ? '#9333EA' : '#6D874F'}
+                />
+              ))}
+            </View>
+          </>
         )}
 
         <AppText variant="title" style={{ marginBottom: spacing.md }}>

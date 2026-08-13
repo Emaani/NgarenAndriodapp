@@ -23,12 +23,16 @@ export interface Animal {
   description?: string;
   damTag?: string;
   sireTag?: string;
-  /** Photo URIs (front, side, back) — the prototype's primary animal ID. */
+  /** Photo URIs (360°: front, left, right, back) — the primary animal ID. */
   photos?: string[];
   /** App-assigned unique code (NGR-…), the animal's primary platform key. */
   ngarenCode?: string;
   /** Coat colour / markings text descriptor. */
   color?: string;
+  /** Tagging method (satellite | bluetooth | qr | manual) for device-type views. */
+  taggingMethod?: string;
+  /** Maker-checker state. Undefined is treated as approved (legacy records). */
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
 }
 
 export interface Location {

@@ -1,0 +1,95 @@
+import { useState } from 'react';
+import { Image, View } from 'react-native';
+import { Redirect, useRouter } from 'expo-router';
+import { colors, radius, shadow, spacing } from '@/theme';
+import { Animal } from '@/data/types';
+import { getPendingLocalAnimals, setLocalAnimalApproval } from '@/data/localAnimals';
+import { useResource } from '@/data/hooks';
+import { useAuth } from '@/services/auth';
+import { ageFromDate } from '@/lib/date';
+import { taggingMeta } from '@/lib/tagging';
+import { AppText, Button, EmptyState, GradientHeader, Icon, IconChip, Screen } from '@/ui';
+
+/**
+ * Maker-checker approvals — the "checker" step. A designated approver (owner or
+ * admin) reviews animals captured by a maker and approves or rejects each before
+ * the record is finalised. Data integrity per the management decision.
+ */
+export default function Approvals() {
+  const router = useRouter();
+  const { loading, isAuthenticated, canManageTeam } = useAuth();
+  const { data: pending, reload } = useResource(getPendingLocalAnimals, []);
+  const [local, setLocal] = useState<Animal[] | null>(null);
+  const [busy, setBusy] = useState<number | null>(null);
+
+  if (loading) return null;
+  if (!isAuthenticated) return <Redirect href="/login" />;
+  if (!canManageTeam) return <Redirect href="/(tabs)/home" />;
+
+  const items = local ?? pending;
+
+  const decide = async (animal: Animal, status: 'approved' | 'rejected') => {
+    setBusy(animal.id);
+    setLocal((prev) => (prev ?? pending).filter((a) => a.id !== animal.id));
+    await setLocalAnimalApproval(animal.id, status);
+    setBusy(null);
+  };
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <GradientHeader title="Pending Approvals" subtitle={`${items.length} awaiting review`} showBack />
+      <Screen contentStyle={{ paddingTop: spacing.md }}>
+        {items.length === 0 ? (
+          <EmptyState
+            icon="clipboard-check-outline"
+            title="Nothing to approve"
+            subtitle="Newly registered animals appear here for review before they're finalised."
+            actionLabel="Refresh"
+            onAction={reload}
+          />
+        ) : (
+          items.map((a) => {
+            const meta = taggingMeta(a.taggingMethod);
+            return (
+              <View
+                key={a.id}
+                style={[
+                  { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, gap: spacing.sm, borderWidth: 1, borderColor: colors.divider },
+                  shadow[1],
+                ]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.mdMinus }}>
+                  {a.photos?.[0] ? (
+                    <Image source={{ uri: a.photos[0] }} style={{ width: 48, height: 48, borderRadius: radius.md }} />
+                  ) : (
+                    <IconChip icon="cow" />
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <AppText variant="bodyLarge" style={{ fontWeight: '600' }}>
+                      {a.name ?? a.tag}
+                    </AppText>
+                    <AppText variant="caption" color={colors.onSurfaceVariant}>
+                      {a.ngarenCode ?? a.tag} · {a.breed.name}
+                    </AppText>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                    <Icon name={meta.icon} size={16} color={colors.onSurfaceVariant} />
+                    <AppText variant="caption" color={colors.onSurfaceVariant}>
+                      {meta.short}
+                    </AppText>
+                  </View>
+                </View>
+                <AppText variant="caption" color={colors.onSurfaceVariant}>
+                  Tag {a.tag} · {a.color ?? '—'} · {a.locationName ?? '—'} · Age {ageFromDate(a.dateOfBirth)} · {a.photos?.length ?? 0} photos
+                </AppText>
+                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                  <Button label="Approve" icon="check" loading={busy === a.id} onPress={() => decide(a, 'approved')} style={{ flex: 1 }} />
+                  <Button label="Reject" variant="outline" onPress={() => decide(a, 'rejected')} style={{ flex: 1 }} />
+                </View>
+              </View>
+            );
+          })
+        )}
+      </Screen>
+    </View>
+  );
+}

@@ -38,3 +38,22 @@ export async function addLocalAnimal(animal: Animal): Promise<void> {
 export async function getLocalAnimalById(id: number): Promise<Animal | undefined> {
   return (await getLocalAnimals()).find((a) => a.id === id);
 }
+
+/** Maker-checker: set an animal's approval state (approve / reject). */
+export async function setLocalAnimalApproval(
+  id: number,
+  status: 'approved' | 'rejected',
+): Promise<void> {
+  try {
+    const all = await getLocalAnimals();
+    const next = all.map((a) => (a.id === id ? { ...a, approvalStatus: status } : a));
+    await AsyncStorage.setItem(KEY, JSON.stringify(next));
+  } catch {
+    // best-effort
+  }
+}
+
+/** Animals awaiting a checker's approval. */
+export async function getPendingLocalAnimals(): Promise<Animal[]> {
+  return (await getLocalAnimals()).filter((a) => a.approvalStatus === 'pending');
+}

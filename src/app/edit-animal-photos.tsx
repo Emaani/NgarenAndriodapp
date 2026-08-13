@@ -26,7 +26,8 @@ export default function EditAnimalPhotos() {
   );
 
   const [front, setFront] = useState<string | null>(null);
-  const [side, setSide] = useState<string | null>(null);
+  const [left, setLeft] = useState<string | null>(null);
+  const [right, setRight] = useState<string | null>(null);
   const [back, setBack] = useState<string | null>(null);
   const [seeded, setSeeded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -36,8 +37,9 @@ export default function EditAnimalPhotos() {
     if (seeded || !animal) return;
     const p = animal.photos ?? [];
     setFront(p[0] ?? null);
-    setSide(p[1] ?? null);
-    setBack(p[2] ?? null);
+    setLeft(p[1] ?? null);
+    setRight(p[2] ?? null);
+    setBack(p[3] ?? null);
     setSeeded(true);
   }, [animal, seeded]);
 
@@ -53,7 +55,7 @@ export default function EditAnimalPhotos() {
     );
   }
 
-  const photos = [front, side, back].filter((p): p is string => !!p);
+  const photos = [front, left, right, back].filter((p): p is string => !!p);
 
   const onSave = async () => {
     setSaving(true);
@@ -72,10 +74,11 @@ export default function EditAnimalPhotos() {
       <GradientHeader title="Photo ID" subtitle={animal.name ?? animal.tag} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>
-          Capture or upload the animal from three angles. The front photo is its primary ID.
+          Capture or upload the animal from four angles (360°). The front photo is its primary ID.
         </AppText>
         <PhotoField label="Front" value={front} onChange={setFront} />
-        <PhotoField label="Side" value={side} onChange={setSide} />
+        <PhotoField label="Left side" value={left} onChange={setLeft} />
+        <PhotoField label="Right side" value={right} onChange={setRight} />
         <PhotoField label="Back" value={back} onChange={setBack} />
         <Button
           label="Save Photo ID"

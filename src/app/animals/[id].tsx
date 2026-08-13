@@ -11,6 +11,7 @@ import { getLocalAnimalById } from '@/data/localAnimals';
 import { HEALTH_TYPE_LABELS, getLocalHealthRecords } from '@/data/localHealth';
 import { useResource } from '@/data/hooks';
 import { ageFromDate, formatDate } from '@/lib/date';
+import { taggingMeta } from '@/lib/tagging';
 import { ActionChip, AppText, Button, ChartCard, DetailRow, EmptyState, GradientHeader, Icon, Screen } from '@/ui';
 
 export default function AnimalDetail() {
@@ -79,10 +80,17 @@ export default function AnimalDetail() {
               <Icon name="cow" size={44} color={colors.primary} />
             </View>
           )}
-          <ActionChip
-            label={animal.status === 'active' ? 'Active' : 'Inactive'}
-            variant={animal.status === 'active' ? 'success' : 'neutral'}
-          />
+          <View style={{ flexDirection: 'row', gap: spacing.xs }}>
+            <ActionChip
+              label={animal.status === 'active' ? 'Active' : 'Inactive'}
+              variant={animal.status === 'active' ? 'success' : 'neutral'}
+            />
+            {animal.approvalStatus === 'pending' ? (
+              <ActionChip label="Pending approval" variant="warning" />
+            ) : animal.approvalStatus === 'rejected' ? (
+              <ActionChip label="Rejected" variant="error" />
+            ) : null}
+          </View>
         </View>
 
         {/* Photo ID gallery (front / side / back) — the primary identifier.
@@ -138,15 +146,17 @@ export default function AnimalDetail() {
           Static record
         </AppText>
         <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.md }, shadow[1]]}>
-          {animal.ngarenCode ? <DetailRow label="Ngaren code" value={animal.ngarenCode} /> : null}
-          <DetailRow label="Tag ID" value={animal.tag} />
+          {/* Dual ID: immutable system code + the owner's custom tag. */}
+          {animal.ngarenCode ? <DetailRow label="Ngaren code (system)" value={animal.ngarenCode} /> : null}
+          <DetailRow label="Tag ID (yours)" value={animal.tag} />
           <DetailRow label="Breed" value={animal.breed.name} />
           {animal.color ? <DetailRow label="Colour" value={animal.color} /> : null}
           <DetailRow label="Location" value={animal.locationName ?? '—'} />
-          <DetailRow label="Date of Birth" value={formatDate(animal.dateOfBirth)} />
+          {/* Privacy: display age, not the date of birth. */}
           <DetailRow label="Age" value={ageFromDate(animal.dateOfBirth)} />
-          <DetailRow label="Dam (mother)" value={animal.damTag ?? '—'} />
-          <DetailRow label="Sire (father)" value={animal.sireTag ?? '—'} last={!animal.description} />
+          <DetailRow label="Tagging method" value={taggingMeta(animal.taggingMethod).short} />
+          <DetailRow label="Dam (mother)" value={animal.damTag ?? 'Unknown'} />
+          <DetailRow label="Sire (father)" value={animal.sireTag ?? 'Unknown'} last={!animal.description} />
           {animal.description ? <DetailRow label="Notes" value={animal.description} last /> : null}
         </View>
 
