@@ -3,10 +3,10 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import {
   animals as animalsFallback,
-  behaviourSeries as behaviourFallback,
   calloutRequests as calloutFallback,
 } from '@/data/mock';
-import { getAnimalBehaviour, getAnimalById, getCalloutRequests } from '@/data/api';
+import { getAnimalById, getCalloutRequests } from '@/data/api';
+import { getCeresBehaviour } from '@/data/ceresBehaviour';
 import { getLocalAnimalById } from '@/data/localAnimals';
 import { HEALTH_TYPE_LABELS, getLocalHealthRecords } from '@/data/localHealth';
 import { useResource } from '@/data/hooks';
@@ -22,10 +22,15 @@ export default function AnimalDetail() {
     async () => (await getLocalAnimalById(Number(id))) ?? (await getAnimalById(Number(id))),
     animalsFallback.find((a) => a.id === Number(id)),
   );
-  const { data: behaviour, loading: behaviourLoading } = useResource(
-    () => getAnimalBehaviour(Number(id)),
-    behaviourFallback,
-  );
+  // Live Ceres telemetry for THIS animal: resolve its tag identifiers, then
+  // query ceres_telemetry. Empty [] when it has no synced telemetry.
+  const { data: behaviour, loading: behaviourLoading } = useResource(async () => {
+    const a = (await getLocalAnimalById(Number(id))) ?? (await getAnimalById(Number(id)));
+    const keys = [a?.deviceSerial ?? undefined, a?.tag, a?.ngarenCode].filter(
+      (k): k is string => !!k,
+    );
+    return getCeresBehaviour(keys);
+  }, []);
   const { data: callouts } = useResource(() => getCalloutRequests(), calloutFallback);
   // All local health records; filtered to this animal below once it resolves.
   const { data: allHealth } = useResource(() => getLocalHealthRecords(), []);

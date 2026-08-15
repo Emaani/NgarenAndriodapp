@@ -1,8 +1,9 @@
 import { View } from 'react-native';
 import { Redirect } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { summary as summaryFallback, behaviourSeries as behaviourFallback } from '@/data/mock';
-import { getSummary, getAnimalBehaviour } from '@/data/api';
+import { summary as summaryFallback } from '@/data/mock';
+import { getSummary } from '@/data/api';
+import { getCeresBehaviour } from '@/data/ceresBehaviour';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { AppText, ChartCard, DonutChart, GradientHeader, Icon, IconName, Screen } from '@/ui';
@@ -54,7 +55,8 @@ function SectionCard({ title, subtitle, children }: { title: string; subtitle?: 
 export default function Insights() {
   const { isAdmin, loading, isAuthenticated } = useAuth();
   const { data: summary } = useResource(getSummary, summaryFallback);
-  const { data: behaviour } = useResource(() => getAnimalBehaviour(0), behaviourFallback);
+  // Herd-wide live Ceres behaviour (no tag filter). Empty when no telemetry.
+  const { data: behaviour, loading: behaviourLoading } = useResource(() => getCeresBehaviour(), []);
 
   if (loading) return null;
   if (!isAuthenticated) return <Redirect href="/login" />;
@@ -102,12 +104,23 @@ export default function Insights() {
         <AppText variant="title" style={{ marginTop: spacing.sm, marginBottom: spacing.md }}>
           Herd behaviour trends
         </AppText>
-        <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.md }}>
-          Drag any chart to inspect a reading.
-        </AppText>
-        {behaviour.slice(0, 3).map((series) => (
-          <ChartCard key={series.label} series={series} />
-        ))}
+        {behaviour.length > 0 ? (
+          <>
+            <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.md }}>
+              Live Ceres telemetry · drag any chart to inspect a reading.
+            </AppText>
+            {behaviour.slice(0, 3).map((series) => (
+              <ChartCard key={series.label} series={series} />
+            ))}
+          </>
+        ) : (
+          <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.lg, alignItems: 'center', gap: spacing.sm }, shadow[1]]}>
+            <Icon name="chart-line" size={28} color={colors.onSurfaceVariant} />
+            <AppText variant="body" color={colors.onSurfaceVariant} style={{ textAlign: 'center' }}>
+              {behaviourLoading ? 'Loading telemetry…' : 'No live Ceres telemetry in the last 14 days.'}
+            </AppText>
+          </View>
+        )}
       </Screen>
     </View>
   );
