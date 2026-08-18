@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { animals as animalsFallback, locations as locationsFallback, vets } from '@/data/mock';
@@ -21,6 +21,7 @@ export default function RequestCallout() {
   const [location, setLocation] = useState(locationsFallback[0]?.name ?? '');
   const [urgency, setUrgency] = useState<(typeof URGENCY)[number]>('Routine');
   const [notes, setNotes] = useState('');
+  const [tcsAccepted, setTcsAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const onSubmit = async () => {
@@ -131,11 +132,18 @@ export default function RequestCallout() {
           multiline
         />
 
+        {/* Accept booking / managed-health T&Cs before requesting a service. */}
+        <Pressable onPress={() => setTcsAccepted((v) => !v)} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginTop: spacing.sm, marginBottom: spacing.md }}>
+          <Icon name={tcsAccepted ? 'checkbox-marked' : 'checkbox-blank-outline'} size={22} color={tcsAccepted ? colors.primary : colors.onSurfaceVariant} />
+          <AppText variant="body" color={colors.onSurface} style={{ flex: 1 }}>
+            I accept the booking & managed-health terms & conditions.
+          </AppText>
+        </Pressable>
+
         <Button
           label={submitting ? 'Submitting…' : 'Submit Request'}
           onPress={onSubmit}
-          disabled={!animal || submitting}
-          style={{ marginTop: spacing.sm }}
+          disabled={!animal || !tcsAccepted || submitting}
         />
       </Screen>
     </View>

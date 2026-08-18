@@ -25,7 +25,7 @@ export interface Animal {
   sireTag?: string;
   /** Photo URIs (360°: front, left, right, back) — the primary animal ID. */
   photos?: string[];
-  /** App-assigned unique code (NGR-…), the animal's primary platform key. */
+  /** Ngaren Animal Account Number (AAN, NGR-…) — the animal's primary key. */
   ngarenCode?: string;
   /** Coat colour / markings text descriptor. */
   color?: string;
@@ -33,6 +33,21 @@ export interface Animal {
   taggingMethod?: string;
   /** Maker-checker state. Undefined is treated as approved (legacy records). */
   approvalStatus?: 'pending' | 'approved' | 'rejected';
+  /** Physical farm address where the animal is based. */
+  physicalAddress?: string;
+  /** One or more tagging devices associated to this AAN. */
+  devices?: RegisteredDevice[];
+}
+
+/** A tagging device associated to an animal's AAN (step 1d of AAN creation). */
+export interface RegisteredDevice {
+  /** Model type, e.g. 'Ceres Gen6' | 'Ceres Rancher' | 'Gsat Rancher' | 'Bluetooth'. */
+  type: string;
+  serial: string;
+  supplier?: string;
+  photo?: string | null;
+  /** Satellite linkage route: Ngaren-assisted support, or self-linkage online. */
+  linkage?: 'support' | 'self';
 }
 
 export interface Location {

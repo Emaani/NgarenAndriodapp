@@ -151,12 +151,13 @@ export default function AnimalDetail() {
           Static record
         </AppText>
         <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.md }, shadow[1]]}>
-          {/* Dual ID: immutable system code + the owner's custom tag. */}
-          {animal.ngarenCode ? <DetailRow label="Ngaren code (system)" value={animal.ngarenCode} /> : null}
-          <DetailRow label="Tag ID (yours)" value={animal.tag} />
+          {/* Dual ID: the AAN (system) + the owner's farmer reference. */}
+          {animal.ngarenCode ? <DetailRow label="AAN (system)" value={animal.ngarenCode} /> : null}
+          <DetailRow label="Farmer reference" value={animal.tag} />
           <DetailRow label="Breed" value={animal.breed.name} />
           {animal.color ? <DetailRow label="Colour" value={animal.color} /> : null}
           <DetailRow label="Location" value={animal.locationName ?? '—'} />
+          {animal.physicalAddress ? <DetailRow label="Address" value={animal.physicalAddress} /> : null}
           {/* Privacy: display age, not the date of birth. */}
           <DetailRow label="Age" value={ageFromDate(animal.dateOfBirth)} />
           <DetailRow label="Tagging method" value={taggingMeta(animal.taggingMethod).short} />
@@ -176,6 +177,25 @@ export default function AnimalDetail() {
           <DetailRow label="Vet visits" value={vetVisits === 0 ? 'None booked' : String(vetVisits)} />
           <DetailRow label="Alerts monitoring" value={tagActive ? 'On' : 'Off'} last />
         </View>
+
+        {/* Associated devices (AAN can carry more than one). */}
+        {animal.devices && animal.devices.length > 0 ? (
+          <>
+            <AppText variant="title" style={{ marginTop: spacing.lg, marginBottom: spacing.sm }}>
+              Devices ({animal.devices.length})
+            </AppText>
+            <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.md }, shadow[1]]}>
+              {animal.devices.map((d, i) => (
+                <DetailRow
+                  key={d.serial + i}
+                  label={d.type}
+                  value={`${d.serial}${d.linkage ? ` · ${d.linkage === 'support' ? 'Ngaren linkage' : 'Self-linkage'}` : ''}`}
+                  last={i === animal.devices!.length - 1}
+                />
+              ))}
+            </View>
+          </>
+        ) : null}
 
         {/* Digital Health Card — chronological history for this animal's code. */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.lg, marginBottom: spacing.sm }}>
