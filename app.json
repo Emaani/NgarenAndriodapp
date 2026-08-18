@@ -19,7 +19,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.emaanidev.ngarenconnectmobile",
-      "versionCode": 15
+      "versionCode": 16
     },
     "web": {
       "output": "static",
