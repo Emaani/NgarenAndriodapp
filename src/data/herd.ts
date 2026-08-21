@@ -78,6 +78,30 @@ export async function getHerdAnimalById(id: number): Promise<Animal | undefined>
 }
 
 /**
+ * Best-effort approval write-through: when the Field-Operations checker approves
+ * a captured animal, mark its lineage row `complete` so the web command centre
+ * (and Ceres linkage) sees it finalised. Rejection stays local — animal_lineage
+ * has no "rejected" lifecycle, so a rejected capture simply never finalises.
+ * No-ops (and returns false) when Supabase isn't configured or the row isn't
+ * present yet (e.g. the maker's role couldn't insert it).
+ */
+export async function setLineageApproval(
+  aan: string | undefined,
+  status: 'approved' | 'rejected',
+): Promise<boolean> {
+  if (!isSupabaseConfigured() || !aan || status !== 'approved') return false;
+  try {
+    const { error } = await supabase
+      .from('animal_lineage')
+      .update({ lifecycle_status: 'complete' })
+      .eq('animal_id', aan);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Best-effort write-through of a newly created AAN into animal_lineage so it
  * syncs to the web command centre. Requires an insert-capable role (admin/vet);
  * for others it no-ops and the animal remains local. Only http(s) photo URLs are

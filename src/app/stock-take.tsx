@@ -4,7 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Redirect, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { animals as animalsFallback } from '@/data/mock';
-import { getAnimals } from '@/data/api';
+import { getHerd } from '@/data/herd';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { Animal } from '@/data/types';
@@ -187,7 +187,7 @@ function SummaryStat({ value, label, color }: { value: number; label: string; co
 export default function StockTake() {
   const router = useRouter();
   const { can } = useAuth();
-  const { data: allAnimals } = useResource(() => getAnimals(), animalsFallback);
+  const { data: allAnimals } = useResource(getHerd, animalsFallback);
   const [marks, setMarks] = useState<Record<number, Mark>>(() =>
     Object.fromEntries(animalsFallback.map((a) => [a.id, 'pending' as Mark])),
   );

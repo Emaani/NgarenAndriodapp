@@ -7,6 +7,7 @@ import { colors, radius, shadow, spacing } from '@/theme';
 import { summary as summaryFallback } from '@/data/mock';
 import { getSummary } from '@/data/api';
 import { getLocalAnimals } from '@/data/localAnimals';
+import { getHerd } from '@/data/herd';
 import { getFarmerPortfolio, portfolioTotals } from '@/data/portfolio';
 import { VET_METRICS_FALLBACK, getVetMetrics } from '@/data/vet';
 import { useResource } from '@/data/hooks';
@@ -141,17 +142,25 @@ export default function Home() {
   const { data: portfolio } = useResource(getFarmerPortfolio, []);
   const { data: vetMetrics } = useResource(getVetMetrics, VET_METRICS_FALLBACK);
   const { data: localAnimals } = useResource(getLocalAnimals, []);
+  const { data: herd } = useResource(getHerd, []);
 
   // Stock-take/validation reporting categorized by device type (management
-  // decision). Counts the animals onboarded through the app by tagging method.
+  // decision), across the whole live herd. Only animals whose tagging method is
+  // known are classified — animal_lineage doesn't record the device model, so
+  // unclassified animals aren't force-bucketed (that would be misleading).
   const deviceBreakdown = useMemo(() => {
     const counts: Record<TaggingMethod, number> = { satellite: 0, bluetooth: 0, qr: 0, manual: 0 };
-    for (const a of localAnimals) {
-      const m = (a.taggingMethod as TaggingMethod) ?? 'manual';
-      counts[m] = (counts[m] ?? 0) + 1;
+    for (const a of herd) {
+      const m = a.taggingMethod as TaggingMethod | undefined;
+      if (m) counts[m] = (counts[m] ?? 0) + 1;
     }
     return counts;
-  }, [localAnimals]);
+  }, [herd]);
+  const classifiedCount = useMemo(
+    () => (Object.values(deviceBreakdown) as number[]).reduce((s, n) => s + n, 0),
+    [deviceBreakdown],
+  );
+  // Pending approvals are the local captures the checker reviews on-device.
   const pendingCount = useMemo(
     () => localAnimals.filter((a) => a.approvalStatus === 'pending').length,
     [localAnimals],
@@ -312,7 +321,7 @@ export default function Home() {
         )}
 
         {/* Reporting categorized by device type (management decision). */}
-        {!isVet && localAnimals.length > 0 && (
+        {!isVet && classifiedCount > 0 && (
           <>
             <AppText variant="title" style={{ marginBottom: spacing.md }}>
               By device type

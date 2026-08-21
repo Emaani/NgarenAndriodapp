@@ -3,7 +3,8 @@ import { Pressable, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { animals as animalsFallback, locations as locationsFallback, vets } from '@/data/mock';
-import { getAnimals, getLocations, submitCalloutRequest } from '@/data/api';
+import { getLocations, submitCalloutRequest } from '@/data/api';
+import { getHerd } from '@/data/herd';
 import { useResource } from '@/data/hooks';
 import { CalloutUrgency } from '@/data/types';
 import { AppText, Button, GradientHeader, Icon, Screen, SelectField, TextField } from '@/ui';
@@ -14,7 +15,7 @@ export default function RequestCallout() {
   const router = useRouter();
   const { vetId } = useLocalSearchParams<{ vetId?: string }>();
   const vet = vetId ? vets.find((v) => v.id === Number(vetId)) : undefined;
-  const { data: animals } = useResource(() => getAnimals(), animalsFallback);
+  const { data: animals } = useResource(getHerd, animalsFallback);
   const { data: locations } = useResource(() => getLocations(), locationsFallback);
 
   const [animal, setAnimal] = useState('');

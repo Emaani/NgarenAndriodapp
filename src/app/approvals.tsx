@@ -4,6 +4,7 @@ import { Redirect, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { Animal } from '@/data/types';
 import { getPendingLocalAnimals, setLocalAnimalApproval } from '@/data/localAnimals';
+import { setLineageApproval } from '@/data/herd';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { ageFromDate } from '@/lib/date';
@@ -35,6 +36,9 @@ export default function Approvals() {
     setBusy(animal.id);
     setLocal((prev) => (prev ?? pending).filter((a) => a.id !== animal.id));
     await setLocalAnimalApproval(animal.id, status);
+    // Sync the checker's decision to animal_lineage so the web command centre
+    // sees the finalised animal. Best-effort — a local approval still stands.
+    await setLineageApproval(animal.ngarenCode, status);
     setBusy(null);
   };
 
