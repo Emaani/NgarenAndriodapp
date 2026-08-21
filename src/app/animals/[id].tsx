@@ -5,8 +5,9 @@ import {
   animals as animalsFallback,
   calloutRequests as calloutFallback,
 } from '@/data/mock';
-import { getAnimalById, getCalloutRequests } from '@/data/api';
+import { getCalloutRequests } from '@/data/api';
 import { getCeresBehaviour } from '@/data/ceresBehaviour';
+import { getHerdAnimalById } from '@/data/herd';
 import { getLocalAnimalById } from '@/data/localAnimals';
 import { HEALTH_TYPE_LABELS, getLocalHealthRecords } from '@/data/localHealth';
 import { useResource } from '@/data/hooks';
@@ -17,15 +18,15 @@ import { ActionChip, AppText, Button, ChartCard, DetailRow, EmptyState, Gradient
 export default function AnimalDetail() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  // Locally-onboarded animals (with photo IDs) take precedence over the backend.
+  // Local animals take precedence, else the live animal_lineage herd.
   const { data: animal } = useResource(
-    async () => (await getLocalAnimalById(Number(id))) ?? (await getAnimalById(Number(id))),
+    () => getHerdAnimalById(Number(id)),
     animalsFallback.find((a) => a.id === Number(id)),
   );
   // Live Ceres telemetry for THIS animal: resolve its tag identifiers, then
   // query ceres_telemetry. Empty [] when it has no synced telemetry.
   const { data: behaviour, loading: behaviourLoading } = useResource(async () => {
-    const a = (await getLocalAnimalById(Number(id))) ?? (await getAnimalById(Number(id)));
+    const a = (await getLocalAnimalById(Number(id))) ?? (await getHerdAnimalById(Number(id)));
     const keys = [a?.deviceSerial ?? undefined, a?.tag, a?.ngarenCode].filter(
       (k): k is string => !!k,
     );

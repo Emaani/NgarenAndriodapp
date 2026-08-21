@@ -163,9 +163,11 @@ export default function Home() {
   const roleActions = isAdmin ? ADMIN_ACTIONS : isVet ? VET_ACTIONS : FARMER_ACTIONS;
   // Hide actions a delegated seat member lacks the permission for; Team &
   // Payments are owner-only. Owners/solo farmers/admins see the full grid.
+  // Approvals also open to a delegated Field-Operations validator.
+  const canApprove = canManageTeam || can('approve_records');
   const actions = roleActions.filter((a) => {
-    // Team, Payments and Approvals (the maker-checker step) are owner/admin only.
-    if (a.route === '/team' || a.route === '/payments' || a.route === '/approvals') return canManageTeam;
+    if (a.route === '/team' || a.route === '/payments') return canManageTeam;
+    if (a.route === '/approvals') return canApprove;
     return !a.perm || can(a.perm);
   });
   const linkedDevices = Math.max(0, summary.devices - summary.connectivity.unconnected);
@@ -290,7 +292,7 @@ export default function Home() {
         )}
 
         {/* Maker-checker: pending-approval prompt for approvers. */}
-        {canManageTeam && pendingCount > 0 && (
+        {canApprove && pendingCount > 0 && (
           <Pressable
             onPress={() => router.push('/approvals' as never)}
             style={({ pressed }) => [

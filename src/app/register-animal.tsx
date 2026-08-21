@@ -6,9 +6,11 @@ import {
   breeds as breedsFallback,
   locations as locationsFallback,
 } from '@/data/mock';
-import { getAnimals, getBreeds, getLocations, registerAnimal } from '@/data/api';
-import { addLocalAnimal, getLocalAnimals } from '@/data/localAnimals';
-import { RegisteredDevice } from '@/data/types';
+import { getBreeds, getLocations, registerAnimal } from '@/data/api';
+import { addLocalAnimal } from '@/data/localAnimals';
+import { getHerd, syncAnimalToLineage } from '@/data/herd';
+import { uploadAnimalPhotos } from '@/lib/imageUpload';
+import { Animal, RegisteredDevice } from '@/data/types';
 import { useAuth } from '@/services/auth';
 import { generateNgarenCode } from '@/lib/ngaren';
 import { DEVICE_MODEL_OPTIONS, deviceModel, methodForDevices } from '@/lib/tagging';
@@ -53,16 +55,13 @@ function SectionHeading({ step, title, subtitle }: { step: string; title: string
 
 export default function RegisterAnimal() {
   const router = useRouter();
-  const { canManageTeam } = useAuth();
+  const { canManageTeam, user } = useAuth();
   const { data: breeds } = useResource(
     getBreeds,
     breedsFallback.map((name) => ({ key: name.toLowerCase(), name })),
   );
   const { data: locations } = useResource(() => getLocations(), locationsFallback);
-  const { data: herd } = useResource(async () => {
-    const [remote, local] = await Promise.all([getAnimals(), getLocalAnimals()]);
-    return [...local, ...remote];
-  }, []);
+  const { data: herd } = useResource(getHerd, []);
 
   // (a) AAN — the Ngaren Animal Account Number, assigned at inception.
   const [aan] = useState(() => generateNgarenCode());
@@ -82,9 +81,11 @@ export default function RegisterAnimal() {
   const [photoRight, setPhotoRight] = useState<string | null>(null);
   const [photoBack, setPhotoBack] = useState<string | null>(null);
 
-  // (c) Farm / location
+  // (c) Farm / location — structured address for analytics/geofencing prep.
   const [locationId, setLocationId] = useState('');
-  const [physicalAddress, setPhysicalAddress] = useState('');
+  const [village, setVillage] = useState('');
+  const [parish, setParish] = useState('');
+  const [district, setDistrict] = useState('');
 
   // (d) Devices
   const [devices, setDevices] = useState<RegisteredDevice[]>([]);
@@ -141,21 +142,27 @@ export default function RegisterAnimal() {
     return choice;
   };
 
-  const canSubmit = !!tag.trim() && !!breedKey && !!locationId && !!photoFront && tcsAccepted;
+  // Farmer references should be unique within the herd.
+  const tagTaken = useMemo(() => {
+    const t = tag.trim().toLowerCase();
+    return !!t && herd.some((a) => a.tag.toLowerCase() === t);
+  }, [tag, herd]);
+
+  const canSubmit = !!tag.trim() && !tagTaken && !!breedKey && !!locationId && !!photoFront && tcsAccepted;
 
   const onSubmit = async () => {
     setSubmitting(true);
     try {
       const breedName = breedOptions.find((b) => b.value === breedKey)?.label ?? 'Unknown';
       const locationName = locationOptions.find((l) => l.value === locationId)?.label;
-      await addLocalAnimal({
+      const newAnimal: Animal = {
         id: Date.now(),
         tag: tag.trim(),
         name: name.trim() || undefined,
         breed: { key: breedKey || 'unknown', name: breedName },
         locationId: locationId ? Number(locationId) : undefined,
         locationName,
-        physicalAddress: physicalAddress.trim() || undefined,
+        physicalAddress: [village.trim(), parish.trim(), district.trim()].filter(Boolean).join(', ') || undefined,
         dateOfBirth: dob || '',
         status: 'active',
         description: notes.trim() || undefined,
@@ -168,19 +175,24 @@ export default function RegisterAnimal() {
         color: color.trim() || undefined,
         taggingMethod: methodForDevices(devices),
         approvalStatus: autoApprove ? 'approved' : 'pending',
-      });
+      };
+      await addLocalAnimal(newAnimal);
 
-      try {
-        await registerAnimal({
-          tag,
-          breedKey: breedKey || undefined,
-          locationId: locationId ? Number(locationId) : undefined,
-          dateOfBirth: dob || null,
-          description: notes.trim() || undefined,
-        });
-      } catch {
-        // ignore — the animal is already saved locally
-      }
+      // Background: compress + upload the photos, then write-through to Supabase
+      // animal_lineage with the uploaded URLs so the AAN + photos sync to the web
+      // command centre. Fire-and-forget so navigation stays instant; local URIs
+      // already drive on-device display, and everything degrades gracefully.
+      (async () => {
+        const urls = user?.id && photos.length ? await uploadAnimalPhotos(photos, user.id, aan) : [];
+        await syncAnimalToLineage(newAnimal, user?.id, urls);
+      })().catch(() => undefined);
+      registerAnimal({
+        tag,
+        breedKey: breedKey || undefined,
+        locationId: locationId ? Number(locationId) : undefined,
+        dateOfBirth: dob || null,
+        description: notes.trim() || undefined,
+      }).catch(() => undefined);
 
       router.replace('/(tabs)/animals');
     } catch {
@@ -208,6 +220,11 @@ export default function RegisterAnimal() {
         {/* (b) Animal information */}
         <SectionHeading step="b" title="Animal information" subtitle="Farmer reference, descriptors & 360° photos" />
         <TextField label="Farmer reference (Tag ID)" required value={tag} onChangeText={setTag} placeholder="e.g. A-073" />
+        {tagTaken ? (
+          <AppText variant="caption" color={colors.error} style={{ marginTop: -spacing.sm, marginBottom: spacing.md }}>
+            This tag is already used in your herd — choose a unique reference.
+          </AppText>
+        ) : null}
         <TextField label="Name" value={name} onChangeText={setName} placeholder="Optional friendly name" />
         <PickerField label="Breed" required value={breedKey} placeholder="Select a breed" options={breedOptions} onSelect={setBreedKey} />
         <TextField label="Colour / markings" value={color} onChangeText={setColor} placeholder="e.g. Brown with white patch" />
@@ -250,7 +267,9 @@ export default function RegisterAnimal() {
         {/* (c) Farm / location */}
         <SectionHeading step="c" title="Farm & location" subtitle="Where the animal is based" />
         <PickerField label="Location" required value={locationId} placeholder="Select a location" options={locationOptions} onSelect={setLocationId} />
-        <TextField label="Physical address" value={physicalAddress} onChangeText={setPhysicalAddress} placeholder="Village, parish, district…" multiline />
+        <TextField label="Village" value={village} onChangeText={setVillage} placeholder="e.g. Nsambya" />
+        <TextField label="Parish" value={parish} onChangeText={setParish} placeholder="e.g. Kibuli" />
+        <TextField label="District" value={district} onChangeText={setDistrict} placeholder="e.g. Kampala" />
         <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginTop: -spacing.sm, marginBottom: spacing.md }}>
           Map geo-fencing uses partner rendering now; Google Maps geo-fencing is coming.
         </AppText>
@@ -270,7 +289,11 @@ export default function RegisterAnimal() {
                 {d.linkage ? ` · ${d.linkage === 'support' ? 'Ngaren linkage' : 'Self-linkage'}` : ''}
               </AppText>
             </View>
-            <Pressable onPress={() => setDevices((prev) => prev.filter((_, idx) => idx !== i))} hitSlop={8}>
+            <Pressable
+              accessibilityLabel={`Remove ${d.type} device`}
+              accessibilityRole="button"
+              onPress={() => setDevices((prev) => prev.filter((_, idx) => idx !== i))}
+              hitSlop={8}>
               <Icon name="close" size={18} color={colors.onSurfaceVariant} />
             </Pressable>
           </View>

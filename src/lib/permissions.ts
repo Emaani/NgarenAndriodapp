@@ -20,6 +20,8 @@ export const PERMISSIONS = [
   'manage_devices',
   'manage_locations',
   'view_reports',
+  // Field-Operations validation: review & approve pending animal accounts.
+  'approve_records',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -31,6 +33,7 @@ const ALL: Permission[] = [...PERMISSIONS];
 /** Seat-role → permissions, mirroring seat_role_permissions seed rows. */
 export const SEAT_ROLE_TEMPLATES: Record<SeatRole, Permission[]> = {
   owner: ALL,
+  // Farm Manager doubles as the Field-Operations validator (can approve).
   farm_manager: ALL,
   stockman: ['view_animals', 'stock_take', 'view_track'],
   viewer: ['view_animals', 'view_track', 'view_health', 'view_reports'],

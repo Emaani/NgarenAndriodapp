@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { Modal, Pressable, View } from 'react-native';
+import { Modal, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { AppText } from './AppText';
@@ -16,6 +16,11 @@ export function BottomSheet({
   children: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
+  // Cap the content so a tall sheet (e.g. the device-capture form in landscape)
+  // scrolls instead of pushing its actions off-screen.
+  const maxContentHeight = height * 0.72;
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={{ flex: 1, backgroundColor: colors.scrim }} onPress={onClose} />
@@ -46,7 +51,13 @@ export function BottomSheet({
             {title}
           </AppText>
         )}
-        {children}
+        <ScrollView
+          style={{ maxHeight: maxContentHeight }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: spacing.xs }}>
+          {children}
+        </ScrollView>
       </View>
     </Modal>
   );

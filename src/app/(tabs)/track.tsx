@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, View } from 'react-native';
+import { Alert, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { colors, radius, shadow, spacing } from '@/theme';
@@ -257,7 +257,7 @@ export default function TrackScreen() {
           {report.insideCount} inside · {report.breaches.length} outside
         </AppText>
 
-        <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+        <View>
           {report.noFences ? (
             <AppText variant="body" color={colors.onSurfaceVariant} style={{ paddingVertical: spacing.md }}>
               No boundaries are visible. Enable a location in the filter to see its geofence.
@@ -336,7 +336,7 @@ export default function TrackScreen() {
               ))}
             </>
           )}
-        </ScrollView>
+        </View>
       </BottomSheet>
 
       <BottomSheet visible={filterOpen} onClose={() => setFilterOpen(false)} title="Filter by Location">

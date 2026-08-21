@@ -17,14 +17,17 @@ import { AppText, Button, EmptyState, GradientHeader, Icon, IconChip, Screen } f
  */
 export default function Approvals() {
   const router = useRouter();
-  const { loading, isAuthenticated, canManageTeam } = useAuth();
+  const { loading, isAuthenticated, canManageTeam, can } = useAuth();
   const { data: pending, reload } = useResource(getPendingLocalAnimals, []);
   const [local, setLocal] = useState<Animal[] | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
 
+  // Field-Operations validators (owner / admin / delegated approver) review here.
+  const canApprove = canManageTeam || can('approve_records');
+
   if (loading) return null;
   if (!isAuthenticated) return <Redirect href="/login" />;
-  if (!canManageTeam) return <Redirect href="/(tabs)/home" />;
+  if (!canApprove) return <Redirect href="/(tabs)/home" />;
 
   const items = local ?? pending;
 
@@ -37,7 +40,7 @@ export default function Approvals() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Pending Approvals" subtitle={`${items.length} awaiting review`} showBack />
+      <GradientHeader title="Pending Approvals" subtitle={`Field Operations review · ${items.length} awaiting`} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         {items.length === 0 ? (
           <EmptyState
