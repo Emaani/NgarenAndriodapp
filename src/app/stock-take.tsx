@@ -207,15 +207,15 @@ export default function StockTake() {
 
   const counted = useMemo(
     () => allAnimals.filter((a) => marks[a.id] !== 'pending').length,
-    [marks],
+    [marks, allAnimals],
   );
   const present = useMemo(
     () => allAnimals.filter((a) => marks[a.id] === 'present').length,
-    [marks],
+    [marks, allAnimals],
   );
   const missing = useMemo(
     () => allAnimals.filter((a) => marks[a.id] === 'missing').length,
-    [marks],
+    [marks, allAnimals],
   );
   const notCounted = allAnimals.length - counted;
   const progress = allAnimals.length ? counted / allAnimals.length : 0;

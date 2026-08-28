@@ -3,8 +3,8 @@ import { View } from 'react-native';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, spacing } from '@/theme';
 import { animals as animalsFallback } from '@/data/mock';
-import { getAnimalById } from '@/data/api';
-import { addLocalAnimal, getLocalAnimalById } from '@/data/localAnimals';
+import { getHerdAnimalById } from '@/data/herd';
+import { addLocalAnimal } from '@/data/localAnimals';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { generateNgarenCode } from '@/lib/ngaren';
@@ -20,8 +20,10 @@ export default function EditAnimalPhotos() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { loading, isAuthenticated } = useAuth();
+  // Resolve from the same live herd the detail screen uses (local-first, then
+  // animal_lineage) so any animal you can open, you can also photograph.
   const { data: animal } = useResource(
-    async () => (await getLocalAnimalById(Number(id))) ?? (await getAnimalById(Number(id))),
+    () => getHerdAnimalById(Number(id)),
     animalsFallback.find((a) => a.id === Number(id)),
   );
 
@@ -59,14 +61,17 @@ export default function EditAnimalPhotos() {
 
   const onSave = async () => {
     setSaving(true);
-    await addLocalAnimal({
-      ...animal,
-      // Give previously-created animals a proper primary key if they lack one.
-      ngarenCode: animal.ngarenCode ?? generateNgarenCode(),
-      photos,
-    });
-    setSaving(false);
-    router.back();
+    try {
+      await addLocalAnimal({
+        ...animal,
+        // Give previously-created animals a proper primary key if they lack one.
+        ngarenCode: animal.ngarenCode ?? generateNgarenCode(),
+        photos,
+      });
+      router.back();
+    } catch {
+      setSaving(false);
+    }
   };
 
   return (

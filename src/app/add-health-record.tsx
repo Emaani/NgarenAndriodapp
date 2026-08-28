@@ -39,18 +39,21 @@ export default function AddHealthRecord() {
 
   const onSubmit = async () => {
     setSaving(true);
-    await addLocalHealthRecord({
-      animalKey,
-      animalLabel,
-      type,
-      medication: medication.trim() || null,
-      notes: notes.trim(),
-      photo,
-      recordedBy: user?.fullName ?? user?.email ?? 'User',
-      date: date || today,
-    });
-    setSaving(false);
-    router.back();
+    try {
+      await addLocalHealthRecord({
+        animalKey,
+        animalLabel,
+        type,
+        medication: medication.trim() || null,
+        notes: notes.trim(),
+        photo,
+        recordedBy: user?.fullName ?? user?.email ?? 'User',
+        date: date || today,
+      });
+      router.back();
+    } catch {
+      setSaving(false);
+    }
   };
 
   return (
