@@ -33,11 +33,11 @@ const FARMER_ACTIONS: Action[] = [
   { icon: 'stethoscope', label: 'Find a Vet', route: '/find-vet', tint: '#21C45D', perm: 'book_vet' },
   { icon: 'clipboard-pulse-outline', label: 'Vet Requests', route: '/vet-requests', tint: '#EF4444', perm: 'book_vet' },
   { icon: 'plus-circle-outline', label: 'Register Animal', route: '/register-animal', tint: '#6D874F', perm: 'register_animal' },
-  { icon: 'clipboard-check-outline', label: 'Approvals', route: '/approvals', tint: '#F59E0B' },
+  { icon: 'check-decagram-outline', label: 'Approvals', route: '/approvals', tint: '#F59E0B' },
   { icon: 'dna', label: 'Breeding', route: '/breeding', tint: '#EC4899', perm: 'manage_breeding' },
   { icon: 'heart-pulse', label: 'Managed Health', route: '/health', tint: '#EF4444', perm: 'view_health' },
   { icon: 'calendar-month-outline', label: 'Calendar', route: '/calendar', tint: '#0EA5E9' },
-  { icon: 'clipboard-check-outline', label: 'Stock Take', route: '/stock-take', tint: '#F59E0B', perm: 'stock_take' },
+  { icon: 'clipboard-list-outline', label: 'Stock Take', route: '/stock-take', tint: '#F59E0B', perm: 'stock_take' },
   { icon: 'cow', label: 'View Animals', route: '/(tabs)/animals', tint: '#2563EB', perm: 'view_animals' },
   { icon: 'map-marker-radius', label: 'Track Animals', route: '/(tabs)/track', tint: '#16A34A', perm: 'view_track' },
   { icon: 'storefront-outline', label: 'Marketplace', route: '/marketplace', tint: '#0D9488' },
@@ -49,7 +49,7 @@ const FARMER_ACTIONS: Action[] = [
 // farmer does not get (mirrors the Command Center's adminNav superset).
 const ADMIN_ACTIONS: Action[] = [
   { icon: 'account-multiple-outline', label: 'Farmers Portfolio', route: '/farmers', tint: '#6D874F' },
-  { icon: 'clipboard-check-outline', label: 'Approvals', route: '/approvals', tint: '#F59E0B' },
+  { icon: 'check-decagram-outline', label: 'Approvals', route: '/approvals', tint: '#F59E0B' },
   { icon: 'cow', label: 'Livestock', route: '/(tabs)/animals', tint: '#2563EB' },
   { icon: 'map-marker-radius', label: 'Track', route: '/(tabs)/track', tint: '#16A34A' },
   { icon: 'chart-box-outline', label: 'Insights', route: '/insights', tint: '#0D9488' },
@@ -71,7 +71,7 @@ const ADMIN_ACTIONS: Action[] = [
 // Vet "Health Intelligence System" — clinical oversight across assigned farms.
 const VET_ACTIONS: Action[] = [
   { icon: 'clipboard-pulse-outline', label: 'Call-out Queue', route: '/vet', tint: '#3D99F5' },
-  { icon: 'clipboard-check-outline', label: 'Log a Visit', route: '/log-visit', tint: '#16A34A' },
+  { icon: 'clipboard-edit-outline', label: 'Log a Visit', route: '/log-visit', tint: '#16A34A' },
   { icon: 'heart-pulse', label: 'Managed Health', route: '/health', tint: '#EF4444' },
   { icon: 'cow', label: 'Livestock', route: '/(tabs)/animals', tint: '#2563EB' },
   { icon: 'dna', label: 'Breeding', route: '/breeding', tint: '#EC4899' },

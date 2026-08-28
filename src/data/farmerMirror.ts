@@ -55,6 +55,10 @@ const MOCK_MIRROR: FarmerMirror = {
 /** Fetch a farmer's profile + herd + devices, mirroring the web Support view. */
 export async function getFarmerMirror(farmerId: string): Promise<FarmerMirror> {
   if (!isSupabaseConfigured()) return MOCK_MIRROR;
+  // Demo/offline fallback ids (portfolio served MOCK_PORTFOLIO, ids f1..f6) are
+  // not real user_ids — resolving them against profiles yields "not found".
+  // Show the demo mirror instead so the flow stays coherent in demo mode.
+  if (/^f\d+$/.test(farmerId)) return MOCK_MIRROR;
   try {
     const [profileRes, animalRes, deviceRes] = await Promise.all([
       supabase.from('profiles').select('user_id, full_name, email, farm_id').eq('user_id', farmerId).maybeSingle(),

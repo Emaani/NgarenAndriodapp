@@ -1,5 +1,6 @@
 export { AppText } from './AppText';
 export { Icon, type IconName } from './Icon';
+export { CowGlyph } from './CowGlyph';
 export { Card } from './Card';
 export { ActionChip } from './Chip';
 export { SearchBar } from './SearchBar';

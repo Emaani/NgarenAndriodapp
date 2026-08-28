@@ -56,25 +56,70 @@ export async function getFarmerPortfolio(): Promise<FarmerPortfolioItem[]> {
   if (!isSupabaseConfigured()) return MOCK_PORTFOLIO;
   try {
     // Farmers are profiles carrying the "farmer" role. RLS lets admins read all.
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('user_id, full_name, farm_name, location');
-    if (error || !data || data.length === 0) {
-      reportDataFailure('portfolio', error);
+    // `profiles` is thin (user_id, full_name, email, farm_id) — no farm_name /
+    // location columns, so we must NOT select those (the old query did, which
+    // errored on every call and silently served mock farmers whose ids the
+    // Support-mirror couldn't resolve — the "Farmer not found" bug).
+    const [profilesRes, rolesRes, animalsRes, devicesRes] = await Promise.all([
+      supabase.from('profiles').select('user_id, full_name, email, farm_id'),
+      supabase.from('user_roles').select('user_id, role'),
+      supabase.from('animal_lineage').select('assigned_farmer_id, created_by_user, animal_tag_id, tag_status'),
+      supabase.from('devices').select('assigned_to, status'),
+    ]);
+
+    const profiles = (profilesRes.data ?? []) as Record<string, unknown>[];
+    if (profilesRes.error || profiles.length === 0) {
+      reportDataFailure('portfolio', profilesRes.error);
       return MOCK_PORTFOLIO;
     }
     reportDataSuccess();
-    return data.map((p: Record<string, unknown>, i: number) => ({
-      id: String(p.user_id ?? i),
-      farmerName: (p.full_name as string) ?? 'Farmer',
-      farmName: (p.farm_name as string) ?? '—',
-      location: (p.location as string) ?? '—',
-      animals: 0,
-      devices: 0,
-      activeTags: 0,
-      healthScore: 0,
-      status: 'active' as const,
-    }));
+
+    // Keep only farmer-role profiles when we can read roles; otherwise show all.
+    const roles = (rolesRes.data ?? []) as { user_id: string; role: string }[];
+    const farmerIds = new Set(roles.filter((r) => r.role === 'farmer').map((r) => r.user_id));
+    const farmers = farmerIds.size > 0 ? profiles.filter((p) => farmerIds.has(String(p.user_id))) : profiles;
+
+    // Per-farmer counts, aggregated client-side from two bulk reads.
+    const animals = (animalsRes.data ?? []) as Record<string, unknown>[];
+    const devices = (devicesRes.data ?? []) as Record<string, unknown>[];
+    const animalCount = new Map<string, number>();
+    const tagCount = new Map<string, number>();
+    for (const a of animals) {
+      const owner = String(a.assigned_farmer_id ?? a.created_by_user ?? '');
+      if (!owner) continue;
+      animalCount.set(owner, (animalCount.get(owner) ?? 0) + 1);
+      const tagged = a.animal_tag_id != null && String(a.animal_tag_id).length > 0 && a.tag_status !== 'unlinked';
+      if (tagged) tagCount.set(owner, (tagCount.get(owner) ?? 0) + 1);
+    }
+    const deviceCount = new Map<string, number>();
+    for (const d of devices) {
+      const owner = String(d.assigned_to ?? '');
+      if (!owner) continue;
+      deviceCount.set(owner, (deviceCount.get(owner) ?? 0) + 1);
+    }
+
+    return farmers.map((p) => {
+      const id = String(p.user_id);
+      const nAnimals = animalCount.get(id) ?? 0;
+      const nDevices = deviceCount.get(id) ?? 0;
+      const nTags = tagCount.get(id) ?? 0;
+      const healthScore = nAnimals > 0 ? Math.round((nTags / nAnimals) * 100) : 0;
+      const status: FarmerPortfolioItem['status'] =
+        nAnimals === 0 ? 'inactive' : healthScore >= 80 ? 'active' : 'attention';
+      return {
+        id,
+        farmerName: (p.full_name as string) ?? 'Farmer',
+        // profiles has no farm_name/region — surface what it does have: the
+        // farm_id (if set) and the email, both useful for admin identification.
+        farmName: (p.farm_id as string) ?? '',
+        location: (p.email as string) ?? '',
+        animals: nAnimals,
+        devices: nDevices,
+        activeTags: nTags,
+        healthScore,
+        status,
+      };
+    });
   } catch (e) {
     reportDataFailure('portfolio', e);
     return MOCK_PORTFOLIO;

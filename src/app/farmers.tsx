@@ -82,7 +82,7 @@ export default function Farmers() {
                       {f.farmerName}
                     </AppText>
                     <AppText variant="caption" color={colors.onSurfaceVariant}>
-                      {f.farmName} · {f.location}
+                      {[f.farmName, f.location].filter((s) => s && s !== '—').join(' · ') || 'No farm details'}
                     </AppText>
                   </View>
                   <ActionChip label={f.status[0].toUpperCase() + f.status.slice(1)} variant={STATUS_VARIANT[f.status]} />
