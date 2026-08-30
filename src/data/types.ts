@@ -318,6 +318,41 @@ export interface Vet {
   rating: number;
   reviews: number;
   available: boolean;
+  /** Professional persona (Aug 29 2026 standup) — resume-style profile fields. */
+  credentials?: string;
+  photo?: string;
+  videoVisits?: boolean;
+  selfPay?: boolean;
+  institution?: string;
+  tagline?: string;
+  sponsored?: boolean;
+  yearsExperience?: number;
+}
+
+/** A single day in a vet's booking calendar. `appts === 0` means closed. */
+export interface VetDayAvailability {
+  dateIso: string;
+  appts: number;
+  video: boolean;
+}
+
+/**
+ * The Veterinary impact dashboard metrics (Aug 29 2026 standup). Counted from
+ * the vet's completed work — visits, animals & farmers served, the nature of
+ * services delivered, and the key field observations recorded.
+ */
+export interface VetImpact {
+  totalVisits: number;
+  animalsManaged: number;
+  farmersServiced: number;
+  services: { treatment: number; vaccination: number; stockTaking: number; others: number };
+  observations: { ticks: number; flies: number; disease: number };
+}
+
+/** Full vet profile: persona + booking calendar + impact dashboard. */
+export interface VetProfile extends Vet {
+  availability: VetDayAvailability[];
+  impact: VetImpact;
 }
 
 // Appointment priority — reduced to Routine / Emergency (Aug 29 2026 standup;

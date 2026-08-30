@@ -2,10 +2,20 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { CalloutRequest, CalloutStatus, CalloutUrgency } from '@/data/types';
+import { CalloutRequest, CalloutStatus, CalloutUrgency, VetImpact } from '@/data/types';
 import { getCalloutRequests, updateCalloutStatus } from '@/data/api';
+import { getMyVetImpact } from '@/data/vetProfiles';
+import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
-import { ActionChip, AppText, Button, GradientHeader, Icon, IconChip, Screen } from '@/ui';
+import { ActionChip, AppText, Button, GradientHeader, Icon, IconChip, Screen, VetImpactDashboard } from '@/ui';
+
+const EMPTY_IMPACT: VetImpact = {
+  totalVisits: 0,
+  animalsManaged: 0,
+  farmersServiced: 0,
+  services: { treatment: 0, vaccination: 0, stockTaking: 0, others: 0 },
+  observations: { ticks: 0, flies: 0, disease: 0 },
+};
 
 type Filter = 'pending' | 'accepted' | 'all';
 
@@ -110,6 +120,7 @@ export default function VetDashboard() {
   const { canVet, isAuthenticated, loading, user, signOut } = useAuth();
   const [requests, setRequests] = useState<CalloutRequest[]>([]);
   const [filter, setFilter] = useState<Filter>('pending');
+  const { data: impact } = useResource(getMyVetImpact, EMPTY_IMPACT);
 
   useEffect(() => {
     getCalloutRequests()
@@ -173,30 +184,41 @@ export default function VetDashboard() {
         </View>
       </GradientHeader>
 
-      <View style={{ flexDirection: 'row', gap: spacing.sm, padding: spacing.md, paddingBottom: 0 }}>
-        {FILTERS.map((f) => {
-          const active = filter === f.key;
-          return (
-            <Pressable
-              key={f.key}
-              onPress={() => setFilter(f.key)}
-              style={{
-                paddingHorizontal: spacing.md,
-                paddingVertical: spacing.sm,
-                borderRadius: radius.full,
-                backgroundColor: active ? colors.primary : colors.surface,
-                borderWidth: 1,
-                borderColor: active ? colors.primary : colors.divider,
-              }}>
-              <AppText variant="body" color={active ? '#fff' : colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
-                {f.label}
-              </AppText>
-            </Pressable>
-          );
-        })}
-      </View>
-
       <Screen contentStyle={{ paddingTop: spacing.md }}>
+        {/* Veterinary impact dashboard — the vet's reach, counted from records. */}
+        <AppText variant="title" style={{ marginBottom: spacing.sm }}>
+          My impact
+        </AppText>
+        <View style={{ marginBottom: spacing.lg }}>
+          <VetImpactDashboard impact={impact} />
+        </View>
+
+        <AppText variant="title" style={{ marginBottom: spacing.sm }}>
+          Call-out requests
+        </AppText>
+        <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
+          {FILTERS.map((f) => {
+            const active = filter === f.key;
+            return (
+              <Pressable
+                key={f.key}
+                onPress={() => setFilter(f.key)}
+                style={{
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: spacing.sm,
+                  borderRadius: radius.full,
+                  backgroundColor: active ? colors.primary : colors.surface,
+                  borderWidth: 1,
+                  borderColor: active ? colors.primary : colors.divider,
+                }}>
+                <AppText variant="body" color={active ? '#fff' : colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
+                  {f.label}
+                </AppText>
+              </Pressable>
+            );
+          })}
+        </View>
+
         {visible.length === 0 ? (
           <View style={{ alignItems: 'center', paddingVertical: spacing.xxl, gap: spacing.sm }}>
             <Icon name="clipboard-check-outline" size={44} color={colors.onSurfaceVariant} />

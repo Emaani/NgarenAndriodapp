@@ -10,84 +10,84 @@ import { AppText, Button, EmptyState, GradientHeader, Icon, Screen, SearchBar } 
 // a short radius, since farmers and vets travel locally (bicycle, boda).
 const PROXIMITY_KM = 5;
 
-function VetCard({ vet, onRequest, onRate }: { vet: Vet; onRequest: () => void; onRate: () => void }) {
+function initials(name: string): string {
+  const parts = name.replace(/^Dr\.?\s+/i, '').trim().split(/\s+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase();
+}
+
+function Tag({ icon, label }: { icon: 'video' | 'cash-multiple'; label: string }) {
   return (
-    <View
-      style={[
-        {
-          backgroundColor: colors.surface,
-          borderRadius: radius.md,
-          padding: spacing.md,
-          gap: spacing.sm,
-          marginBottom: spacing.mdMinus,
-        },
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.background, borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 2, borderWidth: 1, borderColor: colors.divider }}>
+      <Icon name={icon} size={12} color={colors.onSurfaceVariant} />
+      <AppText variant="caption" color={colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
+        {label}
+      </AppText>
+    </View>
+  );
+}
+
+function VetCard({ vet, onOpen, onRequest }: { vet: Vet; onOpen: () => void; onRequest: () => void }) {
+  return (
+    <Pressable
+      onPress={onOpen}
+      style={({ pressed }) => [
+        { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm, marginBottom: spacing.mdMinus, opacity: pressed ? 0.95 : 1 },
         shadow[1],
       ]}>
       <View style={{ flexDirection: 'row', gap: spacing.md }}>
-        <View
-          style={{
-            width: 52,
-            height: 52,
-            borderRadius: radius.full,
-            backgroundColor: colors.primaryTint,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-          <Icon name="stethoscope" size={26} color={colors.primary} />
+        <View>
+          <View style={{ width: 56, height: 56, borderRadius: radius.full, backgroundColor: colors.primaryTint, alignItems: 'center', justifyContent: 'center' }}>
+            <AppText variant="bodyLarge" color={colors.primaryDark} style={{ fontWeight: '800' }}>
+              {initials(vet.name)}
+            </AppText>
+          </View>
+          {vet.videoVisits ? (
+            <View style={{ position: 'absolute', right: -2, bottom: -2, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.onSurface, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.surface }}>
+              <Icon name="video" size={11} color="#fff" />
+            </View>
+          ) : null}
         </View>
         <View style={{ flex: 1, gap: 2 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <AppText variant="bodyLarge" style={{ fontWeight: '600' }}>
-              {vet.name}
-            </AppText>
-            <Pressable onPress={onRate} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-              <Icon name="star" size={14} color={colors.warning} />
-              <AppText variant="caption" color={colors.onSurface}>
-                {vet.rating} · {vet.reviews} visits
-              </AppText>
-            </Pressable>
-          </View>
-          <AppText variant="body" color={colors.onSurfaceVariant}>
-            {vet.clinic}
+          <AppText variant="bodyLarge" style={{ fontWeight: '700' }}>
+            {vet.name}
           </AppText>
           <AppText variant="caption" color={colors.onSurfaceVariant}>
-            {vet.specialty}
+            {vet.credentials ?? vet.specialty}
+          </AppText>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Icon name="star" size={14} color={colors.warning} />
+            <AppText variant="caption" color={colors.onSurface} style={{ fontWeight: '600' }}>
+              {vet.rating.toFixed(2)}
+            </AppText>
+            <AppText variant="caption" color={colors.onSurfaceVariant}>
+              · {vet.reviews} reviews
+            </AppText>
+          </View>
+        </View>
+        <View style={{ alignItems: 'flex-end', gap: 4 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+            <Icon name="map-marker" size={13} color={colors.onSurfaceVariant} />
+            <AppText variant="caption" color={colors.onSurfaceVariant}>
+              {vet.distanceKm} km
+            </AppText>
+          </View>
+          <AppText variant="caption" color={vet.available ? colors.success : colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
+            {vet.available ? 'Available' : 'Busy'}
           </AppText>
         </View>
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-          <Icon name="map-marker" size={14} color={colors.onSurfaceVariant} />
-          <AppText variant="caption" color={colors.onSurfaceVariant}>
-            {vet.distanceKm} km away
-          </AppText>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 4,
-              marginLeft: spacing.sm,
-            }}>
-            <View
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: 4,
-                backgroundColor: vet.available ? colors.success : colors.onSurfaceVariant,
-              }}
-            />
-            <AppText variant="caption" color={vet.available ? colors.success : colors.onSurfaceVariant}>
-              {vet.available ? 'Available' : 'Busy'}
-            </AppText>
-          </View>
-        </View>
-        <Pressable onPress={onRequest} disabled={!vet.available}>
-          <AppText variant="bodyLarge" color={vet.available ? colors.accent : colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
+
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+        {vet.videoVisits ? <Tag icon="video" label="Video visits" /> : null}
+        {vet.selfPay ? <Tag icon="cash-multiple" label="Self-pay" /> : null}
+        <View style={{ flex: 1 }} />
+        <Pressable onPress={onRequest} disabled={!vet.available} hitSlop={8} style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.full, backgroundColor: vet.available ? colors.primary : colors.divider }}>
+          <AppText variant="body" color={vet.available ? '#fff' : colors.onSurfaceVariant} style={{ fontWeight: '700' }}>
             Request
           </AppText>
         </Pressable>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -127,8 +127,8 @@ export default function FindVet() {
             <VetCard
               key={v.id}
               vet={v}
+              onOpen={() => router.push(`/find-vet/${v.id}` as never)}
               onRequest={() => router.push(`/find-vet/request?vetId=${v.id}`)}
-              onRate={() => router.push(`/rate-vet?vetId=${v.id}`)}
             />
           ))
         )}

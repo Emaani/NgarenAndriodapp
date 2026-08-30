@@ -231,8 +231,8 @@ export const invoices: Invoice[] = [
 ];
 
 export const vets: Vet[] = [
-  { id: 1, name: 'Dr. Sarah Mwangi', clinic: 'Nakuru Animal Clinic', specialty: 'Large animal / Cattle', distanceKm: 2.4, rating: 4.9, reviews: 128, available: true },
-  { id: 2, name: 'Dr. John Kamau', clinic: 'Rift Valley Vet Services', specialty: 'General practice', distanceKm: 5.1, rating: 4.7, reviews: 86, available: true },
-  { id: 3, name: 'Dr. Aisha Noor', clinic: 'Highlands Livestock Care', specialty: 'Reproduction', distanceKm: 8.3, rating: 4.8, reviews: 64, available: false },
-  { id: 4, name: 'Dr. Peter Otieno', clinic: 'Savannah Mobile Vets', specialty: 'Emergency / Field calls', distanceKm: 11.6, rating: 4.6, reviews: 152, available: true },
+  { id: 1, name: 'Dr. Sarah Namukasa', clinic: 'Nakasero Animal Clinic', specialty: 'Large animal / Cattle', distanceKm: 2.4, rating: 4.9, reviews: 128, available: true, credentials: 'Veterinary Surgeon (BVM)', videoVisits: true, selfPay: true, institution: 'Makerere University', tagline: 'Same-day call-outs · Highly recommended · Excellent wait time', sponsored: true, yearsExperience: 9 },
+  { id: 2, name: 'Dr. John Kato', clinic: 'Kampala Livestock Vets', specialty: 'General practice', distanceKm: 4.2, rating: 4.7, reviews: 86, available: true, credentials: 'Veterinary Officer (BVM)', videoVisits: true, selfPay: true, institution: 'Makerere University', tagline: 'General farm health · Friendly · Flexible hours', yearsExperience: 6 },
+  { id: 3, name: 'Dr. Aisha Nakato', clinic: 'Highlands Livestock Care', specialty: 'Reproduction', distanceKm: 3.6, rating: 4.8, reviews: 64, available: true, credentials: 'Veterinary Surgeon (MSc Repro)', videoVisits: true, selfPay: true, institution: 'Makerere University', tagline: 'Breeding & fertility specialist · Gentle handling', yearsExperience: 11 },
+  { id: 4, name: 'Dr. Peter Okello', clinic: 'Savannah Mobile Vets', specialty: 'Emergency / Field calls', distanceKm: 6.8, rating: 4.6, reviews: 152, available: true, credentials: 'Veterinary Surgeon (BVM)', videoVisits: false, selfPay: true, institution: 'Gulu University', tagline: 'Emergency field calls · Fast response', yearsExperience: 14 },
 ];
