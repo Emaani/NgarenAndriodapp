@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { View } from 'react-native';
+import { AppState, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -13,6 +13,7 @@ import {
 } from '@expo-google-fonts/inter';
 import { addNotificationResponseListener, routeColdStartNotification } from '@/services/push';
 import { registerBackgroundSyncAsync } from '@/services/backgroundSync';
+import { startSyncQueueWatcher, processSyncQueue } from '@/data/syncQueue';
 import { AuthProvider } from '@/services/auth';
 import { initSentry, wrapWithSentry } from '@/services/sentry';
 import { AppErrorBoundary } from '@/components/AppErrorBoundary';
@@ -40,6 +41,18 @@ function RootLayout() {
   // or where background tasks aren't supported, e.g. web/simulator).
   useEffect(() => {
     registerBackgroundSyncAsync();
+  }, []);
+  // Drain the durable write queue on reconnect and whenever the app returns to
+  // the foreground, so offline registrations reliably sync (see syncQueue).
+  useEffect(() => {
+    const unsub = startSyncQueueWatcher();
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') void processSyncQueue();
+    });
+    return () => {
+      unsub();
+      sub.remove();
+    };
   }, []);
 
   if (!fontsLoaded) return null;

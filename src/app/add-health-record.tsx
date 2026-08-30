@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, spacing } from '@/theme';
 import { HEALTH_TYPE_LABELS, HealthEventType, addLocalHealthRecord } from '@/data/localHealth';
+import { notify } from '@/lib/toast';
 import { useAuth } from '@/services/auth';
 import { AppText, Button, DatePickerField, GradientHeader, PhotoField, PickerField, Screen, TextField } from '@/ui';
 
@@ -50,9 +51,11 @@ export default function AddHealthRecord() {
         recordedBy: user?.fullName ?? user?.email ?? 'User',
         date: date || today,
       });
+      notify('Health record saved');
       router.back();
     } catch {
       setSaving(false);
+      notify('Could not save the record — please try again');
     }
   };
 

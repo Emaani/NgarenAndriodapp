@@ -116,8 +116,9 @@ export async function syncAnimalToLineage(
   try {
     const remotePhoto =
       uploadedPhotoUrls?.[0] ?? (animal.photos ?? []).find((p) => /^https?:\/\//.test(p));
-    const { error } = await supabase.from('animal_lineage').insert({
-      animal_id: animal.ngarenCode ?? animal.tag,
+    const aan = animal.ngarenCode ?? animal.tag;
+    const row = {
+      animal_id: aan,
       animal_name: animal.name ?? animal.tag,
       animal_tag_id: animal.deviceSerial ?? null,
       visual_tag_number: animal.tag,
@@ -130,7 +131,22 @@ export async function syncAnimalToLineage(
       lifecycle_status: animal.approvalStatus === 'approved' ? 'complete' : 'in_progress',
       tag_status: animal.deviceSerial ? 'assigned' : 'unassigned',
       farm_name: animal.locationName ?? null,
-    });
+    };
+    // Idempotent write-through so retries (offline queue) never duplicate a row:
+    // update the existing AAN if present, otherwise insert. Works whether or not
+    // animal_id has a unique constraint. Only overwrite photo_url when we have one,
+    // so a retry that failed to (re)upload doesn't wipe an existing photo.
+    const { data: existing } = await supabase
+      .from('animal_lineage')
+      .select('id')
+      .eq('animal_id', aan)
+      .maybeSingle();
+    if (existing) {
+      const patch = remotePhoto ? row : { ...row, photo_url: undefined };
+      const { error } = await supabase.from('animal_lineage').update(patch).eq('animal_id', aan);
+      return !error;
+    }
+    const { error } = await supabase.from('animal_lineage').insert(row);
     return !error;
   } catch {
     return false;

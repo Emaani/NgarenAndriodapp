@@ -5,6 +5,7 @@ import { colors, radius, shadow, spacing } from '@/theme';
 import { animals as animalsFallback, vets } from '@/data/mock';
 import { submitCalloutRequest } from '@/data/api';
 import { getHerd } from '@/data/herd';
+import { notify } from '@/lib/toast';
 import { useResource } from '@/data/hooks';
 import { AppointmentMode, Animal, CalloutUrgency } from '@/data/types';
 import { AppText, Button, GradientHeader, Icon, PhotoField, Screen, SelectField, TextField } from '@/ui';
@@ -62,6 +63,7 @@ export default function RequestCallout() {
         photo: photo || undefined,
         accessBufferHours: accessHours,
       });
+      notify(`Vet request sent for ${animalLabel}`);
     } catch {
       // Best-effort in mock mode; the farmer is still routed home.
     } finally {

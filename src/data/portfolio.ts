@@ -51,9 +51,50 @@ export function portfolioTotals(items: FarmerPortfolioItem[]): PortfolioTotals {
   };
 }
 
-/** The farmer portfolio (admin). Falls back to mock offline / on error. */
+/**
+ * The farmer portfolio (admin). Prefers the server-side aggregation RPC
+ * (get_farmer_portfolio) which scales to large herds; falls back to the
+ * client-side bulk aggregation if the RPC isn't present, then to mock.
+ */
 export async function getFarmerPortfolio(): Promise<FarmerPortfolioItem[]> {
   if (!isSupabaseConfigured()) return MOCK_PORTFOLIO;
+
+  // Fast path: aggregate in Postgres (one round-trip, no full-table pulls).
+  try {
+    const { data, error } = await supabase.rpc('get_farmer_portfolio');
+    if (!error && Array.isArray(data)) {
+      reportDataSuccess();
+      if (data.length === 0) return [];
+      return (data as Record<string, unknown>[]).map((p) => {
+        const nAnimals = Number(p.animals ?? 0);
+        const nDevices = Number(p.devices ?? 0);
+        const nTags = Number(p.active_tags ?? 0);
+        const healthScore = nAnimals > 0 ? Math.round((nTags / nAnimals) * 100) : 0;
+        const status: FarmerPortfolioItem['status'] =
+          nAnimals === 0 ? 'inactive' : healthScore >= 80 ? 'active' : 'attention';
+        return {
+          id: String(p.user_id),
+          farmerName: (p.full_name as string) ?? 'Farmer',
+          farmName: (p.farm_id as string) ?? '',
+          location: (p.email as string) ?? '',
+          animals: nAnimals,
+          devices: nDevices,
+          activeTags: nTags,
+          healthScore,
+          status,
+        };
+      });
+    }
+    // error (e.g. function not yet migrated) → fall through to client-side path.
+  } catch {
+    // fall through
+  }
+
+  return clientSidePortfolio();
+}
+
+/** Legacy client-side aggregation — used until the RPC migration is applied. */
+async function clientSidePortfolio(): Promise<FarmerPortfolioItem[]> {
   try {
     // Farmers are profiles carrying the "farmer" role. RLS lets admins read all.
     // `profiles` is thin (user_id, full_name, email, farm_id) — no farm_name /

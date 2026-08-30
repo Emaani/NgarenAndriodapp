@@ -10,8 +10,9 @@ import {
 import { getBreeds, getLocations, registerAnimal } from '@/data/api';
 import { addLocalAnimal } from '@/data/localAnimals';
 import { addSupportRequest } from '@/data/supportRequests';
-import { getHerd, syncAnimalToLineage } from '@/data/herd';
-import { uploadAnimalPhotos } from '@/lib/imageUpload';
+import { getHerd } from '@/data/herd';
+import { enqueueAnimalSync, processSyncQueue } from '@/data/syncQueue';
+import { notify } from '@/lib/toast';
 import { Animal, RegisteredDevice } from '@/data/types';
 import { useAuth } from '@/services/auth';
 import { COUNTRY_CODES, DEFAULT_COUNTRY_CODE, generateNgarenCode } from '@/lib/ngaren';
@@ -233,14 +234,12 @@ export default function RegisterAnimal() {
       };
       await addLocalAnimal(newAnimal);
 
-      // Background: compress + upload the photos, then write-through to Supabase
-      // animal_lineage with the uploaded URLs so the AAN + photos sync to the web
-      // command centre. Fire-and-forget so navigation stays instant; local URIs
-      // already drive on-device display, and everything degrades gracefully.
-      (async () => {
-        const urls = user?.id && photos.length ? await uploadAnimalPhotos(photos, user.id, aan) : [];
-        await syncAnimalToLineage(newAnimal, user?.id, urls);
-      })().catch(() => undefined);
+      // Durable write-through: enqueue the photo upload + animal_lineage sync so
+      // it survives a flaky connection and retries until it lands (see
+      // syncQueue). Kick an immediate drain; the local record already drives
+      // on-device display, so navigation stays instant regardless.
+      await enqueueAnimalSync({ animal: newAnimal, userId: user?.id, photoUris: photos, aan });
+      void processSyncQueue();
       registerAnimal({
         tag,
         breedKey: breedKey || undefined,
@@ -249,6 +248,7 @@ export default function RegisterAnimal() {
         description: notes.trim() || undefined,
       }).catch(() => undefined);
 
+      notify(autoApprove ? `${aan} created — syncing to Ngaren…` : `${aan} submitted for activation — syncing…`);
       router.replace('/(tabs)/animals');
     } catch {
       setSubmitting(false);

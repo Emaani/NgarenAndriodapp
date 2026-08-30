@@ -5,6 +5,7 @@ import { colors, radius, shadow, spacing } from '@/theme';
 import { Animal } from '@/data/types';
 import { getPendingLocalAnimals, setLocalAnimalApproval } from '@/data/localAnimals';
 import { setLineageApproval } from '@/data/herd';
+import { notify } from '@/lib/toast';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { ageFromDate } from '@/lib/date';
@@ -40,6 +41,7 @@ export default function Approvals() {
     // sees the finalised animal. Best-effort — a local approval still stands.
     await setLineageApproval(animal.ngarenCode, status);
     setBusy(null);
+    notify(status === 'approved' ? `${animal.name ?? animal.tag} activated` : `${animal.name ?? animal.tag} rejected`);
   };
 
   return (
