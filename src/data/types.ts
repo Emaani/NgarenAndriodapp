@@ -33,8 +33,10 @@ export interface Animal {
   taggingMethod?: string;
   /** Maker-checker state. Undefined is treated as approved (legacy records). */
   approvalStatus?: 'pending' | 'approved' | 'rejected';
-  /** Physical farm address where the animal is based. */
+  /** Physical farm address where the animal is based (Address Line 1/2, City, Country). */
   physicalAddress?: string;
+  /** Google geospatial coordinates of the animal's base — optional, mandatory for satellite tags. */
+  coordinates?: { lat: number; lng: number };
   /** One or more tagging devices associated to this AAN. */
   devices?: RegisteredDevice[];
 }
@@ -318,8 +320,13 @@ export interface Vet {
   available: boolean;
 }
 
-export type CalloutUrgency = 'Routine' | 'Soon' | 'Emergency';
+// Appointment priority — reduced to Routine / Emergency (Aug 29 2026 standup;
+// the 'Soon' middle category was removed as redundant).
+export type CalloutUrgency = 'Routine' | 'Emergency';
 export type CalloutStatus = 'pending' | 'accepted' | 'declined' | 'completed';
+
+/** How the vet attends the appointment (Aug 29 2026 standup). */
+export type AppointmentMode = 'onsite' | 'video' | 'hybrid';
 
 /** An incoming vet call-out request — the unit of work in the vet persona. */
 export interface CalloutRequest {

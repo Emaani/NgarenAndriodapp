@@ -4,7 +4,11 @@ import { useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { vets } from '@/data/mock';
 import { Vet } from '@/data/types';
-import { AppText, Button, GradientHeader, Icon, Screen, SearchBar } from '@/ui';
+import { AppText, Button, EmptyState, GradientHeader, Icon, Screen, SearchBar } from '@/ui';
+
+// "Uber for vets" proximity cap (Aug 29 2026 standup): only surface vets within
+// a short radius, since farmers and vets travel locally (bicycle, boda).
+const PROXIMITY_KM = 5;
 
 function VetCard({ vet, onRequest, onRate }: { vet: Vet; onRequest: () => void; onRate: () => void }) {
   return (
@@ -39,7 +43,7 @@ function VetCard({ vet, onRequest, onRate }: { vet: Vet; onRequest: () => void; 
             <Pressable onPress={onRate} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
               <Icon name="star" size={14} color={colors.warning} />
               <AppText variant="caption" color={colors.onSurface}>
-                {vet.rating} ({vet.reviews})
+                {vet.rating} · {vet.reviews} visits
               </AppText>
             </Pressable>
           </View>
@@ -91,31 +95,43 @@ export default function FindVet() {
   const router = useRouter();
   const [query, setQuery] = useState('');
 
+  // Only vets within the proximity radius, nearest first (Uber-for-vets logic).
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
-    return vets.filter(
-      (v) =>
-        v.name.toLowerCase().includes(q) ||
-        v.clinic.toLowerCase().includes(q) ||
-        v.specialty.toLowerCase().includes(q),
-    );
+    return vets
+      .filter((v) => v.distanceKm <= PROXIMITY_KM)
+      .filter(
+        (v) =>
+          v.name.toLowerCase().includes(q) ||
+          v.clinic.toLowerCase().includes(q) ||
+          v.specialty.toLowerCase().includes(q),
+      )
+      .sort((a, b) => a.distanceKm - b.distanceKm);
   }, [query]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Find a Vet" subtitle="Vets near your location" showBack />
+      <GradientHeader title="Find a Vet" subtitle={`Vets within ${PROXIMITY_KM} km of your location`} showBack />
       <View style={{ padding: spacing.md, paddingBottom: 0 }}>
         <SearchBar value={query} onChangeText={setQuery} placeholder="Search by name, clinic or specialty..." />
       </View>
       <Screen contentStyle={{ paddingTop: spacing.md }}>
-        {filtered.map((v) => (
-          <VetCard
-            key={v.id}
-            vet={v}
-            onRequest={() => router.push(`/find-vet/request?vetId=${v.id}`)}
-            onRate={() => router.push(`/rate-vet?vetId=${v.id}`)}
+        {filtered.length === 0 ? (
+          <EmptyState
+            icon="map-marker-off-outline"
+            title="No vets within range"
+            subtitle={`No enlisted vets are within ${PROXIMITY_KM} km right now. Try again later or request a call-out and we'll match you.`}
           />
-        ))}
+        ) : (
+          filtered.map((v) => (
+            <VetCard
+              key={v.id}
+              vet={v}
+              onRequest={() => router.push(`/find-vet/request?vetId=${v.id}`)}
+              onRate={() => router.push(`/rate-vet?vetId=${v.id}`)}
+            />
+          ))
+        )}
         <Button
           label="Request a Call-out"
           icon="phone-outgoing"

@@ -44,13 +44,13 @@ export default function Approvals() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Pending Approvals" subtitle={`Field Operations review · ${items.length} awaiting`} showBack />
+      <GradientHeader title="Record Activation" subtitle={`Validate & activate · ${items.length} awaiting`} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         {items.length === 0 ? (
           <EmptyState
-            icon="clipboard-check-outline"
-            title="Nothing to approve"
-            subtitle="Newly registered animals appear here for review before they're finalised."
+            icon="check-decagram-outline"
+            title="Nothing to activate"
+            subtitle="Newly created animal records appear here to be validated and activated before they go live."
             actionLabel="Refresh"
             onAction={reload}
           />
@@ -89,7 +89,7 @@ export default function Approvals() {
                   Tag {a.tag} · {a.color ?? '—'} · {a.locationName ?? '—'} · Age {ageFromDate(a.dateOfBirth)} · {a.photos?.length ?? 0} photos
                 </AppText>
                 <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                  <Button label="Approve" icon="check" loading={busy === a.id} onPress={() => decide(a, 'approved')} style={{ flex: 1 }} />
+                  <Button label="Activate" icon="check" loading={busy === a.id} onPress={() => decide(a, 'approved')} style={{ flex: 1 }} />
                   <Button label="Reject" variant="outline" onPress={() => decide(a, 'rejected')} style={{ flex: 1 }} />
                 </View>
               </View>

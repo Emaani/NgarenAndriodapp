@@ -9,7 +9,7 @@ import { CalloutRequest, CalloutStatus, CalloutUrgency } from '@/data/types';
 import { ActionChip, AppText, Button, EmptyState, GradientHeader, Icon, IconChip, Screen } from '@/ui';
 
 const urgencyVariant = (u: CalloutUrgency) =>
-  u === 'Emergency' ? 'error' : u === 'Soon' ? 'warning' : 'neutral';
+  u === 'Emergency' ? 'error' : 'neutral';
 
 const statusVariant = (s: CalloutStatus) =>
   s === 'accepted' ? 'success' : s === 'completed' ? 'info' : s === 'declined' ? 'error' : 'warning';

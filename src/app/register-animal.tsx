@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Alert, Pressable, View } from 'react-native';
+import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import {
@@ -8,11 +9,12 @@ import {
 } from '@/data/mock';
 import { getBreeds, getLocations, registerAnimal } from '@/data/api';
 import { addLocalAnimal } from '@/data/localAnimals';
+import { addSupportRequest } from '@/data/supportRequests';
 import { getHerd, syncAnimalToLineage } from '@/data/herd';
 import { uploadAnimalPhotos } from '@/lib/imageUpload';
 import { Animal, RegisteredDevice } from '@/data/types';
 import { useAuth } from '@/services/auth';
-import { generateNgarenCode } from '@/lib/ngaren';
+import { COUNTRY_CODES, DEFAULT_COUNTRY_CODE, generateNgarenCode } from '@/lib/ngaren';
 import { DEVICE_MODEL_OPTIONS, deviceModel, methodForDevices } from '@/lib/tagging';
 import { useResource } from '@/data/hooks';
 import {
@@ -63,8 +65,9 @@ export default function RegisterAnimal() {
   const { data: locations } = useResource(() => getLocations(), locationsFallback);
   const { data: herd } = useResource(getHerd, []);
 
-  // (a) AAN — the Ngaren Animal Account Number, assigned at inception.
-  const [aan] = useState(() => generateNgarenCode());
+  // (a) AAN — the Ngaren Animal Account Number. Per the Aug 29 2026 standup it is
+  // generated ONLY on submission (once the mandatory details exist), not on open,
+  // to avoid minting orphan identifiers for abandoned attempts.
 
   // (b) Animal information
   const [tag, setTag] = useState('');
@@ -81,11 +84,17 @@ export default function RegisterAnimal() {
   const [photoRight, setPhotoRight] = useState<string | null>(null);
   const [photoBack, setPhotoBack] = useState<string | null>(null);
 
-  // (c) Farm / location — structured address for analytics/geofencing prep.
+  // (c) Farm / location — standardized address (Aug 29 2026 standup): Address
+  // Line 1/2, City, Country — geography-agnostic, replacing village/parish/district.
   const [locationId, setLocationId] = useState('');
-  const [village, setVillage] = useState('');
-  const [parish, setParish] = useState('');
-  const [district, setDistrict] = useState('');
+  const [addr1, setAddr1] = useState('');
+  const [addr2, setAddr2] = useState('');
+  const [city, setCity] = useState('');
+  const [country, setCountry] = useState('Uganda');
+  // Google geospatial coordinates — optional, mandatory when a satellite device
+  // is attached.
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [locating, setLocating] = useState(false);
 
   // (d) Devices
   const [devices, setDevices] = useState<RegisteredDevice[]>([]);
@@ -148,13 +157,58 @@ export default function RegisterAnimal() {
     return !!t && herd.some((a) => a.tag.toLowerCase() === t);
   }, [tag, herd]);
 
-  const canSubmit = !!tag.trim() && !tagTaken && !!breedKey && !!locationId && !!photoFront && tcsAccepted;
+  // Coordinates become mandatory once a satellite device is attached.
+  const hasSatellite = useMemo(
+    () => devices.some((d) => !!deviceModel(d.type)?.satellite),
+    [devices],
+  );
+
+  const captureCoords = async () => {
+    setLocating(true);
+    try {
+      const perm = await Location.requestForegroundPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Location permission needed', 'Enable location access to capture the animal’s coordinates.');
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+    } catch {
+      Alert.alert('Could not get location', 'Please try again, or continue without coordinates.');
+    } finally {
+      setLocating(false);
+    }
+  };
+
+  // "Request for support" (Aug 29 2026 standup): mint a Work Order so the Ngaren
+  // team can complete onboarding, device association and activation on the
+  // farmer's behalf, rather than the farmer self-onboarding.
+  const requestSupport = async () => {
+    const wo = await addSupportRequest({
+      animalsCount: 1,
+      notes: notes.trim() || undefined,
+      requestedBy: user?.fullName ?? user?.email ?? undefined,
+    });
+    Alert.alert(
+      'Support requested',
+      `Work Order ${wo.workOrderId} created. Our team will contact you to complete onboarding, device association and activation.`,
+      [{ text: 'Done', onPress: () => router.replace('/(tabs)/animals') }],
+    );
+  };
+
+  const canSubmit =
+    !!tag.trim() && !tagTaken && !!breedKey && !!locationId && !!photoFront && tcsAccepted && (!hasSatellite || !!coords);
 
   const onSubmit = async () => {
     setSubmitting(true);
     try {
       const breedName = breedOptions.find((b) => b.value === breedKey)?.label ?? 'Unknown';
       const locationName = locationOptions.find((l) => l.value === locationId)?.label;
+      // Generate the AAN now, on submission, using the country's operational code.
+      const countryCode =
+        Object.entries(COUNTRY_CODES).find(([, n]) => n.toLowerCase() === country.trim().toLowerCase())?.[0] ??
+        DEFAULT_COUNTRY_CODE;
+      const aan = generateNgarenCode(countryCode);
       const newAnimal: Animal = {
         id: Date.now(),
         tag: tag.trim(),
@@ -162,7 +216,8 @@ export default function RegisterAnimal() {
         breed: { key: breedKey || 'unknown', name: breedName },
         locationId: locationId ? Number(locationId) : undefined,
         locationName,
-        physicalAddress: [village.trim(), parish.trim(), district.trim()].filter(Boolean).join(', ') || undefined,
+        physicalAddress: [addr1.trim(), addr2.trim(), city.trim(), country.trim()].filter(Boolean).join(', ') || undefined,
+        coordinates: coords ?? undefined,
         dateOfBirth: dob || '',
         status: 'active',
         description: notes.trim() || undefined,
@@ -204,18 +259,34 @@ export default function RegisterAnimal() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <GradientHeader title="Create Animal Account" subtitle="Ngaren Animal Account Number (AAN)" showBack />
       <Screen contentStyle={{ paddingTop: spacing.md, paddingBottom: spacing.xxl }}>
-        {/* (a) AAN — auto-assigned */}
+        {/* (a) AAN — assigned on submission */}
         <View style={{ backgroundColor: colors.primaryTint, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm }}>
           <AppText variant="caption" color={colors.onSurfaceVariant}>
-            Animal Account Number (AAN) · auto-assigned
+            Animal Account Number (AAN)
           </AppText>
           <AppText variant="title" color={colors.primary} style={{ fontWeight: '700' }}>
-            {aan}
+            {(Object.entries(COUNTRY_CODES).find(([, n]) => n.toLowerCase() === country.trim().toLowerCase())?.[0] ?? DEFAULT_COUNTRY_CODE)}-MMYY-XXXXXX
           </AppText>
           <AppText variant="caption" color={colors.onSurfaceVariant}>
-            The animal’s permanent digital identity in Ngaren.
+            The animal’s permanent identity — assigned automatically when you submit this form.
           </AppText>
         </View>
+
+        {/* Do-it-yourself vs. request Ngaren support */}
+        <Pressable
+          onPress={requestSupport}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderColor: colors.divider, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm }}>
+          <Icon name="lifebuoy" size={20} color={colors.primary} />
+          <View style={{ flex: 1 }}>
+            <AppText variant="body" style={{ fontWeight: '600' }}>
+              Prefer we set this up for you?
+            </AppText>
+            <AppText variant="caption" color={colors.onSurfaceVariant}>
+              Request Ngaren support — we’ll raise a work order and onboard on your behalf.
+            </AppText>
+          </View>
+          <Icon name="chevron-right" size={20} color={colors.onSurfaceVariant} />
+        </Pressable>
 
         {/* (b) Animal information */}
         <SectionHeading step="b" title="Animal information" subtitle="Farmer reference, descriptors & 360° photos" />
@@ -264,14 +335,37 @@ export default function RegisterAnimal() {
         <PhotoField label="Right side" value={photoRight} onChange={setPhotoRight} />
         <PhotoField label="Back" value={photoBack} onChange={setPhotoBack} />
 
-        {/* (c) Farm / location */}
+        {/* (c) Farm / location — standardized address + geospatial pin */}
         <SectionHeading step="c" title="Farm & location" subtitle="Where the animal is based" />
         <PickerField label="Location" required value={locationId} placeholder="Select a location" options={locationOptions} onSelect={setLocationId} />
-        <TextField label="Village" value={village} onChangeText={setVillage} placeholder="e.g. Nsambya" />
-        <TextField label="Parish" value={parish} onChangeText={setParish} placeholder="e.g. Kibuli" />
-        <TextField label="District" value={district} onChangeText={setDistrict} placeholder="e.g. Kampala" />
-        <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginTop: -spacing.sm, marginBottom: spacing.md }}>
-          Map geo-fencing uses partner rendering now; Google Maps geo-fencing is coming.
+        <TextField label="Address Line 1" value={addr1} onChangeText={setAddr1} placeholder="e.g. Plot 12, Nakasero Road" />
+        <TextField label="Address Line 2" value={addr2} onChangeText={setAddr2} placeholder="Optional" />
+        <TextField label="City" value={city} onChangeText={setCity} placeholder="e.g. Kampala" />
+        <TextField label="Country" value={country} onChangeText={setCountry} placeholder="e.g. Uganda" />
+
+        {/* Google geospatial coordinates — optional; mandatory for satellite tags. */}
+        <AppText variant="bodyLarge" style={{ fontWeight: '600', marginTop: spacing.xs, marginBottom: spacing.xs }}>
+          Geospatial location{hasSatellite ? ' *' : ' (optional)'}
+        </AppText>
+        <Pressable
+          onPress={captureCoords}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderColor: coords ? colors.primary : colors.divider, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.xs }}>
+          <Icon name={coords ? 'map-marker-check' : 'map-marker-plus-outline'} size={20} color={colors.primary} />
+          <View style={{ flex: 1 }}>
+            <AppText variant="body" style={{ fontWeight: '600' }}>
+              {locating ? 'Getting coordinates…' : coords ? 'Coordinates captured' : 'Capture Google coordinates'}
+            </AppText>
+            {coords ? (
+              <AppText variant="caption" color={colors.onSurfaceVariant}>
+                {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
+              </AppText>
+            ) : null}
+          </View>
+        </Pressable>
+        <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.md }}>
+          {hasSatellite
+            ? 'A satellite device is attached — coordinates are required. Google Maps geo-fencing builds on this.'
+            : 'Captures a Google coordinate for mapping & geo-fencing. Required if you add a satellite device.'}
         </AppText>
 
         {/* (d) Devices */}
@@ -318,11 +412,11 @@ export default function RegisterAnimal() {
 
         <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.md }}>
           {autoApprove
-            ? 'As the farm owner, this account is approved automatically.'
-            : 'Submitted for Ngaren Field Operations / owner review before the account becomes operational.'}
+            ? 'As the farm owner, this record is created and activated automatically.'
+            : 'On submit the record is Created, then Validated, then Activated by Ngaren after a completeness check (target 48 hours). You’ll be notified once activated.'}
         </AppText>
         <Button
-          label={autoApprove ? 'Create AAN' : 'Submit AAN for approval'}
+          label={autoApprove ? 'Create AAN' : 'Submit for activation'}
           loading={submitting}
           disabled={!canSubmit}
           onPress={onSubmit}

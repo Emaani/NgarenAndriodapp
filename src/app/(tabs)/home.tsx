@@ -33,7 +33,7 @@ const FARMER_ACTIONS: Action[] = [
   { icon: 'stethoscope', label: 'Find a Vet', route: '/find-vet', tint: '#21C45D', perm: 'book_vet' },
   { icon: 'clipboard-pulse-outline', label: 'Vet Requests', route: '/vet-requests', tint: '#EF4444', perm: 'book_vet' },
   { icon: 'plus-circle-outline', label: 'Register Animal', route: '/register-animal', tint: '#6D874F', perm: 'register_animal' },
-  { icon: 'check-decagram-outline', label: 'Approvals', route: '/approvals', tint: '#F59E0B' },
+  { icon: 'check-decagram-outline', label: 'Activation', route: '/approvals', tint: '#F59E0B' },
   { icon: 'dna', label: 'Breeding', route: '/breeding', tint: '#EC4899', perm: 'manage_breeding' },
   { icon: 'heart-pulse', label: 'Managed Health', route: '/health', tint: '#EF4444', perm: 'view_health' },
   { icon: 'calendar-month-outline', label: 'Calendar', route: '/calendar', tint: '#0EA5E9' },
@@ -49,7 +49,7 @@ const FARMER_ACTIONS: Action[] = [
 // farmer does not get (mirrors the Command Center's adminNav superset).
 const ADMIN_ACTIONS: Action[] = [
   { icon: 'account-multiple-outline', label: 'Farmers Portfolio', route: '/farmers', tint: '#6D874F' },
-  { icon: 'check-decagram-outline', label: 'Approvals', route: '/approvals', tint: '#F59E0B' },
+  { icon: 'check-decagram-outline', label: 'Activation', route: '/approvals', tint: '#F59E0B' },
   { icon: 'cow', label: 'Livestock', route: '/(tabs)/animals', tint: '#2563EB' },
   { icon: 'map-marker-radius', label: 'Track', route: '/(tabs)/track', tint: '#16A34A' },
   { icon: 'chart-box-outline', label: 'Insights', route: '/insights', tint: '#0D9488' },
@@ -310,10 +310,10 @@ export default function Home() {
             <Icon name="clipboard-alert-outline" size={22} color="#B45309" />
             <View style={{ flex: 1 }}>
               <AppText variant="bodyLarge" style={{ fontWeight: '700' }}>
-                {pendingCount} animal{pendingCount === 1 ? '' : 's'} awaiting approval
+                {pendingCount} animal{pendingCount === 1 ? '' : 's'} awaiting activation
               </AppText>
               <AppText variant="caption" color={colors.onSurfaceVariant}>
-                Review and approve newly captured records.
+                Validate and activate newly created records.
               </AppText>
             </View>
             <Icon name="chevron-right" size={22} color={colors.onSurfaceVariant} />

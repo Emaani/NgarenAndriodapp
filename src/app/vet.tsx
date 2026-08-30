@@ -16,7 +16,7 @@ const FILTERS: { key: Filter; label: string }[] = [
 ];
 
 const urgencyVariant = (u: CalloutUrgency) =>
-  u === 'Emergency' ? 'error' : u === 'Soon' ? 'warning' : 'neutral';
+  u === 'Emergency' ? 'error' : 'neutral';
 
 const statusVariant = (s: CalloutStatus) =>
   s === 'accepted' ? 'success' : s === 'completed' ? 'info' : s === 'declined' ? 'error' : 'warning';

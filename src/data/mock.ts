@@ -211,7 +211,7 @@ export const breeds = ['Hereford', 'Ankole', 'Boran', 'Friesian', 'Sahiwal'];
 
 export const calloutRequests: CalloutRequest[] = [
   { id: 1, farmerName: 'Patrick Etyang', animal: 'Bull #A-042', locationName: 'North Paddock', distanceKm: 2.4, urgency: 'Emergency', notes: 'Visible limp on the front left leg, not grazing.', requestedAt: '10 min ago', status: 'pending' },
-  { id: 2, farmerName: 'Grace Wanjiru', animal: 'Cow #A-017', locationName: 'Water Point A', distanceKm: 5.1, urgency: 'Soon', notes: 'Reduced milk yield over the last 3 days.', requestedAt: '40 min ago', status: 'pending' },
+  { id: 2, farmerName: 'Grace Wanjiru', animal: 'Cow #A-017', locationName: 'Water Point A', distanceKm: 5.1, urgency: 'Routine', notes: 'Reduced milk yield over the last 3 days.', requestedAt: '40 min ago', status: 'pending' },
   { id: 3, farmerName: 'Daniel Mwangi', animal: 'Heifer #A-061', locationName: 'South Paddock', distanceKm: 8.3, urgency: 'Routine', notes: 'Routine pregnancy check.', requestedAt: '2 hours ago', status: 'accepted' },
   { id: 4, farmerName: 'Esther Achieng', animal: 'Cow #A-008', locationName: 'Holding Yard', distanceKm: 11.6, urgency: 'Routine', notes: 'Annual vaccination due.', requestedAt: 'Yesterday', status: 'completed' },
 ];

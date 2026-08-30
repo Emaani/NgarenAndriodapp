@@ -92,7 +92,7 @@ export default function AnimalDetail() {
               variant={animal.status === 'active' ? 'success' : 'neutral'}
             />
             {animal.approvalStatus === 'pending' ? (
-              <ActionChip label="Pending approval" variant="warning" />
+              <ActionChip label="Pending activation" variant="warning" />
             ) : animal.approvalStatus === 'rejected' ? (
               <ActionChip label="Rejected" variant="error" />
             ) : null}

@@ -57,6 +57,7 @@ import {
   BehaviourSeries,
   CalloutRequest,
   CalloutStatus,
+  AppointmentMode,
   CalloutUrgency,
   DashboardSummary,
   Device,
@@ -598,6 +599,16 @@ export interface CalloutRequestPayload {
   locationName: string;
   urgency: CalloutUrgency;
   notes?: string;
+  /** How the vet attends: on-site, video, or hybrid (Aug 29 2026 standup). */
+  mode?: AppointmentMode;
+  /** Optional photo attached to the request (e.g. the symptom). */
+  photo?: string | null;
+  /**
+   * Hours the vet retains access to the animal's health records after the
+   * appointment window (Aug 29 2026 standup — time-limited access, no perpetual
+   * access to farm data). Access = appointment + this buffer.
+   */
+  accessBufferHours?: number;
 }
 
 /** Fetch the vet's incoming call-out requests. Falls back to mock offline. */
