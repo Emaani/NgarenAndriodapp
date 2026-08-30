@@ -1,4 +1,4 @@
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { calloutRequests as calloutFallback } from '@/data/mock';
@@ -50,10 +50,11 @@ export default function VetRequests() {
           />
         ) : (
           requests.map((r: CalloutRequest) => (
-            <View
+            <Pressable
               key={r.id}
-              style={[
-                { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, gap: spacing.sm, borderWidth: 1, borderColor: colors.divider },
+              onPress={() => router.push(`/vet-request/${r.id}` as never)}
+              style={({ pressed }) => [
+                { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, gap: spacing.sm, borderWidth: 1, borderColor: colors.divider, opacity: pressed ? 0.9 : 1 },
                 shadow[1],
               ]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.mdMinus }}>
@@ -77,14 +78,16 @@ export default function VetRequests() {
 
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-                  <Icon name="progress-clock" size={15} color={colors.onSurfaceVariant} />
-                  <AppText variant="caption" color={colors.onSurfaceVariant}>
-                    Status
-                  </AppText>
+                  <ActionChip label={r.status[0].toUpperCase() + r.status.slice(1)} variant={statusVariant(r.status)} />
                 </View>
-                <ActionChip label={r.status[0].toUpperCase() + r.status.slice(1)} variant={statusVariant(r.status)} />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                  <AppText variant="caption" color={colors.primary} style={{ fontWeight: '600' }}>
+                    View details
+                  </AppText>
+                  <Icon name="chevron-right" size={16} color={colors.primary} />
+                </View>
               </View>
-            </View>
+            </Pressable>
           ))
         )}
       </Screen>
