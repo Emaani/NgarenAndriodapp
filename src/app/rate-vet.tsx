@@ -10,7 +10,7 @@ const RATING_LABELS = ['', 'Poor', 'Fair', 'Good', 'Very good', 'Excellent'];
 
 export default function RateVet() {
   const router = useRouter();
-  const { vetId } = useLocalSearchParams<{ vetId?: string }>();
+  const { vetId, animal, service } = useLocalSearchParams<{ vetId?: string; animal?: string; service?: string }>();
   const vet = vetId ? vets.find((v) => v.id === Number(vetId)) : vets[0];
 
   const [rating, setRating] = useState(0);
@@ -24,6 +24,16 @@ export default function RateVet() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <GradientHeader title="Rate your vet" subtitle={vet ? vet.name : 'Share your experience'} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
+        {/* Service-linked rating (Sep 3 2026 standup): tied to a specific
+            completed visit, not a general public rating. */}
+        {animal || service ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.primaryTint, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md }}>
+            <Icon name="check-decagram-outline" size={18} color={colors.primary} />
+            <AppText variant="caption" color={colors.primary} style={{ flex: 1, fontWeight: '600' }}>
+              Linked to your {service ?? 'visit'}{animal ? ` for ${animal}` : ''} — verified feedback for that service.
+            </AppText>
+          </View>
+        ) : null}
         {vet && (
           <View
             style={[

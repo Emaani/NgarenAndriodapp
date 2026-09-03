@@ -6,42 +6,50 @@ import { VetDayAvailability } from '@/data/types';
 import { useResource } from '@/data/hooks';
 import { AppText, Button, EmptyState, GradientHeader, Icon, Screen, VetImpactDashboard } from '@/ui';
 
+// Real-time availability colours (Sep 3 2026 standup): green = open slots,
+// red = fully booked/committed. Green days are tappable to book directly.
+const AVAIL_GREEN = '#16A34A';
+const AVAIL_RED = '#EF4444';
+
 function initials(name: string): string {
   const parts = name.replace(/^Dr\.?\s+/i, '').trim().split(/\s+/).filter(Boolean);
   return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase();
 }
 
-/** A single day tile in the booking calendar (mirrors the reference profile). */
-function DayCard({ day }: { day: VetDayAvailability }) {
+/** A single day tile: green when slots are open (tappable to book), red when
+ *  fully booked/committed. Real-time availability at a glance. */
+function DayCard({ day, onBook }: { day: VetDayAvailability; onBook: () => void }) {
   const { weekday, day: date } = formatDayLabel(day.dateIso);
-  const closed = day.appts === 0;
+  const available = day.appts > 0;
+  const tint = available ? AVAIL_GREEN : AVAIL_RED;
   return (
-    <View
-      style={{
+    <Pressable
+      onPress={available ? onBook : undefined}
+      disabled={!available}
+      style={({ pressed }) => ({
         width: 92,
         borderRadius: radius.md,
         paddingVertical: spacing.sm,
         paddingHorizontal: spacing.xs,
         alignItems: 'center',
         gap: 2,
-        backgroundColor: closed ? colors.background : '#FDE68A',
+        backgroundColor: tint + (pressed ? '33' : '18'),
         borderWidth: 1,
-        borderColor: closed ? colors.divider : '#F59E0B55',
-        opacity: closed ? 0.6 : 1,
-      }}>
+        borderColor: tint + '66',
+      })}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-        <AppText variant="body" style={{ fontWeight: '700' }} color={closed ? colors.onSurfaceVariant : colors.onSurface}>
+        <AppText variant="body" style={{ fontWeight: '700' }} color={colors.onSurface}>
           {weekday}
         </AppText>
-        {!closed && day.video ? <Icon name="video" size={13} color={colors.onSurface} /> : null}
+        {available && day.video ? <Icon name="video" size={13} color={tint} /> : null}
       </View>
-      <AppText variant="caption" color={closed ? colors.onSurfaceVariant : colors.onSurface}>
+      <AppText variant="caption" color={colors.onSurface}>
         {date}
       </AppText>
-      <AppText variant="caption" color={closed ? colors.onSurfaceVariant : colors.onSurface} style={{ fontWeight: '600' }}>
-        {closed ? 'No appts' : `${day.appts} appts`}
+      <AppText variant="caption" color={tint} style={{ fontWeight: '700' }}>
+        {available ? `${day.appts} open` : 'Booked'}
       </AppText>
-    </View>
+    </Pressable>
   );
 }
 
@@ -123,12 +131,22 @@ export default function VetProfileScreen() {
         </View>
 
         {/* Booking calendar */}
-        <AppText variant="title" style={{ marginTop: spacing.lg, marginBottom: spacing.sm }}>
+        <AppText variant="title" style={{ marginTop: spacing.lg, marginBottom: spacing.xs }}>
           Availability
         </AppText>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.sm }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: AVAIL_GREEN }} />
+            <AppText variant="caption" color={colors.onSurfaceVariant}>Open · tap to book</AppText>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: AVAIL_RED }} />
+            <AppText variant="caption" color={colors.onSurfaceVariant}>Booked</AppText>
+          </View>
+        </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
           {vet.availability.map((d) => (
-            <DayCard key={d.dateIso} day={d} />
+            <DayCard key={d.dateIso} day={d} onBook={() => router.push(`/find-vet/request?vetId=${vet.id}` as never)} />
           ))}
         </View>
 

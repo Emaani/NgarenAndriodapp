@@ -1,9 +1,9 @@
 import { formatDate } from '@/lib/date';
 import { toCsv } from '@/lib/export';
-import { Animal, Device } from '@/data/types';
+import { Animal, CalloutRequest, Device } from '@/data/types';
 import { BreedingRecord, HealthRecord } from '@/data/clinical';
 
-export type ReportKind = 'livestock' | 'devices' | 'health' | 'breeding';
+export type ReportKind = 'livestock' | 'devices' | 'health' | 'breeding' | 'vet_audit';
 
 export interface ReportDef {
   id: ReportKind;
@@ -33,12 +33,42 @@ export const REPORT_CATALOG: ReportDef[] = [
     icon: 'heart-pulse',
   },
   {
+    id: 'vet_audit',
+    name: 'Vet visits audit',
+    description: 'Audit trail of vet requests — fulfilled vs unfulfilled visits.',
+    icon: 'clipboard-check-outline',
+  },
+  {
     id: 'breeding',
-    name: 'Breeding log',
+    name: 'Breeding log (Phase 2)',
     description: 'Matings, expected calving and confirmed pregnancies.',
     icon: 'dna',
   },
 ];
+
+/**
+ * Audit-trail export (Sep 3 2026 standup): fulfilled vs unfulfilled vet visits,
+ * chosen over automated escalation so management can review service delivery.
+ */
+export function vetAuditCsv(requests: CalloutRequest[]): string {
+  const fulfilment = (s: string) =>
+    s === 'completed' ? 'Fulfilled' : s === 'declined' ? 'Unfulfilled (declined)' : s === 'accepted' ? 'In progress' : 'Awaiting';
+  const slaFor = (u: string) => (u === 'Emergency' ? '4h' : '48h');
+  return toCsv(
+    ['Animal', 'Farmer', 'Location', 'Priority', 'SLA', 'Status', 'Fulfilment', 'Requested', 'Distance (km)'],
+    requests.map((r) => [
+      r.animal,
+      r.farmerName,
+      r.locationName,
+      r.urgency,
+      slaFor(r.urgency),
+      r.status,
+      fulfilment(r.status),
+      r.requestedAt,
+      String(r.distanceKm),
+    ]),
+  );
+}
 
 export function animalsCsv(animals: Animal[]): string {
   return toCsv(

@@ -9,16 +9,23 @@ import { notify } from '@/lib/toast';
 import { sendLocalNotification } from '@/services/push';
 import { useResource } from '@/data/hooks';
 import { AppointmentMode, Animal, CalloutUrgency } from '@/data/types';
-import { AppText, Button, GradientHeader, Icon, PhotoField, Screen, SelectField, TextField } from '@/ui';
+import { AppText, Button, GradientHeader, Icon, PhotoField, PickerField, Screen, TextField } from '@/ui';
 
 const URGENCY = ['Routine', 'Emergency'] as const;
+// SLA per priority tier (Sep 3 2026 standup): routine sits up to 48h before
+// escalation; emergency has a 4h response window. The records-access buffer
+// defaults from the tier so it matches the appointment window.
+const SLA: Record<(typeof URGENCY)[number], { responseHrs: number; defaultAccess: number; note: string }> = {
+  Routine: { responseHrs: 48, defaultAccess: 24, note: 'Response within 48 hours' },
+  Emergency: { responseHrs: 4, defaultAccess: 4, note: 'Response within 4 hours' },
+};
 const MODES: { key: AppointmentMode; label: string; icon: 'map-marker-check-outline' | 'video-outline' | 'account-switch-outline' }[] = [
   { key: 'onsite', label: 'On-site', icon: 'map-marker-check-outline' },
   { key: 'video', label: 'Video', icon: 'video-outline' },
   { key: 'hybrid', label: 'Hybrid', icon: 'account-switch-outline' },
 ];
 // Access = appointment + buffer. Keeps a vet from having perpetual access to
-// farm data (Aug 29 2026 standup): access lapses after the window.
+// farm data: access lapses after the window.
 const ACCESS_BUFFERS = [
   { hours: 4, label: 'Within 4 hours' },
   { hours: 24, label: 'Within 24 hours' },
@@ -44,10 +51,22 @@ export default function RequestCallout() {
   const locationName = animal?.locationName ?? '';
   const animalLabel = animal ? animal.name ?? animal.tag : '';
 
-  const cycleAnimal = () => {
-    if (animals.length === 0) return;
-    const idx = animal ? animals.findIndex((a) => a.id === animal.id) : -1;
-    setAnimal(animals[(idx + 1) % animals.length]);
+  // Animal selection dialog options (account number + name), per the Sep 3
+  // standup ("add selection dialogs" for animal selection).
+  const animalOptions = useMemo(
+    () =>
+      animals.map((a) => ({
+        label: `${a.accountNumber ?? a.tag}${a.name ? ` · ${a.name}` : ''}`,
+        value: String(a.id),
+      })),
+    [animals],
+  );
+  const selectAnimal = (v: string) => setAnimal(animals.find((a) => String(a.id) === v) ?? null);
+
+  // Picking a priority sets the matching records-access window from its SLA.
+  const pickUrgency = (u: (typeof URGENCY)[number]) => {
+    setUrgency(u);
+    setAccessHours(SLA[u].defaultAccess);
   };
 
   const onSubmit = async () => {
@@ -103,13 +122,14 @@ export default function RequestCallout() {
           </View>
         )}
 
-        {/* Animal — selecting it auto-fills the location from its registration. */}
-        <SelectField
+        {/* Animal — a selection dialog; picking auto-fills the location. */}
+        <PickerField
           label="Animal"
           required
-          value={animalLabel}
+          value={animal ? String(animal.id) : ''}
           placeholder="Select an animal"
-          onPress={cycleAnimal}
+          options={animalOptions}
+          onSelect={selectAnimal}
         />
         {animal ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: -spacing.sm, marginBottom: spacing.md }}>
@@ -145,16 +165,23 @@ export default function RequestCallout() {
         <AppText variant="body" style={{ fontWeight: '600', marginBottom: spacing.sm }}>
           Priority *
         </AppText>
-        <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
+        <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xs }}>
           {URGENCY.map((u) => (
             <Button
               key={u}
               label={u}
               variant={urgency === u ? 'primary' : 'outline'}
-              onPress={() => setUrgency(u)}
+              onPress={() => pickUrgency(u)}
               style={{ flex: 1, paddingHorizontal: spacing.sm }}
             />
           ))}
+        </View>
+        {/* SLA for the chosen tier. */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.md }}>
+          <Icon name={urgency === 'Emergency' ? 'alarm-light-outline' : 'clock-outline'} size={15} color={urgency === 'Emergency' ? colors.error : colors.onSurfaceVariant} />
+          <AppText variant="caption" color={urgency === 'Emergency' ? colors.error : colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
+            SLA: {SLA[urgency].note}
+          </AppText>
         </View>
 
         <TextField
@@ -165,8 +192,8 @@ export default function RequestCallout() {
           multiline
         />
 
-        {/* Optional symptom photo */}
-        <PhotoField label="Photo (optional)" value={photo} onChange={setPhoto} />
+        {/* Symptom photo — live capture only (authenticity). */}
+        <PhotoField label="Live photo (optional)" value={photo} onChange={setPhoto} liveOnly />
 
         {/* Time-limited access window */}
         <AppText variant="body" style={{ fontWeight: '600', marginBottom: spacing.xs }}>

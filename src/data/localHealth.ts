@@ -10,7 +10,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const KEY = 'ngaren.local.health.v1';
 
-export type HealthEventType = 'vaccination' | 'treatment' | 'ailment';
+// Managed-health service/event types. 'consultation' added per the managed-
+// health MVP (vaccination / treatment / consultation), alongside 'ailment'.
+export type HealthEventType = 'vaccination' | 'treatment' | 'consultation' | 'ailment';
+
+// Structured field observations for MVP data collection (disease/pest trends).
+export const HEALTH_OBSERVATIONS = ['Ticks', 'Flies', 'Worms', 'Disease', 'Wounds', 'Lameness'] as const;
+export type HealthObservation = (typeof HEALTH_OBSERVATIONS)[number];
 
 export interface LocalHealthRecord {
   id: string;
@@ -20,6 +26,8 @@ export interface LocalHealthRecord {
   medication: string | null;
   notes: string;
   photo: string | null;
+  /** Structured pest/disease observations for trend analytics. */
+  observations?: HealthObservation[];
   recordedBy: string;
   date: string; // ISO date of the event
   createdAt: string;
@@ -28,6 +36,7 @@ export interface LocalHealthRecord {
 export const HEALTH_TYPE_LABELS: Record<HealthEventType, string> = {
   vaccination: 'Vaccination',
   treatment: 'Treatment',
+  consultation: 'Consultation',
   ailment: 'Ailment',
 };
 

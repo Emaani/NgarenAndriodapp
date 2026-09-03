@@ -3,8 +3,9 @@ import { Alert, Pressable, View } from 'react-native';
 import { Redirect } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { animals as animalsFallback, devices as devicesFallback } from '@/data/mock';
-import { getDevices } from '@/data/api';
+import { getDevices, getCalloutRequests } from '@/data/api';
 import { getHerd } from '@/data/herd';
+import { calloutRequests as calloutFallback } from '@/data/mock';
 import { getBreedingRecords, getHealthRecords } from '@/data/clinical';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
@@ -16,6 +17,7 @@ import {
   breedingCsv,
   devicesCsv,
   healthCsv,
+  vetAuditCsv,
 } from '@/data/reports';
 import { AppText, GradientHeader, Icon, IconChip, Screen } from '@/ui';
 
@@ -30,6 +32,7 @@ export default function Reports() {
   const { data: devices } = useResource(() => getDevices(), devicesFallback);
   const { data: health } = useResource(getHealthRecords, []);
   const { data: breeding } = useResource(getBreedingRecords, []);
+  const { data: callouts } = useResource(() => getCalloutRequests(), calloutFallback);
   const [busy, setBusy] = useState<ReportKind | null>(null);
 
   if (loading) return null;
@@ -37,7 +40,11 @@ export default function Reports() {
   if (!isAdmin && !canVet) return <Redirect href="/(tabs)/home" />;
 
   const rowCount = (id: ReportKind) =>
-    id === 'livestock' ? animals.length : id === 'devices' ? devices.length : id === 'health' ? health.length : breeding.length;
+    id === 'livestock' ? animals.length
+      : id === 'devices' ? devices.length
+      : id === 'health' ? health.length
+      : id === 'vet_audit' ? callouts.length
+      : breeding.length;
 
   const runExport = async (id: ReportKind) => {
     setBusy(id);
@@ -47,6 +54,7 @@ export default function Reports() {
         livestock: { file: `livestock-${stamp}.csv`, csv: animalsCsv(animals) },
         devices: { file: `devices-${stamp}.csv`, csv: devicesCsv(devices) },
         health: { file: `health-${stamp}.csv`, csv: healthCsv(health) },
+        vet_audit: { file: `vet-visits-audit-${stamp}.csv`, csv: vetAuditCsv(callouts) },
         breeding: { file: `breeding-${stamp}.csv`, csv: breedingCsv(breeding) },
       };
       const { file, csv } = map[id];

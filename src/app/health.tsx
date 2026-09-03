@@ -107,12 +107,13 @@ export default function Health() {
         ) : null}
 
         {/* Managed-health workflows, all reachable from this tab. */}
+        {/* Breeding/lineage deferred to Phase 2 (Sep 3 2026 standup) — the MVP
+            focuses on the managed-health workflow. */}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg }}>
           <ActionTile icon="calendar-month-outline" label="Calendar" sublabel="Visits, vaccinations, follow-ups" tint="#0EA5E9" onPress={() => router.push('/calendar')} />
           {canBookVet ? (
             <ActionTile icon="clipboard-pulse-outline" label="My vet requests" sublabel="Track call-out status" tint="#EF4444" onPress={() => router.push('/vet-requests')} />
           ) : null}
-          <ActionTile icon="dna" label="Breeding & repro" sublabel="Mating & pregnancy" tint="#EC4899" onPress={() => router.push('/breeding')} />
           <ActionTile icon="cow" label="My animals" sublabel="Open an animal to log health" tint="#16A34A" onPress={() => router.push('/(tabs)/animals')} />
         </View>
 

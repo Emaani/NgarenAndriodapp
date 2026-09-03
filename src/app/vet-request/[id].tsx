@@ -94,6 +94,7 @@ export default function VetRequestDetail() {
         <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.md, marginBottom: spacing.lg }, shadow[1]]}>
           <DetailRow label="Animal" value={req.animal} />
           <DetailRow label="Priority" value={req.urgency} />
+          <DetailRow label="SLA" value={req.urgency === 'Emergency' ? 'Response within 4 hours' : 'Response within 48 hours'} />
           <DetailRow label="Location" value={req.locationName} />
           <DetailRow label="Distance" value={`${req.distanceKm} km`} />
           <DetailRow label="Requested" value={req.requestedAt} />
@@ -141,7 +142,12 @@ export default function VetRequestDetail() {
         {/* Relevant actions */}
         <Button label="View on map" icon="map-marker-radius" variant="outline" onPress={() => router.push('/(tabs)/track')} style={{ marginBottom: spacing.sm }} />
         {completed ? (
-          <Button label="Rate the vet" icon="star-outline" onPress={() => router.push('/rate-vet' as never)} style={{ marginBottom: spacing.sm }} />
+          <Button
+            label="Rate this visit"
+            icon="star-outline"
+            onPress={() => router.push(`/rate-vet?animal=${encodeURIComponent(req.animal)}&service=${encodeURIComponent(req.urgency + ' visit')}` as never)}
+            style={{ marginBottom: spacing.sm }}
+          />
         ) : (
           <Button label="Book another vet" icon="stethoscope" onPress={() => router.push('/find-vet')} style={{ marginBottom: spacing.sm }} />
         )}

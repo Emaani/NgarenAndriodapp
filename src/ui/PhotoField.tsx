@@ -13,10 +13,14 @@ export function PhotoField({
   label,
   value,
   onChange,
+  liveOnly = false,
 }: {
   label: string;
   value?: string | null;
   onChange: (uri: string | null) => void;
+  /** When true, only a live camera capture is allowed — no gallery upload. Used
+   *  for visit/health photos so the image is authentic to the date of service. */
+  liveOnly?: boolean;
 }) {
   const pickFromCamera = async () => {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
@@ -39,6 +43,11 @@ export function PhotoField({
   };
 
   const choose = () => {
+    // Live-only: skip the chooser and go straight to the camera (no gallery).
+    if (liveOnly) {
+      pickFromCamera();
+      return;
+    }
     Alert.alert(label, 'Add a photo', [
       { text: 'Take photo', onPress: pickFromCamera },
       { text: 'Choose from gallery', onPress: pickFromLibrary },
@@ -80,9 +89,9 @@ export function PhotoField({
             alignItems: 'center',
             gap: spacing.xs,
           }}>
-          <Icon name="camera-plus-outline" size={28} color={colors.primary} />
+          <Icon name={liveOnly ? 'camera-outline' : 'camera-plus-outline'} size={28} color={colors.primary} />
           <AppText variant="body" color={colors.onSurfaceVariant}>
-            Take a photo or upload
+            {liveOnly ? 'Take a live photo' : 'Take a photo or upload'}
           </AppText>
         </Pressable>
       )}
