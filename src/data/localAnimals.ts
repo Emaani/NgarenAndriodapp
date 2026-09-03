@@ -35,6 +35,19 @@ export async function addLocalAnimal(animal: Animal): Promise<void> {
   }
 }
 
+export async function updateLocalAnimal(
+  match: (animal: Animal) => boolean,
+  patch: Partial<Animal>,
+): Promise<void> {
+  try {
+    const existing = await getLocalAnimals();
+    const next = existing.map((animal) => (match(animal) ? { ...animal, ...patch } : animal));
+    await AsyncStorage.setItem(KEY, JSON.stringify(next));
+  } catch {
+    // Best-effort only.
+  }
+}
+
 export async function getLocalAnimalById(id: number): Promise<Animal | undefined> {
   return (await getLocalAnimals()).find((a) => a.id === id);
 }

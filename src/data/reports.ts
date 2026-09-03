@@ -42,8 +42,10 @@ export const REPORT_CATALOG: ReportDef[] = [
 
 export function animalsCsv(animals: Animal[]): string {
   return toCsv(
-    ['Tag', 'Name', 'Breed', 'Location', 'Date of birth', 'Status', 'Device', 'Dam', 'Sire'],
+    ['Account Number', 'Internal ID', 'Farmer Tag', 'Name', 'Breed', 'Location', 'Date of birth', 'Status', 'Device', 'Dam', 'Sire'],
     animals.map((a) => [
+      a.accountNumber ?? '',
+      a.ngarenCode ?? '',
       a.tag,
       a.name ?? '',
       a.breed.name,

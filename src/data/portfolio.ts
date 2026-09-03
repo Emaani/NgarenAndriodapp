@@ -109,11 +109,13 @@ async function clientSidePortfolio(): Promise<FarmerPortfolioItem[]> {
     ]);
 
     const profiles = (profilesRes.data ?? []) as Record<string, unknown>[];
-    if (profilesRes.error || profiles.length === 0) {
+    if (profilesRes.error) {
+      // Real read failure → honest empty + offline banner. No silent mock in prod.
       reportDataFailure('portfolio', profilesRes.error);
-      return MOCK_PORTFOLIO;
+      return [];
     }
     reportDataSuccess();
+    if (profiles.length === 0) return []; // legitimately no farmers yet.
 
     // Keep only farmer-role profiles when we can read roles; otherwise show all.
     const roles = (rolesRes.data ?? []) as { user_id: string; role: string }[];
@@ -163,6 +165,6 @@ async function clientSidePortfolio(): Promise<FarmerPortfolioItem[]> {
     });
   } catch (e) {
     reportDataFailure('portfolio', e);
-    return MOCK_PORTFOLIO;
+    return []; // no silent mock in production — honest empty + banner.
   }
 }

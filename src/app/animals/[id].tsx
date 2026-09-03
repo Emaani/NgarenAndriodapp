@@ -65,7 +65,11 @@ export default function AnimalDetail() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title={animal.name ?? animal.tag} subtitle={animal.breed.name} showBack />
+      <GradientHeader
+        title={animal.name ?? animal.tag}
+        subtitle={animal.accountNumber ? `${animal.accountNumber} · ${animal.breed.name}` : animal.breed.name}
+        showBack
+      />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         <View style={{ alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md }}>
           {animal.photos && animal.photos.length > 0 ? (
@@ -153,7 +157,8 @@ export default function AnimalDetail() {
         </AppText>
         <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.md }, shadow[1]]}>
           {/* Dual ID: the AAN (system) + the owner's farmer reference. */}
-          {animal.ngarenCode ? <DetailRow label="AAN (system)" value={animal.ngarenCode} /> : null}
+          {animal.accountNumber ? <DetailRow label="Account number" value={animal.accountNumber} /> : null}
+          {animal.ngarenCode ? <DetailRow label="Internal ID" value={animal.ngarenCode} /> : null}
           <DetailRow label="Farmer reference" value={animal.tag} />
           <DetailRow label="Breed" value={animal.breed.name} />
           {animal.color ? <DetailRow label="Colour" value={animal.color} /> : null}

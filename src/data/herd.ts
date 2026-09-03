@@ -1,32 +1,35 @@
 /**
- * The herd, sourced from Supabase `animal_lineage` — the SAME table the web
+ * The herd, sourced from Supabase `animal_lineage` - the SAME table the web
  * command centre and Ceres telemetry key on. This replaces the mock/platform-api
- * herd so animals are real and sync across mobile ↔ web, and so per-animal Ceres
+ * herd so animals are real and sync across mobile <-> web, and so per-animal Ceres
  * telemetry links by the animal's `animal_tag_id`.
  *
  * Locally-onboarded animals (captured on-device, possibly not yet written back)
- * are merged on top. Degrades gracefully: not configured / query error → the
+ * are merged on top. Degrades gracefully: not configured / query error -> the
  * platform-api mock + local, so the app never breaks.
  */
 import { supabase } from '../services/supabase';
 import { isSupabaseConfigured } from '../config';
 import { reportDataFailure, reportDataSuccess } from '../services/dataHealth';
 import { getAnimals } from './api';
-import { getLocalAnimalById, getLocalAnimals } from './localAnimals';
+import { getLocalAnimalById, getLocalAnimals, updateLocalAnimal } from './localAnimals';
 import { Animal } from './types';
 
-/** Stable numeric id from a lineage uuid (48 bits — safe integer, collision-safe at farm scale). */
+/** Stable numeric id from a lineage uuid (48 bits - safe integer, collision-safe at farm scale). */
 function uuidToId(uuid: string): number {
   const hex = uuid.replace(/[^0-9a-f]/gi, '').slice(0, 12) || '0';
   return parseInt(hex, 16);
 }
 
 function mapLineage(r: Record<string, unknown>): Animal {
-  const breedName = (r.animal_breed as string) ?? '—';
+  const breedName = (r.animal_breed as string) ?? '-';
   return {
     id: uuidToId(String(r.id)),
-    tag: (r.visual_tag_number as string) ?? (r.animal_tag_id as string) ?? (r.animal_id as string) ?? '—',
+    tag: (r.visual_tag_number as string) ?? (r.animal_tag_id as string) ?? (r.animal_id as string) ?? '-',
     name: (r.animal_name as string) ?? undefined,
+    accountNumber: (r.account_number as string) ?? undefined,
+    farmerId: (r.farmer_id as string) ?? undefined,
+    animalSequence: r.animal_sequence == null ? undefined : Number(r.animal_sequence),
     breed: { key: breedName.toLowerCase().replace(/\s+/g, '-'), name: breedName },
     locationName: (r.farm_name as string) ?? undefined,
     dateOfBirth: (r.birth_date as string) ?? '',
@@ -50,27 +53,26 @@ export async function getHerd(): Promise<Animal[]> {
   try {
     const { data, error } = await supabase
       .from('animal_lineage')
-      .select('id, animal_id, animal_name, animal_tag_id, visual_tag_number, animal_breed, birth_date, dam_name, dam_id, sire_name, sire_id, photo_url, farm_name, lifecycle_status')
+      .select('id, animal_id, animal_name, animal_tag_id, visual_tag_number, animal_breed, birth_date, dam_name, dam_id, sire_name, sire_id, photo_url, farm_name, lifecycle_status, farmer_id, animal_sequence, account_number')
       .order('created_at', { ascending: false });
     if (error || !data) {
+      // Production (Supabase configured): NEVER silently substitute mock data.
+      // Show real on-device records only and raise the honest offline banner.
       reportDataFailure('herd', error);
-      const remote = await getAnimals();
-      return [...local, ...remote];
+      return local;
     }
     reportDataSuccess();
-    // Local animals not yet reflected in animal_lineage sit on top (dedupe by AAN).
     const remote = data.map(mapLineage);
     const remoteCodes = new Set(remote.map((a) => a.ngarenCode).filter(Boolean));
     const localUnsynced = local.filter((a) => !a.ngarenCode || !remoteCodes.has(a.ngarenCode));
     return [...localUnsynced, ...remote];
   } catch (e) {
     reportDataFailure('herd', e);
-    const remote = await getAnimals();
-    return [...local, ...remote];
+    return local; // real local records only — no silent mock in production.
   }
 }
 
-/** One animal by numeric id — local first, then the live/backend herd. */
+/** One animal by numeric id - local first, then the live/backend herd. */
 export async function getHerdAnimalById(id: number): Promise<Animal | undefined> {
   const localHit = await getLocalAnimalById(id);
   if (localHit) return localHit;
@@ -80,21 +82,21 @@ export async function getHerdAnimalById(id: number): Promise<Animal | undefined>
 /**
  * Best-effort approval write-through: when the Field-Operations checker approves
  * a captured animal, mark its lineage row `complete` so the web command centre
- * (and Ceres linkage) sees it finalised. Rejection stays local — animal_lineage
+ * (and Ceres linkage) sees it finalised. Rejection stays local - animal_lineage
  * has no "rejected" lifecycle, so a rejected capture simply never finalises.
  * No-ops (and returns false) when Supabase isn't configured or the row isn't
  * present yet (e.g. the maker's role couldn't insert it).
  */
 export async function setLineageApproval(
-  aan: string | undefined,
+  internalId: string | undefined,
   status: 'approved' | 'rejected',
 ): Promise<boolean> {
-  if (!isSupabaseConfigured() || !aan || status !== 'approved') return false;
+  if (!isSupabaseConfigured() || !internalId || status !== 'approved') return false;
   try {
     const { error } = await supabase
       .from('animal_lineage')
       .update({ lifecycle_status: 'complete' })
-      .eq('animal_id', aan);
+      .eq('animal_id', internalId);
     return !error;
   } catch {
     return false;
@@ -102,10 +104,10 @@ export async function setLineageApproval(
 }
 
 /**
- * Best-effort write-through of a newly created AAN into animal_lineage so it
+ * Best-effort write-through of a newly created animal into animal_lineage so it
  * syncs to the web command centre. Requires an insert-capable role (admin/vet);
  * for others it no-ops and the animal remains local. Only http(s) photo URLs are
- * persisted (local file URIs are device-only — see the Storage upload step).
+ * persisted (local file URIs are device-only - see the Storage upload step).
  */
 export async function syncAnimalToLineage(
   animal: Animal,
@@ -116,9 +118,9 @@ export async function syncAnimalToLineage(
   try {
     const remotePhoto =
       uploadedPhotoUrls?.[0] ?? (animal.photos ?? []).find((p) => /^https?:\/\//.test(p));
-    const aan = animal.ngarenCode ?? animal.tag;
+    const internalId = animal.ngarenCode ?? animal.tag;
     const row = {
-      animal_id: aan,
+      animal_id: internalId,
       animal_name: animal.name ?? animal.tag,
       animal_tag_id: animal.deviceSerial ?? null,
       visual_tag_number: animal.tag,
@@ -127,26 +129,55 @@ export async function syncAnimalToLineage(
       sex: 'unknown',
       photo_url: remotePhoto ?? null,
       assigned_farmer_id: userId,
+      farmer_id: userId,
       created_by_user: userId,
       lifecycle_status: animal.approvalStatus === 'approved' ? 'complete' : 'in_progress',
       tag_status: animal.deviceSerial ? 'assigned' : 'unassigned',
       farm_name: animal.locationName ?? null,
     };
-    // Idempotent write-through so retries (offline queue) never duplicate a row:
-    // update the existing AAN if present, otherwise insert. Works whether or not
-    // animal_id has a unique constraint. Only overwrite photo_url when we have one,
-    // so a retry that failed to (re)upload doesn't wipe an existing photo.
+
     const { data: existing } = await supabase
       .from('animal_lineage')
       .select('id')
-      .eq('animal_id', aan)
+      .eq('animal_id', internalId)
       .maybeSingle();
+
     if (existing) {
       const patch = remotePhoto ? row : { ...row, photo_url: undefined };
-      const { error } = await supabase.from('animal_lineage').update(patch).eq('animal_id', aan);
+      const { data, error } = await supabase
+        .from('animal_lineage')
+        .update(patch)
+        .eq('animal_id', internalId)
+        .select('farmer_id, animal_sequence, account_number')
+        .maybeSingle();
+      if (!error && data) {
+        await updateLocalAnimal(
+          (candidate) => candidate.ngarenCode === internalId || candidate.id === animal.id,
+          {
+            accountNumber: (data.account_number as string) ?? undefined,
+            farmerId: (data.farmer_id as string) ?? undefined,
+            animalSequence: data.animal_sequence == null ? undefined : Number(data.animal_sequence),
+          },
+        );
+      }
       return !error;
     }
-    const { error } = await supabase.from('animal_lineage').insert(row);
+
+    const { data, error } = await supabase
+      .from('animal_lineage')
+      .insert(row)
+      .select('farmer_id, animal_sequence, account_number')
+      .single();
+    if (!error && data) {
+      await updateLocalAnimal(
+        (candidate) => candidate.ngarenCode === internalId || candidate.id === animal.id,
+        {
+          accountNumber: (data.account_number as string) ?? undefined,
+          farmerId: (data.farmer_id as string) ?? undefined,
+          animalSequence: data.animal_sequence == null ? undefined : Number(data.animal_sequence),
+        },
+      );
+    }
     return !error;
   } catch {
     return false;

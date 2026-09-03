@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, RefreshControl, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { FlashList } from '@shopify/flash-list';
-import { colors, spacing } from '@/theme';
+import { colors, radius, spacing } from '@/theme';
 import { animals as animalsFallback } from '@/data/mock';
 import { getHerd } from '@/data/herd';
-import { pendingSyncCount, processSyncQueue } from '@/data/syncQueue';
+import { failedSyncCount, pendingSyncCount, processSyncQueue, syncNow } from '@/data/syncQueue';
 import { useResource } from '@/data/hooks';
-import { AnimalListItem, EmptyState, Fab, GradientHeader, NotificationBell, SearchBar } from '@/ui';
+import { AnimalListItem, AppText, EmptyState, Fab, GradientHeader, Icon, NotificationBell, SearchBar } from '@/ui';
 
 export default function AnimalsTab() {
   const router = useRouter();
@@ -18,12 +18,21 @@ export default function AnimalsTab() {
   // Show how many registrations are still waiting to sync to Supabase, and keep
   // nudging the queue while this screen is open.
   const [pending, setPending] = useState(0);
+  const [failed, setFailed] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+  const refreshCounts = async () => {
+    setPending(await pendingSyncCount());
+    setFailed(await failedSyncCount());
+  };
   useEffect(() => {
     let active = true;
     const tick = async () => {
       void processSyncQueue();
-      const n = await pendingSyncCount();
-      if (active) setPending(n);
+      const [p, f] = [await pendingSyncCount(), await failedSyncCount()];
+      if (active) {
+        setPending(p);
+        setFailed(f);
+      }
     };
     void tick();
     const t = setInterval(tick, 5000);
@@ -33,10 +42,23 @@ export default function AnimalsTab() {
     };
   }, []);
 
+  // Manual "sync now" — drains the queue including any dead-lettered writes.
+  const onSyncNow = async () => {
+    setSyncing(true);
+    try {
+      await syncNow();
+      await refreshCounts();
+      reload();
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
     return allAnimals.filter(
       (a) =>
+        (a.accountNumber ?? '').toLowerCase().includes(q) ||
         a.tag.toLowerCase().includes(q) ||
         (a.name ?? '').toLowerCase().includes(q) ||
         a.breed.name.toLowerCase().includes(q),
@@ -51,8 +73,25 @@ export default function AnimalsTab() {
         right={<NotificationBell />}
       />
       <View style={{ padding: spacing.md, paddingBottom: 0 }}>
-        <SearchBar value={query} onChangeText={setQuery} placeholder="Search by tag, name or breed..." />
+        <SearchBar value={query} onChangeText={setQuery} placeholder="Search by account #, tag, name or breed..." />
       </View>
+      {/* Sync status + manual trigger. Failed writes are never dropped — they
+          park here until a manual retry succeeds. */}
+      {pending > 0 ? (
+        <Pressable
+          onPress={onSyncNow}
+          disabled={syncing}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.md, marginTop: spacing.sm, padding: spacing.sm, borderRadius: radius.md, backgroundColor: failed > 0 ? colors.errorTint : colors.primaryTint, borderWidth: 1, borderColor: failed > 0 ? colors.error + '55' : colors.primary + '33' }}>
+          <Icon name={syncing ? 'sync' : failed > 0 ? 'cloud-alert' : 'cloud-sync-outline'} size={16} color={failed > 0 ? colors.error : colors.primary} />
+          <AppText variant="caption" color={failed > 0 ? colors.error : colors.primary} style={{ flex: 1, fontWeight: '600' }}>
+            {syncing
+              ? 'Syncing…'
+              : failed > 0
+                ? `${failed} write${failed === 1 ? '' : 's'} failed to sync — tap to retry`
+                : `${pending} write${pending === 1 ? '' : 's'} pending — tap to sync now`}
+          </AppText>
+        </Pressable>
+      ) : null}
       {/* Virtualized herd list — scales to large herds; pull to refresh. */}
       <FlashList
         data={filtered}

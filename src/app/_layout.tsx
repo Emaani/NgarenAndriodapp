@@ -11,7 +11,7 @@ import {
   Inter_600SemiBold,
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
-import { addNotificationResponseListener, routeColdStartNotification } from '@/services/push';
+import { addNotificationResponseListener, routeColdStartNotification, initNotificationsAsync } from '@/services/push';
 import { registerBackgroundSyncAsync } from '@/services/backgroundSync';
 import { startSyncQueueWatcher, processSyncQueue } from '@/data/syncQueue';
 import { AuthProvider } from '@/services/auth';
@@ -30,6 +30,10 @@ function RootLayout() {
     Inter_700Bold,
   });
 
+  // Ensure notifications are ready on first launch (channel + permission + token).
+  useEffect(() => {
+    initNotificationsAsync();
+  }, []);
   // Deep-link taps on push notifications into the right screen.
   useEffect(() => addNotificationResponseListener(), []);
   // Handle the case where a notification tap launched the app from killed

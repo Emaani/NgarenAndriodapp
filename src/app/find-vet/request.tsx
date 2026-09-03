@@ -6,6 +6,7 @@ import { animals as animalsFallback, vets } from '@/data/mock';
 import { submitCalloutRequest } from '@/data/api';
 import { getHerd } from '@/data/herd';
 import { notify } from '@/lib/toast';
+import { sendLocalNotification } from '@/services/push';
 import { useResource } from '@/data/hooks';
 import { AppointmentMode, Animal, CalloutUrgency } from '@/data/types';
 import { AppText, Button, GradientHeader, Icon, PhotoField, Screen, SelectField, TextField } from '@/ui';
@@ -64,6 +65,13 @@ export default function RequestCallout() {
         accessBufferHours: accessHours,
       });
       notify(`Vet request sent for ${animalLabel}`);
+      // A real on-device notification so the farmer has a durable record + proof
+      // notifications work (local — no backend push server needed).
+      void sendLocalNotification(
+        'Vet request sent',
+        `${urgency} request for ${animalLabel}${vet ? ` to ${vet.name}` : ''}. We'll notify you when a vet responds.`,
+        { type: 'VET_REQUEST' },
+      );
     } catch {
       // Best-effort in mock mode; the farmer is still routed home.
     } finally {

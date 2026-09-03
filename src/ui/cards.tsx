@@ -48,6 +48,7 @@ export function AnimalListItem({
         )}
         <View style={{ flex: 1, gap: 2 }}>
           <AppText variant="title">{animal.name ?? animal.tag}</AppText>
+          {animal.accountNumber ? <Line icon="identifier" text={`Account: ${animal.accountNumber}`} color={colors.primary} /> : null}
           <Line icon="dna" text={`Breed: ${animal.breed.name}`} />
           <Line icon="map-marker" text={animal.locationName ?? '—'} />
           {/* Privacy: age, not the date of birth. */}

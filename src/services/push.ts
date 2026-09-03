@@ -43,6 +43,76 @@ async function ensureAndroidChannel(): Promise<void> {
 
 export type PushPermission = 'granted' | 'denied' | 'undetermined';
 
+/**
+ * One-time notification bootstrap, called at app start: create the Android
+ * channel, request OS permission if it hasn't been decided yet, and (best-
+ * effort) register the Expo push token. Makes notifications work out of the box
+ * without the user hunting for a settings toggle. Fully guarded — never throws.
+ */
+export async function initNotificationsAsync(): Promise<void> {
+  if (Platform.OS === 'web') return;
+  try {
+    await ensureAndroidChannel();
+    const perm = await Notifications.getPermissionsAsync();
+    if (perm.status === 'undetermined') {
+      await Notifications.requestPermissionsAsync().catch(() => undefined);
+    }
+    // Register the token if we now have permission (no-op without a projectId).
+    registerForPushNotifications().catch(() => undefined);
+  } catch {
+    // Never let notification setup break app start.
+  }
+}
+
+/**
+ * Present a local notification immediately. Local notifications work without any
+ * backend push server, so they make on-device alerts genuinely functional for
+ * testers (e.g. confirming a booking, a reminder). Guarded — never throws.
+ */
+export async function sendLocalNotification(
+  title: string,
+  body: string,
+  data?: Record<string, unknown>,
+): Promise<void> {
+  if (Platform.OS === 'web') return;
+  try {
+    await ensureAndroidChannel();
+    await Notifications.scheduleNotificationAsync({
+      content: { title, body, data: data ?? {} },
+      trigger: null,
+    });
+  } catch {
+    // best-effort
+  }
+}
+
+/**
+ * Schedule a local reminder to fire at a future date (e.g. a vaccination or
+ * follow-up). No-ops for past dates. Returns the notification id or null.
+ */
+export async function scheduleLocalReminder(opts: {
+  title: string;
+  body: string;
+  date: Date;
+  data?: Record<string, unknown>;
+}): Promise<string | null> {
+  if (Platform.OS === 'web') return null;
+  if (!(opts.date instanceof Date) || opts.date.getTime() <= Date.now()) return null;
+  try {
+    await ensureAndroidChannel();
+    return await Notifications.scheduleNotificationAsync({
+      content: { title: opts.title, body: opts.body, data: opts.data ?? {} },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: opts.date,
+        channelId: ANDROID_CHANNEL_ID,
+      },
+    });
+  } catch {
+    return null;
+  }
+}
+
 /** Current OS notification-permission status, without prompting. */
 export async function getPushPermissionStatus(): Promise<PushPermission> {
   if (Platform.OS === 'web') return 'denied';

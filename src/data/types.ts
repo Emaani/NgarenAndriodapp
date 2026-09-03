@@ -13,6 +13,10 @@ export interface Animal {
   id: number;
   tag: string;
   name?: string;
+  accountNumber?: string;
+  farmerId?: string;
+  farmerCode?: number;
+  animalSequence?: number;
   breed: Breed;
   locationId?: number;
   locationName?: string;
@@ -25,7 +29,7 @@ export interface Animal {
   sireTag?: string;
   /** Photo URIs (360°: front, left, right, back) — the primary animal ID. */
   photos?: string[];
-  /** Ngaren Animal Account Number (AAN, NGR-…) — the animal's primary key. */
+  /** Internal Ngaren animal identifier stored separately from the displayed account number. */
   ngarenCode?: string;
   /** Coat colour / markings text descriptor. */
   color?: string;
