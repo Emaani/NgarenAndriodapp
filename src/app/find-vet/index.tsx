@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { vets } from '@/data/mock';
+import { getPrimaryVetIds } from '@/data/primaryVets';
 import { Vet } from '@/data/types';
 import { AppText, Button, EmptyState, GradientHeader, Icon, Screen, SearchBar } from '@/ui';
 
@@ -26,12 +27,12 @@ function Tag({ icon, label }: { icon: 'video' | 'cash-multiple'; label: string }
   );
 }
 
-function VetCard({ vet, onOpen, onRequest }: { vet: Vet; onOpen: () => void; onRequest: () => void }) {
+function VetCard({ vet, isPrimary, onOpen, onRequest }: { vet: Vet; isPrimary?: boolean; onOpen: () => void; onRequest: () => void }) {
   return (
     <Pressable
       onPress={onOpen}
       style={({ pressed }) => [
-        { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm, marginBottom: spacing.mdMinus, opacity: pressed ? 0.95 : 1 },
+        { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm, marginBottom: spacing.mdMinus, opacity: pressed ? 0.95 : 1, borderWidth: isPrimary ? 1 : 0, borderColor: '#FBBF24' },
         shadow[1],
       ]}>
       <View style={{ flexDirection: 'row', gap: spacing.md }}>
@@ -48,9 +49,12 @@ function VetCard({ vet, onOpen, onRequest }: { vet: Vet; onOpen: () => void; onR
           ) : null}
         </View>
         <View style={{ flex: 1, gap: 2 }}>
-          <AppText variant="bodyLarge" style={{ fontWeight: '700' }}>
-            {vet.name}
-          </AppText>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            {isPrimary ? <Icon name="star" size={14} color="#FBBF24" /> : null}
+            <AppText variant="bodyLarge" style={{ fontWeight: '700' }}>
+              {vet.name}
+            </AppText>
+          </View>
           <AppText variant="caption" color={colors.onSurfaceVariant}>
             {vet.credentials ?? vet.specialty}
           </AppText>
@@ -94,10 +98,23 @@ function VetCard({ vet, onOpen, onRequest }: { vet: Vet; onOpen: () => void; onR
 export default function FindVet() {
   const router = useRouter();
   const [query, setQuery] = useState('');
+  const [primaryIds, setPrimaryIds] = useState<number[]>([]);
 
-  // Only vets within the proximity radius, nearest first (Uber-for-vets logic).
+  // Reload trusted vets whenever the screen refocuses (they change on the profile).
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      getPrimaryVetIds().then((ids) => active && setPrimaryIds(ids));
+      return () => {
+        active = false;
+      };
+    }, []),
+  );
+
+  // Within the proximity radius; trusted "primary" vets first, then nearest.
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
+    const primarySet = new Set(primaryIds);
     return vets
       .filter((v) => v.distanceKm <= PROXIMITY_KM)
       .filter(
@@ -106,8 +123,12 @@ export default function FindVet() {
           v.clinic.toLowerCase().includes(q) ||
           v.specialty.toLowerCase().includes(q),
       )
-      .sort((a, b) => a.distanceKm - b.distanceKm);
-  }, [query]);
+      .sort((a, b) => {
+        const pa = primarySet.has(a.id) ? 0 : 1;
+        const pb = primarySet.has(b.id) ? 0 : 1;
+        return pa !== pb ? pa - pb : a.distanceKm - b.distanceKm;
+      });
+  }, [query, primaryIds]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -127,6 +148,7 @@ export default function FindVet() {
             <VetCard
               key={v.id}
               vet={v}
+              isPrimary={primaryIds.includes(v.id)}
               onOpen={() => router.push(`/find-vet/${v.id}` as never)}
               onRequest={() => router.push(`/find-vet/request?vetId=${v.id}`)}
             />

@@ -5,8 +5,10 @@ import { colors, radius, shadow, spacing } from '@/theme';
 import { animals as animalsFallback, vets } from '@/data/mock';
 import { submitCalloutRequest } from '@/data/api';
 import { getHerd } from '@/data/herd';
+import { getFarmerPortfolio } from '@/data/portfolio';
 import { notify } from '@/lib/toast';
 import { sendLocalNotification } from '@/services/push';
+import { useAuth } from '@/services/auth';
 import { useResource } from '@/data/hooks';
 import { AppointmentMode, Animal, CalloutUrgency } from '@/data/types';
 import { AppText, Button, GradientHeader, Icon, PhotoField, PickerField, Screen, TextField } from '@/ui';
@@ -35,8 +37,12 @@ export default function RequestCallout() {
   const router = useRouter();
   const { vetId } = useLocalSearchParams<{ vetId?: string }>();
   const vet = vetId ? vets.find((v) => v.id === Number(vetId)) : undefined;
+  const { isAdmin } = useAuth();
   const { data: animals } = useResource(getHerd, animalsFallback);
+  // Admins can book on a farmer's behalf (Sep 3 2026 standup).
+  const { data: farmers } = useResource(getFarmerPortfolio, []);
 
+  const [onBehalfFarmerId, setOnBehalfFarmerId] = useState('');
   const [animal, setAnimal] = useState<Animal | null>(null);
   const [urgency, setUrgency] = useState<(typeof URGENCY)[number]>('Routine');
   const [mode, setMode] = useState<AppointmentMode>('onsite');
@@ -51,17 +57,34 @@ export default function RequestCallout() {
   const locationName = animal?.locationName ?? '';
   const animalLabel = animal ? animal.name ?? animal.tag : '';
 
+  const farmerOptions = useMemo(
+    () => farmers.map((f) => ({ label: f.farmerName, value: f.id })),
+    [farmers],
+  );
+  const onBehalfFarmerName = farmers.find((f) => f.id === onBehalfFarmerId)?.farmerName;
+
+  // Animals to choose from — for an admin booking on a farmer's behalf, scope to
+  // that farmer's animals once one is chosen.
+  const bookableAnimals = useMemo(
+    () => (isAdmin && onBehalfFarmerId ? animals.filter((a) => a.farmerId === onBehalfFarmerId) : animals),
+    [isAdmin, onBehalfFarmerId, animals],
+  );
+
   // Animal selection dialog options (account number + name), per the Sep 3
   // standup ("add selection dialogs" for animal selection).
   const animalOptions = useMemo(
     () =>
-      animals.map((a) => ({
+      bookableAnimals.map((a) => ({
         label: `${a.accountNumber ?? a.tag}${a.name ? ` · ${a.name}` : ''}`,
         value: String(a.id),
       })),
-    [animals],
+    [bookableAnimals],
   );
-  const selectAnimal = (v: string) => setAnimal(animals.find((a) => String(a.id) === v) ?? null);
+  const selectAnimal = (v: string) => setAnimal(bookableAnimals.find((a) => String(a.id) === v) ?? null);
+  const pickFarmer = (v: string) => {
+    setOnBehalfFarmerId(v);
+    setAnimal(null); // re-scope the animal list to the chosen farmer
+  };
 
   // Picking a priority sets the matching records-access window from its SLA.
   const pickUrgency = (u: (typeof URGENCY)[number]) => {
@@ -73,12 +96,13 @@ export default function RequestCallout() {
     if (!animal || !tcsAccepted || submitting) return;
     setSubmitting(true);
     try {
+      const onBehalfNote = onBehalfFarmerName ? `[On behalf of ${onBehalfFarmerName}] ` : '';
       await submitCalloutRequest({
         vetId: vet?.id,
         animal: animalLabel,
         locationName: locationName || 'Farm',
         urgency: urgency as CalloutUrgency,
-        notes: notes || undefined,
+        notes: `${onBehalfNote}${notes}`.trim() || undefined,
         mode,
         photo: photo || undefined,
         accessBufferHours: accessHours,
@@ -122,12 +146,23 @@ export default function RequestCallout() {
           </View>
         )}
 
+        {/* Admin-only: book on behalf of a farmer. */}
+        {isAdmin ? (
+          <PickerField
+            label="Booking on behalf of"
+            value={onBehalfFarmerId}
+            placeholder="Select a farmer (optional)"
+            options={farmerOptions}
+            onSelect={pickFarmer}
+          />
+        ) : null}
+
         {/* Animal — a selection dialog; picking auto-fills the location. */}
         <PickerField
           label="Animal"
           required
           value={animal ? String(animal.id) : ''}
-          placeholder="Select an animal"
+          placeholder={isAdmin && !onBehalfFarmerId ? 'Select a farmer first, or any animal' : 'Select an animal'}
           options={animalOptions}
           onSelect={selectAnimal}
         />

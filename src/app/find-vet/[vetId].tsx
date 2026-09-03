@@ -1,7 +1,10 @@
+import { useEffect, useState } from 'react';
 import { Image, Pressable, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { getVetProfile, formatDayLabel } from '@/data/vetProfiles';
+import { isPrimaryVet, togglePrimaryVet } from '@/data/primaryVets';
+import { notify } from '@/lib/toast';
 import { VetDayAvailability } from '@/data/types';
 import { useResource } from '@/data/hooks';
 import { AppText, Button, EmptyState, GradientHeader, Icon, Screen, VetImpactDashboard } from '@/ui';
@@ -58,6 +61,21 @@ export default function VetProfileScreen() {
   const { vetId } = useLocalSearchParams<{ vetId: string }>();
   const { data: vet } = useResource(() => getVetProfile(Number(vetId)), undefined);
 
+  // Trusted "primary provider" save (Sep 3 2026 standup).
+  const [primary, setPrimary] = useState(false);
+  useEffect(() => {
+    let active = true;
+    isPrimaryVet(Number(vetId)).then((v) => active && setPrimary(v));
+    return () => {
+      active = false;
+    };
+  }, [vetId]);
+  const onTogglePrimary = async () => {
+    const saved = await togglePrimaryVet(Number(vetId));
+    setPrimary(saved);
+    notify(saved ? 'Saved as a trusted vet' : 'Removed from trusted vets');
+  };
+
   if (!vet) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -69,7 +87,16 @@ export default function VetProfileScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Vet profile" subtitle={`${vet.distanceKm} km away`} showBack />
+      <GradientHeader
+        title="Vet profile"
+        subtitle={`${vet.distanceKm} km away`}
+        showBack
+        right={
+          <Pressable onPress={onTogglePrimary} hitSlop={8} accessibilityLabel={primary ? 'Remove trusted vet' : 'Save trusted vet'}>
+            <Icon name={primary ? 'star' : 'star-outline'} size={24} color={primary ? '#FBBF24' : '#fff'} />
+          </Pressable>
+        }
+      />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         {/* Persona header */}
         <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm, borderWidth: 1, borderColor: colors.divider }, shadow[1]]}>

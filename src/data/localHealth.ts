@@ -24,6 +24,10 @@ export interface LocalHealthRecord {
   animalLabel: string;
   type: HealthEventType;
   medication: string | null;
+  /** Working diagnosis (treatment template). */
+  diagnosis?: string | null;
+  /** Next dose / follow-up due date (vaccination template) — drives a reminder. */
+  nextDueDate?: string | null;
   notes: string;
   photo: string | null;
   /** Structured pest/disease observations for trend analytics. */
