@@ -157,6 +157,26 @@ export default function VetProfileScreen() {
           ) : null}
         </View>
 
+        {/* Services offered (managed-health MVP categories) */}
+        <AppText variant="title" style={{ marginTop: spacing.lg, marginBottom: spacing.sm }}>
+          Services offered
+        </AppText>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+          {[
+            { label: 'Stock-take', icon: 'clipboard-list-outline' as const },
+            { label: 'Vaccination', icon: 'needle' as const },
+            { label: 'Treatment', icon: 'medical-bag' as const },
+            { label: 'Consultation', icon: 'comment-question-outline' as const },
+          ].map((sv) => (
+            <View key={sv.label} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.mdMinus, paddingVertical: spacing.xs, borderRadius: radius.full, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.divider }}>
+              <Icon name={sv.icon} size={15} color={colors.primary} />
+              <AppText variant="caption" color={colors.onSurface} style={{ fontWeight: '600' }}>
+                {sv.label}
+              </AppText>
+            </View>
+          ))}
+        </View>
+
         {/* Booking calendar */}
         <AppText variant="title" style={{ marginTop: spacing.lg, marginBottom: spacing.xs }}>
           Availability

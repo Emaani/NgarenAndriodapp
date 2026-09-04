@@ -97,11 +97,29 @@ export async function getMyVetImpact(): Promise<VetImpact> {
   ]);
 
   const completed = callouts.filter((c) => c.status === 'completed');
-  const animals = new Set<string>();
-  for (const c of callouts) if (c.animal) animals.add(c.animal.toLowerCase());
-  for (const r of clinical) if (r.animalName) animals.add(r.animalName.toLowerCase());
-  const farmers = new Set<string>();
-  for (const c of callouts) if (c.farmerName) farmers.add(c.farmerName.toLowerCase());
+
+  // Distinct animals & farmers with occurrence counts (case-insensitive keys,
+  // original-case labels) — powers the drill-down lists.
+  const animalsMap = new Map<string, { label: string; count: number }>();
+  const addAnimal = (label?: string | null) => {
+    if (!label) return;
+    const k = label.toLowerCase();
+    const e = animalsMap.get(k) ?? { label, count: 0 };
+    e.count += 1;
+    animalsMap.set(k, e);
+  };
+  for (const c of callouts) addAnimal(c.animal);
+  for (const r of clinical) addAnimal(r.animalName);
+  const farmersMap = new Map<string, { label: string; count: number }>();
+  for (const c of callouts) {
+    if (!c.farmerName) continue;
+    const k = c.farmerName.toLowerCase();
+    const e = farmersMap.get(k) ?? { label: c.farmerName, count: 0 };
+    e.count += 1;
+    farmersMap.set(k, e);
+  }
+  const animals = animalsMap;
+  const farmers = farmersMap;
 
   const services = { treatment: 0, vaccination: 0, stockTaking: 0, others: 0 };
   const bump = (text: string | null | undefined, type?: string) => {
@@ -123,11 +141,17 @@ export async function getMyVetImpact(): Promise<VetImpact> {
     disease: obsText.filter((t) => has(t, 'disease', 'infection', 'fever')).length,
   };
 
+  const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
   return {
     totalVisits: completed.length,
     animalsManaged: animals.size,
     farmersServiced: farmers.size,
     services,
     observations,
+    detail: {
+      visits: completed.map((c) => ({ label: c.animal, sub: `${c.farmerName} · ${c.urgency} · ${c.requestedAt}` })),
+      animals: [...animals.values()].map((a) => ({ label: a.label, sub: plural(a.count, 'record') })),
+      farmers: [...farmers.values()].map((f) => ({ label: f.label, sub: plural(f.count, 'visit') })),
+    },
   };
 }

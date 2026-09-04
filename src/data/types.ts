@@ -345,12 +345,25 @@ export interface VetDayAvailability {
  * the vet's completed work — visits, animals & farmers served, the nature of
  * services delivered, and the key field observations recorded.
  */
+/** A row in an impact drill-down list. */
+export interface VetImpactRow {
+  label: string;
+  sub?: string;
+}
+
 export interface VetImpact {
   totalVisits: number;
   animalsManaged: number;
   farmersServiced: number;
   services: { treatment: number; vaccination: number; stockTaking: number; others: number };
   observations: { ticks: number; flies: number; disease: number };
+  /** Underlying records for the clickable tiles — present for the vet's own
+   *  impact (from real records); omitted for browsed portfolio figures. */
+  detail?: {
+    visits: VetImpactRow[];
+    animals: VetImpactRow[];
+    farmers: VetImpactRow[];
+  };
 }
 
 /** Full vet profile: persona + booking calendar + impact dashboard. */
