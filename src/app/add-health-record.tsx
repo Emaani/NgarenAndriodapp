@@ -38,10 +38,13 @@ const TEMPLATES: Record<
  */
 export default function AddHealthRecord() {
   const router = useRouter();
-  const { animal, label } = useLocalSearchParams<{ animal?: string; label?: string }>();
+  const { animal, label, type: presetType } = useLocalSearchParams<{ animal?: string; label?: string; type?: string }>();
   const { loading, isAuthenticated, user } = useAuth();
 
-  const [type, setType] = useState<HealthEventType>('vaccination');
+  const initialType = (['vaccination', 'treatment', 'consultation', 'ailment'] as string[]).includes(presetType ?? '')
+    ? (presetType as HealthEventType)
+    : 'vaccination';
+  const [type, setType] = useState<HealthEventType>(initialType);
   const [medication, setMedication] = useState('');
   const [diagnosis, setDiagnosis] = useState('');
   const [nextDue, setNextDue] = useState('');

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View } from 'react-native';
-import { Redirect, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, spacing } from '@/theme';
 import { CalendarType } from '@/data/clinical';
 import { addLocalEvent } from '@/data/localEvents';
@@ -23,10 +23,11 @@ const TYPE_OPTIONS: { label: string; value: CalendarType }[] = [
 export default function AddEvent() {
   const router = useRouter();
   const { loading, isAuthenticated } = useAuth();
+  const { date: presetDate } = useLocalSearchParams<{ date?: string }>();
 
   const [title, setTitle] = useState('');
   const [type, setType] = useState<CalendarType>('vet_visit');
-  const [date, setDate] = useState('');
+  const [date, setDate] = useState(presetDate ?? '');
   const [saving, setSaving] = useState(false);
 
   if (loading) return null;

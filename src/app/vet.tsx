@@ -46,18 +46,21 @@ function HeaderStat({ value, label }: { value: number; label: string }) {
 
 function RequestCard({
   req,
+  onOpen,
   onAccept,
   onDecline,
   onMap,
 }: {
   req: CalloutRequest;
+  onOpen: () => void;
   onAccept: () => void;
   onDecline: () => void;
   onMap: () => void;
 }) {
   return (
-    <View
-      style={[
+    <Pressable
+      onPress={onOpen}
+      style={({ pressed }) => [
         {
           backgroundColor: colors.surface,
           borderRadius: radius.md,
@@ -66,6 +69,7 @@ function RequestCard({
           borderWidth: 1,
           borderColor: colors.divider,
           gap: spacing.mdMinus,
+          opacity: pressed ? 0.95 : 1,
         },
         shadow[1],
       ]}>
@@ -80,6 +84,7 @@ function RequestCard({
           </AppText>
         </View>
         <ActionChip label={req.urgency} variant={urgencyVariant(req.urgency)} />
+        <Icon name="chevron-right" size={18} color={colors.onSurfaceVariant} />
       </View>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
@@ -111,7 +116,7 @@ function RequestCard({
           </Pressable>
         </View>
       )}
-    </View>
+    </Pressable>
   );
 }
 
@@ -231,6 +236,7 @@ export default function VetDashboard() {
             <RequestCard
               key={r.id}
               req={r}
+              onOpen={() => router.push(`/vet-callout/${r.id}` as never)}
               onAccept={() => setStatus(r.id, 'accepted')}
               onDecline={() => setStatus(r.id, 'declined')}
               onMap={() => router.push('/(tabs)/track')}
