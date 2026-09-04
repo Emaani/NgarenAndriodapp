@@ -4,6 +4,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { vets } from '@/data/mock';
 import { getPrimaryVetIds } from '@/data/primaryVets';
+import { getEnlistedVets } from '@/data/vetEnlistments';
 import { Vet } from '@/data/types';
 import { AppText, Button, EmptyState, GradientHeader, Icon, Screen, SearchBar } from '@/ui';
 
@@ -99,23 +100,28 @@ export default function FindVet() {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [primaryIds, setPrimaryIds] = useState<number[]>([]);
+  const [enlisted, setEnlisted] = useState<Vet[]>([]);
 
-  // Reload trusted vets whenever the screen refocuses (they change on the profile).
+  // Reload trusted + admin-enlisted vets whenever the screen refocuses.
   useFocusEffect(
     useCallback(() => {
       let active = true;
       getPrimaryVetIds().then((ids) => active && setPrimaryIds(ids));
+      getEnlistedVets().then((list) => active && setEnlisted(list));
       return () => {
         active = false;
       };
     }, []),
   );
 
+  // Admin-enlisted vets join the seeded pool.
+  const pool = useMemo(() => [...enlisted, ...vets], [enlisted]);
+
   // Within the proximity radius; trusted "primary" vets first, then nearest.
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
     const primarySet = new Set(primaryIds);
-    return vets
+    return pool
       .filter((v) => v.distanceKm <= PROXIMITY_KM)
       .filter(
         (v) =>
@@ -128,7 +134,7 @@ export default function FindVet() {
         const pb = primarySet.has(b.id) ? 0 : 1;
         return pa !== pb ? pa - pb : a.distanceKm - b.distanceKm;
       });
-  }, [query, primaryIds]);
+  }, [query, primaryIds, pool]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>

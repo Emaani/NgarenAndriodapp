@@ -62,6 +62,7 @@ const ADMIN_ACTIONS: Action[] = [
   { icon: 'calendar-month-outline', label: 'Calendar', route: '/calendar', tint: '#0EA5E9' },
   { icon: 'account-group-outline', label: 'Team & Users', route: '/users', tint: '#0284C7' },
   { icon: 'clipboard-pulse-outline', label: 'Vet Call-outs', route: '/vet', tint: '#F59E0B' },
+  { icon: 'account-plus-outline', label: 'Enlist a Vet', route: '/enlist-vet', tint: '#21C45D' },
   { icon: 'tag-outline', label: 'Devices', route: '/devices', tint: '#9333EA' },
   { icon: 'map-marker-outline', label: 'Locations', route: '/locations', tint: '#0D9488' },
 ];

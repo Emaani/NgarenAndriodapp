@@ -14,6 +14,7 @@ import { getCalloutRequests } from './api';
 import { getHealthRecords } from './clinical';
 import { getLocalHealthRecords } from './localHealth';
 import { vets } from './mock';
+import { getEnlistedVetById } from './vetEnlistments';
 import { Vet, VetDayAvailability, VetImpact, VetProfile } from './types';
 
 const WEEKDAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -64,7 +65,8 @@ function portfolioImpact(vet: Vet): VetImpact {
 }
 
 export async function getVetProfile(id: number): Promise<VetProfile | undefined> {
-  const vet = vets.find((v) => v.id === id);
+  // Seeded vets first, then admin-enlisted vets (created in-app).
+  const vet: Vet | undefined = vets.find((v) => v.id === id) ?? (await getEnlistedVetById(id));
   if (!vet) return undefined;
   return {
     ...vet,
