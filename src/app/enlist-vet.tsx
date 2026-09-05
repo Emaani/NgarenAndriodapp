@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
+import * as Location from 'expo-location';
 import { colors, radius, spacing } from '@/theme';
+import { animals as animalsFallback } from '@/data/mock';
 import { addEnlistedVet } from '@/data/vetEnlistments';
+import { getHerd } from '@/data/herd';
+import { distanceMeters, LatLng } from '@/lib/geo';
 import { useAuth } from '@/services/auth';
 import { notify } from '@/lib/toast';
 import { AppText, Button, GradientHeader, Icon, PickerField, Screen, TextField } from '@/ui';
@@ -44,7 +48,9 @@ export default function EnlistVet() {
   const [specialty, setSpecialty] = useState('');
   const [institution, setInstitution] = useState('');
   const [city, setCity] = useState('');
-  const [distanceKm, setDistanceKm] = useState('2');
+  const [coords, setCoords] = useState<LatLng | null>(null);
+  const [nearestKm, setNearestKm] = useState<number | null>(null);
+  const [locating, setLocating] = useState(false);
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [experience, setExperience] = useState('');
@@ -57,18 +63,55 @@ export default function EnlistVet() {
   if (!isAuthenticated) return <Redirect href="/login" />;
   if (!isAdmin) return <Redirect href="/(tabs)/home" />;
 
-  const canSubmit = name.trim().length > 1 && !!specialty && city.trim().length > 0 && tcs;
+  // Capture the vet's GPS pin and derive their distance from the nearest farm
+  // (Sep 5 2026 standup: device coordinates / map pin, not a typed distance).
+  const captureLocation = async () => {
+    setLocating(true);
+    try {
+      const perm = await Location.requestForegroundPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Location permission needed', 'Enable location access to drop the vet’s map pin.');
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const pin: LatLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      setCoords(pin);
+      // Distance to the nearest farm animal that has coordinates → the vet's
+      // real proximity to farms, replacing the manual estimate.
+      let herd = animalsFallback;
+      try {
+        herd = await getHerd();
+      } catch {
+        // fall back to the seed herd for the distance estimate
+      }
+      const farmPins = herd.map((a) => a.coordinates).filter((c): c is LatLng => !!c);
+      if (farmPins.length) {
+        const km = Math.min(...farmPins.map((f) => distanceMeters(pin, f))) / 1000;
+        setNearestKm(Math.max(0.1, Math.round(km * 10) / 10));
+      } else {
+        setNearestKm(null);
+      }
+    } catch {
+      Alert.alert('Could not get location', 'Please try again to capture the vet’s coordinates.');
+    } finally {
+      setLocating(false);
+    }
+  };
+
+  const canSubmit = name.trim().length > 1 && !!specialty && city.trim().length > 0 && !!coords && tcs;
 
   const onSubmit = async () => {
     setSaving(true);
     try {
-      const dist = Number(distanceKm);
       const vet = await addEnlistedVet({
         name: name.trim(),
         credentials: credentials.trim() || undefined,
         clinic: clinic.trim() || city.trim(),
         specialty: specialty,
-        distanceKm: Number.isFinite(dist) && dist > 0 ? dist : 2,
+        // Proximity from the captured pin; if no farm has coords yet, keep the
+        // vet in range so they still surface to nearby farmers.
+        distanceKm: nearestKm ?? 2,
+        coordinates: coords ?? undefined,
         institution: institution.trim() || undefined,
         videoVisits,
         selfPay,
@@ -109,10 +152,34 @@ export default function EnlistVet() {
           Location & discovery
         </AppText>
         <TextField label="City / area" required value={city} onChangeText={setCity} placeholder="e.g. Kampala" />
-        <TextField label="Approx. distance from farms (km)" value={distanceKm} onChangeText={setDistanceKm} placeholder="2" keyboardType="decimal-pad" />
-        <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginTop: -spacing.sm, marginBottom: spacing.md }}>
-          Proximity uses the registered area for now (GPS discovery is a later phase). Vets within 5 km appear to farmers.
+
+        {/* GPS pin instead of manual distance (Sep 5 2026 standup). */}
+        <AppText variant="body" style={{ fontWeight: '600', marginBottom: spacing.xs }}>
+          Location pin *
         </AppText>
+        <Pressable
+          onPress={captureLocation}
+          disabled={locating}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: coords ? colors.primaryTint : colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: coords ? colors.primary : colors.divider, padding: spacing.md }}>
+          <Icon name={coords ? 'map-marker-check' : 'crosshairs-gps'} size={22} color={colors.primary} />
+          <View style={{ flex: 1 }}>
+            <AppText variant="body" style={{ fontWeight: '600' }} color={coords ? colors.primaryDark : colors.onSurface}>
+              {locating ? 'Getting location…' : coords ? 'Location captured' : 'Capture current location (drop pin)'}
+            </AppText>
+            {coords ? (
+              <AppText variant="caption" color={colors.onSurfaceVariant}>
+                {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
+                {nearestKm != null ? ` · ~${nearestKm} km from nearest farm` : ' · no farm coordinates yet'}
+              </AppText>
+            ) : (
+              <AppText variant="caption" color={colors.onSurfaceVariant}>
+                Uses device GPS to set the vet’s pin. Vets within 5 km appear to farmers.
+              </AppText>
+            )}
+          </View>
+          {coords ? <Icon name="refresh" size={18} color={colors.onSurfaceVariant} /> : null}
+        </Pressable>
+        <View style={{ marginBottom: spacing.md }} />
 
         <AppText variant="title" style={{ marginTop: spacing.md, marginBottom: spacing.sm }}>
           Contact & options

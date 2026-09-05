@@ -138,6 +138,14 @@ export function VetImpactDashboard({ impact }: { impact: VetImpact }) {
         <Tile value={impact.farmersServiced} label="Farmers serviced" icon="account-group-outline" tint="#9333EA" onPress={() => setDrill('farmers')} />
       </View>
 
+      {/* Anonymized-by-default posture (Sep 5 2026 standup). */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+        <Icon name="shield-lock-outline" size={14} color={colors.onSurfaceVariant} />
+        <AppText variant="caption" color={colors.onSurfaceVariant}>
+          Farmer identities are anonymized to protect privacy.
+        </AppText>
+      </View>
+
       <BottomSheet visible={drill !== null} onClose={() => setDrill(null)} title={active?.title ?? ''}>
         {active ? <DetailList rows={active.rows} emptyNote={active.empty} /> : null}
       </BottomSheet>

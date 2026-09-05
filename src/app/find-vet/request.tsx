@@ -7,6 +7,7 @@ import { submitCalloutRequest } from '@/data/api';
 import { getHerd } from '@/data/herd';
 import { getFarmerPortfolio } from '@/data/portfolio';
 import { notify } from '@/lib/toast';
+import { formatDate } from '@/lib/date';
 import { sendLocalNotification } from '@/services/push';
 import { useAuth } from '@/services/auth';
 import { useResource } from '@/data/hooks';
@@ -33,9 +34,17 @@ const ACCESS_BUFFERS = [
   { hours: 24, label: 'Within 24 hours' },
 ];
 
+// Animal-access scope for the visit (Sep 5 2026 standup): the farmer decides
+// which animals the vet may access during the appointment window.
+type AccessScope = 'this-animal' | 'all-animals';
+const ACCESS_SCOPES: { key: AccessScope; label: string; icon: 'cow' | 'cow-off' | 'select-group' }[] = [
+  { key: 'this-animal', label: 'This animal only', icon: 'cow' },
+  { key: 'all-animals', label: 'All my animals', icon: 'select-group' },
+];
+
 export default function RequestCallout() {
   const router = useRouter();
-  const { vetId } = useLocalSearchParams<{ vetId?: string }>();
+  const { vetId, date } = useLocalSearchParams<{ vetId?: string; date?: string }>();
   const vet = vetId ? vets.find((v) => v.id === Number(vetId)) : undefined;
   const { isAdmin } = useAuth();
   const { data: animals } = useResource(getHerd, animalsFallback);
@@ -49,8 +58,12 @@ export default function RequestCallout() {
   const [notes, setNotes] = useState('');
   const [photo, setPhoto] = useState<string | null>(null);
   const [accessHours, setAccessHours] = useState(24);
+  const [accessScope, setAccessScope] = useState<AccessScope>('this-animal');
   const [tcsAccepted, setTcsAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // A chosen calendar slot carried from the vet's availability calendar.
+  const scheduledFor = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : undefined;
 
   // Location is auto-derived from the selected animal's registered location — no
   // manual selection needed (Aug 29 2026 standup).
@@ -97,15 +110,20 @@ export default function RequestCallout() {
     setSubmitting(true);
     try {
       const onBehalfNote = onBehalfFarmerName ? `[On behalf of ${onBehalfFarmerName}] ` : '';
+      const scopeNote =
+        accessScope === 'all-animals' ? '[Access: all animals] ' : '[Access: booked animal only] ';
       await submitCalloutRequest({
         vetId: vet?.id,
         animal: animalLabel,
         locationName: locationName || 'Farm',
         urgency: urgency as CalloutUrgency,
-        notes: `${onBehalfNote}${notes}`.trim() || undefined,
+        notes: `${onBehalfNote}${scopeNote}${notes}`.trim() || undefined,
         mode,
         photo: photo || undefined,
         accessBufferHours: accessHours,
+        scheduledFor,
+        accessScope,
+        accessAnimals: accessScope === 'this-animal' && animalLabel ? [animalLabel] : undefined,
       });
       notify(`Vet request sent for ${animalLabel}`);
       // A real on-device notification so the farmer has a durable record + proof
@@ -145,6 +163,30 @@ export default function RequestCallout() {
             </View>
           </View>
         )}
+
+        {/* Chosen calendar slot from the preferred vet's availability. */}
+        {scheduledFor ? (
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.sm,
+              backgroundColor: colors.primaryTint,
+              borderRadius: radius.md,
+              padding: spacing.md,
+              marginBottom: spacing.md,
+            }}>
+            <Icon name="calendar-check" size={20} color={colors.primary} />
+            <View style={{ flex: 1 }}>
+              <AppText variant="body" style={{ fontWeight: '700' }} color={colors.primaryDark}>
+                {formatDate(scheduledFor)}
+              </AppText>
+              <AppText variant="caption" color={colors.primaryDark}>
+                Selected from {vet ? `${vet.name}’s` : 'the vet’s'} availability
+              </AppText>
+            </View>
+          </View>
+        ) : null}
 
         {/* Admin-only: book on behalf of a farmer. */}
         {isAdmin ? (
@@ -230,12 +272,37 @@ export default function RequestCallout() {
         {/* Symptom photo — live capture only (authenticity). */}
         <PhotoField label="Live photo (optional)" value={photo} onChange={setPhoto} liveOnly />
 
-        {/* Time-limited access window */}
+        {/* Animal-specific permission (Sep 5 2026): which animals the vet may
+            access during this visit. */}
         <AppText variant="body" style={{ fontWeight: '600', marginBottom: spacing.xs }}>
-          Grant records access
+          Animals the vet may access
         </AppText>
         <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>
-          The vet can view this animal’s health records for the appointment plus this buffer — access lapses after.
+          Limit the visit to the booked animal, or grant access to your whole herd for this appointment.
+        </AppText>
+        <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
+          {ACCESS_SCOPES.map((sc) => {
+            const active = accessScope === sc.key;
+            return (
+              <Pressable
+                key={sc.key}
+                onPress={() => setAccessScope(sc.key)}
+                style={{ flex: 1, alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.sm, borderRadius: radius.md, backgroundColor: active ? colors.primary : colors.surface, borderWidth: 1, borderColor: active ? colors.primary : colors.divider }}>
+                <Icon name={sc.icon} size={20} color={active ? '#fff' : colors.onSurfaceVariant} />
+                <AppText variant="caption" color={active ? '#fff' : colors.onSurfaceVariant} style={{ fontWeight: '600', textAlign: 'center' }}>
+                  {sc.label}
+                </AppText>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {/* Time-limited access window */}
+        <AppText variant="body" style={{ fontWeight: '600', marginBottom: spacing.xs }}>
+          Access time window
+        </AppText>
+        <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>
+          The vet can view the {accessScope === 'all-animals' ? 'herd’s' : 'animal’s'} health records for the appointment plus this buffer — access lapses after.
         </AppText>
         <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
           {ACCESS_BUFFERS.map((b) => (
@@ -253,7 +320,7 @@ export default function RequestCallout() {
         <Pressable onPress={() => setTcsAccepted((v) => !v)} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.md }}>
           <Icon name={tcsAccepted ? 'checkbox-marked' : 'checkbox-blank-outline'} size={22} color={tcsAccepted ? colors.primary : colors.onSurfaceVariant} />
           <AppText variant="body" color={colors.onSurface} style={{ flex: 1 }}>
-            I accept the booking & managed-health terms & conditions, and consent to time-limited records access for this appointment.
+            I accept the booking & managed-health terms & conditions, and consent to {accessScope === 'all-animals' ? 'all my animals’' : 'the booked animal’s'} records being accessible to the vet for this appointment window only.
           </AppText>
         </Pressable>
 

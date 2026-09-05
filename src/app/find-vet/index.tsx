@@ -28,7 +28,7 @@ function Tag({ icon, label }: { icon: 'video' | 'cash-multiple'; label: string }
   );
 }
 
-function VetCard({ vet, isPrimary, onOpen, onRequest }: { vet: Vet; isPrimary?: boolean; onOpen: () => void; onRequest: () => void }) {
+function VetCard({ vet, isPrimary, ctaLabel = 'Request', onOpen, onRequest }: { vet: Vet; isPrimary?: boolean; ctaLabel?: string; onOpen: () => void; onRequest: () => void }) {
   return (
     <Pressable
       onPress={onOpen}
@@ -88,7 +88,7 @@ function VetCard({ vet, isPrimary, onOpen, onRequest }: { vet: Vet; isPrimary?: 
         <View style={{ flex: 1 }} />
         <Pressable onPress={onRequest} disabled={!vet.available} hitSlop={8} style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.full, backgroundColor: vet.available ? colors.primary : colors.divider }}>
           <AppText variant="body" color={vet.available ? '#fff' : colors.onSurfaceVariant} style={{ fontWeight: '700' }}>
-            Request
+            {ctaLabel}
           </AppText>
         </Pressable>
       </View>
@@ -117,44 +117,89 @@ export default function FindVet() {
   // Admin-enlisted vets join the seeded pool.
   const pool = useMemo(() => [...enlisted, ...vets], [enlisted]);
 
-  // Within the proximity radius; trusted "primary" vets first, then nearest.
-  const filtered = useMemo(() => {
-    const q = query.toLowerCase();
-    const primarySet = new Set(primaryIds);
-    return pool
-      .filter((v) => v.distanceKm <= PROXIMITY_KM)
-      .filter(
-        (v) =>
-          v.name.toLowerCase().includes(q) ||
-          v.clinic.toLowerCase().includes(q) ||
-          v.specialty.toLowerCase().includes(q),
-      )
-      .sort((a, b) => {
-        const pa = primarySet.has(a.id) ? 0 : 1;
-        const pb = primarySet.has(b.id) ? 0 : 1;
-        return pa !== pb ? pa - pb : a.distanceKm - b.distanceKm;
-      });
-  }, [query, primaryIds, pool]);
+  // Preferred vets are matched by the farmer's saved trusted list — booking is
+  // tied to their calendar availability (Sep 5 2026 standup). When the farmer
+  // has none, we fall back to "discover vets near me" (the proximity list).
+  const primarySet = useMemo(() => new Set(primaryIds), [primaryIds]);
+  const matches = useCallback(
+    (v: Vet) => {
+      const q = query.toLowerCase();
+      return (
+        v.name.toLowerCase().includes(q) ||
+        v.clinic.toLowerCase().includes(q) ||
+        v.specialty.toLowerCase().includes(q)
+      );
+    },
+    [query],
+  );
+
+  // Preferred vets: shown regardless of proximity (they're your chosen providers).
+  const preferred = useMemo(
+    () => pool.filter((v) => primarySet.has(v.id)).filter(matches).sort((a, b) => a.distanceKm - b.distanceKm),
+    [pool, primarySet, matches],
+  );
+  // Discover: nearby vets you haven't chosen yet.
+  const discover = useMemo(
+    () =>
+      pool
+        .filter((v) => !primarySet.has(v.id))
+        .filter((v) => v.distanceKm <= PROXIMITY_KM)
+        .filter(matches)
+        .sort((a, b) => a.distanceKm - b.distanceKm),
+    [pool, primarySet, matches],
+  );
+
+  const hasPreferred = preferred.length > 0;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Find a Vet" subtitle={`Vets within ${PROXIMITY_KM} km of your location`} showBack />
+      <GradientHeader title="Find a Vet" subtitle={hasPreferred ? 'Book your preferred vet, or discover others nearby' : `Vets within ${PROXIMITY_KM} km of your location`} showBack />
       <View style={{ padding: spacing.md, paddingBottom: 0 }}>
         <SearchBar value={query} onChangeText={setQuery} placeholder="Search by name, clinic or specialty..." />
       </View>
       <Screen contentStyle={{ paddingTop: spacing.md }}>
-        {filtered.length === 0 ? (
+        {/* Preferred vets first — booking opens their availability calendar. */}
+        {hasPreferred ? (
+          <>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm }}>
+              <Icon name="star" size={16} color="#FBBF24" />
+              <AppText variant="title">Your preferred vets</AppText>
+            </View>
+            {preferred.map((v) => (
+              <VetCard
+                key={v.id}
+                vet={v}
+                isPrimary
+                ctaLabel="Book"
+                onOpen={() => router.push(`/find-vet/${v.id}` as never)}
+                onRequest={() => router.push(`/find-vet/${v.id}` as never)}
+              />
+            ))}
+            <AppText variant="title" style={{ marginTop: spacing.md, marginBottom: spacing.sm }}>
+              Discover vets near me
+            </AppText>
+          </>
+        ) : (
+          // Fallback: no preferred vet yet — guide the farmer to choose one.
+          <View style={{ flexDirection: 'row', gap: spacing.sm, backgroundColor: colors.primaryTint, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md }}>
+            <Icon name="star-outline" size={20} color={colors.primary} />
+            <AppText variant="caption" color={colors.primaryDark} style={{ flex: 1 }}>
+              You haven’t chosen a preferred vet yet. Discover vets near you and tap ★ on a profile to set them as your preferred provider — future bookings tie to their calendar.
+            </AppText>
+          </View>
+        )}
+
+        {discover.length === 0 ? (
           <EmptyState
             icon="map-marker-off-outline"
-            title="No vets within range"
-            subtitle={`No enlisted vets are within ${PROXIMITY_KM} km right now. Try again later or request a call-out and we'll match you.`}
+            title={hasPreferred ? 'No other vets within range' : 'No vets within range'}
+            subtitle={`No ${hasPreferred ? 'other ' : ''}enlisted vets are within ${PROXIMITY_KM} km right now. Try again later or request a call-out and we'll match you.`}
           />
         ) : (
-          filtered.map((v) => (
+          discover.map((v) => (
             <VetCard
               key={v.id}
               vet={v}
-              isPrimary={primaryIds.includes(v.id)}
               onOpen={() => router.push(`/find-vet/${v.id}` as never)}
               onRequest={() => router.push(`/find-vet/request?vetId=${v.id}`)}
             />

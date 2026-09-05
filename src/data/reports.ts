@@ -1,5 +1,6 @@
 import { formatDate } from '@/lib/date';
 import { toCsv } from '@/lib/export';
+import { makeFarmerAnonymizer } from '@/lib/anon';
 import { Animal, CalloutRequest, Device } from '@/data/types';
 import { BreedingRecord, HealthRecord } from '@/data/clinical';
 
@@ -54,11 +55,13 @@ export function vetAuditCsv(requests: CalloutRequest[]): string {
   const fulfilment = (s: string) =>
     s === 'completed' ? 'Fulfilled' : s === 'declined' ? 'Unfulfilled (declined)' : s === 'accepted' ? 'In progress' : 'Awaiting';
   const slaFor = (u: string) => (u === 'Emergency' ? '4h' : '48h');
+  // Anonymized vet view (Sep 5 2026): farmers appear as stable pseudonyms.
+  const aliasFor = makeFarmerAnonymizer();
   return toCsv(
     ['Animal', 'Farmer', 'Location', 'Priority', 'SLA', 'Status', 'Fulfilment', 'Requested', 'Distance (km)'],
     requests.map((r) => [
       r.animal,
-      r.farmerName,
+      aliasFor(r.farmerName),
       r.locationName,
       r.urgency,
       slaFor(r.urgency),

@@ -1,4 +1,5 @@
 import { File, Paths } from 'expo-file-system';
+import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 
 type Cell = string | number | boolean | null | undefined;
@@ -56,6 +57,37 @@ export async function exportText(filename: string, text: string): Promise<boolea
       mimeType: 'text/plain',
       dialogTitle: 'Share report',
       UTI: 'public.plain-text',
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Render `html` to a PDF and open the share sheet. Used for brand-styled
+ * documents — the Health Score Card and vet practice reports (Sep 5 2026
+ * standup: reports in branded PDF). Returns false if printing or sharing isn't
+ * available (e.g. web), so callers can fall back to CSV/text.
+ */
+export async function exportPdf(filename: string, html: string): Promise<boolean> {
+  try {
+    const { uri } = await Print.printToFileAsync({ html });
+    // Give the PDF a meaningful name in the share sheet where we can.
+    let shareUri = uri;
+    try {
+      const dest = new File(Paths.cache, filename);
+      if (dest.exists) dest.delete();
+      new File(uri).move(dest);
+      shareUri = dest.uri;
+    } catch {
+      // Fall back to the print engine's temp uri if the rename fails.
+    }
+    if (!(await Sharing.isAvailableAsync())) return false;
+    await Sharing.shareAsync(shareUri, {
+      mimeType: 'application/pdf',
+      dialogTitle: 'Share report',
+      UTI: 'com.adobe.pdf',
     });
     return true;
   } catch {

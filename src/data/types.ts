@@ -27,8 +27,16 @@ export interface Animal {
   description?: string;
   damTag?: string;
   sireTag?: string;
-  /** Photo URIs (360°: front, left, right, back) — the primary animal ID. */
+  /** Photo URIs (360°: front, left, right, back) — the current, displayed animal ID. */
   photos?: string[];
+  /**
+   * Immutable onboarding photos, locked at first capture (Sep 5 2026 standup).
+   * These are a permanent static record and are never deleted or overwritten;
+   * later updates change `photos` and append to `photoHistory` instead.
+   */
+  onboardingPhotos?: string[];
+  /** Append-only log of superseded photo sets, kept for audit. */
+  photoHistory?: { at: string; photos: string[]; by?: string }[];
   /** Internal Ngaren animal identifier stored separately from the displayed account number. */
   ngarenCode?: string;
   /** Coat colour / markings text descriptor. */
@@ -331,6 +339,11 @@ export interface Vet {
   tagline?: string;
   sponsored?: boolean;
   yearsExperience?: number;
+  /**
+   * GPS pin captured at enlisting (Sep 5 2026 standup: device coordinates / map
+   * pin instead of a manually-typed distance). `distanceKm` is derived from it.
+   */
+  coordinates?: { lat: number; lng: number };
 }
 
 /** A single day in a vet's booking calendar. `appts === 0` means closed. */

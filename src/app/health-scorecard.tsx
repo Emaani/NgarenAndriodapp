@@ -7,11 +7,11 @@ import { getHerd } from '@/data/herd';
 import { getLocalHealthRecords, HEALTH_TYPE_LABELS } from '@/data/localHealth';
 import { getVetVisits } from '@/data/vetVisits';
 import { getCeresBehaviour } from '@/data/ceresBehaviour';
-import { healthScoreCardSummary, healthScoreCardText } from '@/data/vetReports';
+import { healthScoreCardHtml, healthScoreCardSummary, healthScoreCardText } from '@/data/vetReports';
 import { logReportExport } from '@/data/reportAudit';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
-import { exportText } from '@/lib/export';
+import { exportPdf, exportText } from '@/lib/export';
 import { notify } from '@/lib/toast';
 import { ageFromDate, formatDate } from '@/lib/date';
 import { Animal } from '@/data/types';
@@ -155,28 +155,43 @@ export default function HealthScoreCard() {
     );
   }
 
-  const onGenerate = async () => {
-    setBusy(true);
-    const text = healthScoreCardText({
-      animal,
-      health,
-      visits,
-      generatedBy: user?.fullName ?? user?.email ?? 'Vet',
-      telemetrySummary: hasTelemetry ? 'Ceres telemetry synced (behaviour & activity series available).' : 'No synced telemetry.',
-    });
-    const fileBase = (animal.accountNumber ?? animal.ngarenCode ?? animal.tag).replace(/[^A-Za-z0-9._-]/g, '');
-    const ok = await exportText(`health-scorecard-${fileBase}.txt`, text);
-    await logReportExport({
-      report: 'Health Score Card',
+  const cardInput = () => ({
+    animal,
+    health,
+    visits,
+    generatedBy: user?.fullName ?? user?.email ?? 'Vet',
+    telemetrySummary: hasTelemetry ? 'Ceres telemetry synced (behaviour & activity series available).' : 'No synced telemetry.',
+  });
+  const fileBase = () => (animal.accountNumber ?? animal.ngarenCode ?? animal.tag).replace(/[^A-Za-z0-9._-]/g, '');
+
+  const logGeneration = (format: string, ok: boolean) =>
+    logReportExport({
+      report: `Health Score Card (${format})`,
       subject: `${animal.accountNumber ?? animal.tag}${animal.name ? ` (${animal.name})` : ''}`,
       rows: health.length + visits.length,
       by: user?.fullName ?? user?.email ?? 'Vet',
       actorId: user?.id,
       shared: ok,
     });
+
+  // Primary: brand-styled PDF (Sep 5 2026 standup).
+  const onGeneratePdf = async () => {
+    setBusy(true);
+    const ok = await exportPdf(`health-scorecard-${fileBase()}.pdf`, healthScoreCardHtml(cardInput()));
+    await logGeneration('PDF', ok);
+    setBusy(false);
+    if (!ok) Alert.alert('Sharing unavailable', 'Could not generate the PDF on this device.');
+    else notify('Health Score Card PDF generated & shared');
+  };
+
+  // Secondary: plain-text version (lightweight, works anywhere).
+  const onGenerateText = async () => {
+    setBusy(true);
+    const ok = await exportText(`health-scorecard-${fileBase()}.txt`, healthScoreCardText(cardInput()));
+    await logGeneration('text', ok);
     setBusy(false);
     if (!ok) Alert.alert('Sharing unavailable', 'Could not open the share sheet on this device.');
-    else notify('Health Score Card generated & shared');
+    else notify('Health Score Card shared as text');
   };
 
   const typeTint = (t: string) => (t === 'ailment' ? colors.error : t === 'treatment' ? colors.info : t === 'vaccination' ? colors.success : colors.primary);
@@ -243,7 +258,8 @@ export default function HealthScoreCard() {
           ))
         )}
 
-        <Button label={busy ? 'Generating…' : 'Generate & share Score Card'} icon="file-document-outline" loading={busy} onPress={onGenerate} style={{ marginTop: spacing.lg }} />
+        <Button label={busy ? 'Generating…' : 'Generate & share PDF'} icon="file-pdf-box" loading={busy} onPress={onGeneratePdf} style={{ marginTop: spacing.lg }} />
+        <Button label="Share as text" variant="outline" icon="text-box-outline" disabled={busy} onPress={onGenerateText} style={{ marginTop: spacing.sm }} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm }}>
           <Icon name={'shield-check-outline' as IconName} size={14} color={colors.onSurfaceVariant} />
           <AppText variant="caption" color={colors.onSurfaceVariant}>

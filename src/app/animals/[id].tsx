@@ -13,10 +13,14 @@ import { HEALTH_TYPE_LABELS, getLocalHealthRecords } from '@/data/localHealth';
 import { useResource } from '@/data/hooks';
 import { ageFromDate, formatDate } from '@/lib/date';
 import { taggingMeta } from '@/lib/tagging';
+import { useAuth } from '@/services/auth';
 import { ActionChip, AppText, Button, ChartCard, DetailRow, EmptyState, GradientHeader, Icon, Screen } from '@/ui';
 
 export default function AnimalDetail() {
   const router = useRouter();
+  // Health-record input is reserved for certified professionals (Sep 5 2026
+  // standup): farmers get a view-only Health Score Card + history.
+  const { canVet } = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
   // Local animals take precedence, else the live animal_lineage herd.
   const { data: animal } = useResource(
@@ -206,18 +210,30 @@ export default function AnimalDetail() {
         {/* Digital Health Card — chronological history for this animal's code. */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.lg, marginBottom: spacing.sm }}>
           <AppText variant="title">Health history</AppText>
-          <Pressable
-            onPress={() => router.push(`/add-health-record?animal=${encodeURIComponent(animalKey)}&label=${encodeURIComponent(animalLabel)}` as never)}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-            <Icon name="plus-circle-outline" size={18} color={colors.primary} />
-            <AppText variant="body" color={colors.primary} style={{ fontWeight: '600' }}>
-              Add
-            </AppText>
-          </Pressable>
+          {/* Only certified professionals may input health records (Sep 5 2026). */}
+          {canVet ? (
+            <Pressable
+              onPress={() => router.push(`/add-health-record?animal=${encodeURIComponent(animalKey)}&label=${encodeURIComponent(animalLabel)}` as never)}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+              <Icon name="plus-circle-outline" size={18} color={colors.primary} />
+              <AppText variant="body" color={colors.primary} style={{ fontWeight: '600' }}>
+                Add
+              </AppText>
+            </Pressable>
+          ) : (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+              <Icon name="lock-outline" size={16} color={colors.onSurfaceVariant} />
+              <AppText variant="caption" color={colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
+                View only
+              </AppText>
+            </View>
+          )}
         </View>
         {animalHealth.length === 0 ? (
           <AppText variant="body" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.lg }}>
-            No health records yet. Tap Add to log a vaccination, treatment or ailment.
+            {canVet
+              ? 'No health records yet. Tap Add to log a vaccination, treatment or ailment.'
+              : 'No health records yet. Records are entered by your certified vet during a visit.'}
           </AppText>
         ) : (
           <View style={{ marginBottom: spacing.lg, gap: spacing.sm }}>

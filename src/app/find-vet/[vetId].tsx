@@ -193,7 +193,7 @@ export default function VetProfileScreen() {
         </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
           {vet.availability.map((d) => (
-            <DayCard key={d.dateIso} day={d} onBook={() => router.push(`/find-vet/request?vetId=${vet.id}` as never)} />
+            <DayCard key={d.dateIso} day={d} onBook={() => router.push(`/find-vet/request?vetId=${vet.id}&date=${d.dateIso}` as never)} />
           ))}
         </View>
 

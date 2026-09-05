@@ -609,6 +609,17 @@ export interface CalloutRequestPayload {
    * access to farm data). Access = appointment + this buffer.
    */
   accessBufferHours?: number;
+  /** Chosen calendar slot (ISO date) when booking a preferred vet (Sep 5 2026). */
+  scheduledFor?: string;
+  /**
+   * What the vet may access during the visit window (Sep 5 2026 standup —
+   * time-bound + animal-specific permissions). 'this-animal' limits access to
+   * the booked animal; 'all-animals' grants the whole herd; 'selected' limits
+   * to `accessAnimals`.
+   */
+  accessScope?: 'this-animal' | 'all-animals' | 'selected';
+  /** Animal labels the vet may access when scope is 'selected'. */
+  accessAnimals?: string[];
 }
 
 /** Fetch the vet's incoming call-out requests. Falls back to mock offline. */

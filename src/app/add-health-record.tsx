@@ -12,7 +12,7 @@ import {
 import { notify } from '@/lib/toast';
 import { scheduleLocalReminder } from '@/services/push';
 import { useAuth } from '@/services/auth';
-import { AppText, Button, DatePickerField, GradientHeader, PhotoField, PickerField, Screen, TextField } from '@/ui';
+import { AppText, Button, DatePickerField, GradientHeader, Icon, PhotoField, PickerField, Screen, TextField } from '@/ui';
 
 const TYPE_OPTIONS = (['vaccination', 'treatment', 'consultation', 'ailment'] as HealthEventType[]).map((t) => ({
   label: HEALTH_TYPE_LABELS[t],
@@ -39,7 +39,7 @@ const TEMPLATES: Record<
 export default function AddHealthRecord() {
   const router = useRouter();
   const { animal, label, type: presetType } = useLocalSearchParams<{ animal?: string; label?: string; type?: string }>();
-  const { loading, isAuthenticated, user } = useAuth();
+  const { loading, isAuthenticated, canVet, user } = useAuth();
 
   const initialType = (['vaccination', 'treatment', 'consultation', 'ailment'] as string[]).includes(presetType ?? '')
     ? (presetType as HealthEventType)
@@ -63,6 +63,28 @@ export default function AddHealthRecord() {
 
   if (loading) return null;
   if (!isAuthenticated) return <Redirect href="/login" />;
+
+  // Health records / prescriptions are reserved for certified professionals
+  // (Sep 5 2026 standup). Farmers reaching this screen get a view-only notice.
+  if (!canVet) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <GradientHeader title="Health record" subtitle={label ?? animal ?? 'Animal'} showBack />
+        <Screen contentStyle={{ paddingTop: spacing.xl, alignItems: 'center' }}>
+          <View style={{ width: 72, height: 72, borderRadius: radius.full, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md }}>
+            <Icon name="shield-account-outline" size={34} color={colors.primary} />
+          </View>
+          <AppText variant="title" style={{ textAlign: 'center', marginBottom: spacing.sm }}>
+            Entered by certified vets
+          </AppText>
+          <AppText variant="body" color={colors.onSurfaceVariant} style={{ textAlign: 'center', marginBottom: spacing.lg }}>
+            Health records and prescriptions are added by a certified veterinary professional during a visit. You can view the full history and the Health Score Card at any time.
+          </AppText>
+          <Button label="View Health Score Card" icon="file-document-outline" onPress={() => router.replace(`/health-scorecard${animal ? `?key=${encodeURIComponent(animal)}` : ''}` as never)} />
+        </Screen>
+      </View>
+    );
+  }
 
   const animalKey = animal ?? '';
   const animalLabel = label ?? animal ?? 'Animal';

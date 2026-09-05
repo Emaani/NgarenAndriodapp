@@ -10,6 +10,7 @@
  *  - getMyVetImpact(): the LOGGED-IN vet's own dashboard, counted from real
  *    app data (completed call-outs + health records) so the numbers are exact.
  */
+import { makeFarmerAnonymizer } from '@/lib/anon';
 import { getCalloutRequests } from './api';
 import { getHealthRecords } from './clinical';
 import { getLocalHealthRecords } from './localHealth';
@@ -121,6 +122,13 @@ export async function getMyVetImpact(): Promise<VetImpact> {
   const animals = animalsMap;
   const farmers = farmersMap;
 
+  // Anonymized-by-default vet view (Sep 5 2026 standup): the vet sees totals and
+  // trends but never a farmer's real name/farm identity. Each distinct farmer
+  // gets a stable pseudonymous label ("Farmer #N") for drill-downs.
+  const aliasFor = makeFarmerAnonymizer();
+  // Seed alias order from first appearance across call-outs for stability.
+  for (const c of callouts) if (c.farmerName) aliasFor(c.farmerName);
+
   const services = { treatment: 0, vaccination: 0, stockTaking: 0, others: 0 };
   const bump = (text: string | null | undefined, type?: string) => {
     if (type === 'vaccination' || has(text, 'vaccin')) services.vaccination += 1;
@@ -149,9 +157,10 @@ export async function getMyVetImpact(): Promise<VetImpact> {
     services,
     observations,
     detail: {
-      visits: completed.map((c) => ({ label: c.animal, sub: `${c.farmerName} · ${c.urgency} · ${c.requestedAt}` })),
+      // Farmer identities are anonymized; animal identifiers are kept.
+      visits: completed.map((c) => ({ label: c.animal, sub: `${aliasFor(c.farmerName)} · ${c.urgency} · ${c.requestedAt}` })),
       animals: [...animals.values()].map((a) => ({ label: a.label, sub: plural(a.count, 'record') })),
-      farmers: [...farmers.values()].map((f) => ({ label: f.label, sub: plural(f.count, 'visit') })),
+      farmers: [...farmers.values()].map((f) => ({ label: aliasFor(f.label), sub: plural(f.count, 'visit') })),
     },
   };
 }
