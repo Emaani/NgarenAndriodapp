@@ -1,8 +1,9 @@
-import { ReactNode, useMemo, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
+import { Alert, Pressable, View } from 'react-native';
 import { Redirect, useLocalSearchParams } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { getHerd, getHerdAnimalById } from '@/data/herd';
+import { animals as animalsFallback } from '@/data/mock';
+import { getHerd } from '@/data/herd';
 import { getLocalHealthRecords, HEALTH_TYPE_LABELS } from '@/data/localHealth';
 import { getVetVisits } from '@/data/vetVisits';
 import { getCeresBehaviour } from '@/data/ceresBehaviour';
@@ -13,7 +14,8 @@ import { useAuth } from '@/services/auth';
 import { exportText } from '@/lib/export';
 import { notify } from '@/lib/toast';
 import { ageFromDate, formatDate } from '@/lib/date';
-import { AppText, Button, DetailRow, EmptyState, GradientHeader, Icon, IconName, Screen } from '@/ui';
+import { Animal } from '@/data/types';
+import { AppText, Button, DetailRow, EmptyState, GradientHeader, Icon, IconChip, IconName, Screen, SearchBar } from '@/ui';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -43,30 +45,48 @@ function Stat({ value, label, tint }: { value: number; label: string; tint: stri
  * Animal Health Score Card — the source of truth for one animal's data. Compiles
  * identity, devices, full health history, vet visits and telemetry into one view
  * a vet can generate & share; each generation is written to the report audit
- * trail. Reached with ?id=<numeric> or ?key=<tag/AAN/account>&label=<name>.
+ * trail. Reached with ?id=<numeric> or ?key=<tag/AAN/account>&label=<name>, or
+ * with no params — in which case it shows an animal picker (so it works from the
+ * Reports hub for vets, who don't have the farmer tabs).
  */
 export default function HealthScoreCard() {
-  const { id, key, label } = useLocalSearchParams<{ id?: string; key?: string; label?: string }>();
+  const { id, key } = useLocalSearchParams<{ id?: string; key?: string; label?: string }>();
   const { loading, isAuthenticated, user } = useAuth();
   const [busy, setBusy] = useState(false);
+  const [query, setQuery] = useState('');
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [hasTelemetry, setHasTelemetry] = useState(false);
 
-  const { data: animal } = useResource(async () => {
-    if (id) return getHerdAnimalById(Number(id));
-    const k = (key ?? '').toLowerCase();
-    if (!k) return undefined;
-    const herd = await getHerd();
-    return herd.find((a) =>
-      [a.ngarenCode, a.tag, a.accountNumber, a.name].filter(Boolean).map((x) => String(x).toLowerCase()).includes(k),
-    );
-  }, undefined);
-
+  const { data: herd } = useResource(getHerd, animalsFallback);
   const { data: allHealth } = useResource(getLocalHealthRecords, []);
   const { data: allVisits } = useResource(getVetVisits, []);
-  const { data: behaviour } = useResource(async () => {
-    const a = id ? await getHerdAnimalById(Number(id)) : undefined;
-    const keys = [a?.deviceSerial ?? undefined, a?.tag, a?.ngarenCode].filter((s): s is string => !!s);
-    return keys.length ? getCeresBehaviour(keys) : [];
-  }, []);
+
+  // Resolve the animal from a route param or an in-screen selection.
+  const animal: Animal | undefined = useMemo(() => {
+    if (id) return herd.find((a) => a.id === Number(id));
+    if (key) {
+      const k = key.toLowerCase();
+      return herd.find((a) => [a.ngarenCode, a.tag, a.accountNumber, a.name].filter(Boolean).map((x) => String(x).toLowerCase()).includes(k));
+    }
+    if (selectedId != null) return herd.find((a) => a.id === selectedId);
+    return undefined;
+  }, [herd, id, key, selectedId]);
+
+  // Telemetry status for the resolved animal.
+  useEffect(() => {
+    let active = true;
+    if (!animal) {
+      setHasTelemetry(false);
+      return;
+    }
+    const keys = [animal.deviceSerial ?? undefined, animal.tag, animal.ngarenCode].filter((s): s is string => !!s);
+    getCeresBehaviour(keys)
+      .then((series) => active && setHasTelemetry(series.some((s) => s.actual.length > 0 || s.pfi.length > 0)))
+      .catch(() => active && setHasTelemetry(false));
+    return () => {
+      active = false;
+    };
+  }, [animal]);
 
   const health = useMemo(() => {
     if (!animal) return [];
@@ -80,17 +100,57 @@ export default function HealthScoreCard() {
     return allVisits.filter((v) => needles.some((n) => v.animal.toLowerCase().includes(n)));
   }, [animal, allVisits]);
 
-  const hasTelemetry = behaviour.some((s) => s.actual.length > 0 || s.pfi.length > 0);
   const summary = useMemo(() => healthScoreCardSummary(health), [health]);
+
+  const pickerList = useMemo(() => {
+    const q = query.toLowerCase();
+    return herd.filter(
+      (a) =>
+        (a.accountNumber ?? '').toLowerCase().includes(q) ||
+        a.tag.toLowerCase().includes(q) ||
+        (a.name ?? '').toLowerCase().includes(q) ||
+        a.breed.name.toLowerCase().includes(q),
+    );
+  }, [herd, query]);
 
   if (loading) return null;
   if (!isAuthenticated) return <Redirect href="/login" />;
 
+  // No animal chosen yet → animal picker (self-contained, works for vets).
   if (!animal) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <GradientHeader title="Health Score Card" showBack />
-        <EmptyState icon="clipboard-pulse-outline" title="Animal not found" subtitle="Open the score card from an animal to compile its record." />
+        <GradientHeader title="Health Score Card" subtitle="Choose an animal" showBack />
+        <View style={{ padding: spacing.md, paddingBottom: 0 }}>
+          <SearchBar value={query} onChangeText={setQuery} placeholder="Search by account #, tag, name or breed..." />
+        </View>
+        <Screen contentStyle={{ paddingTop: spacing.md, paddingBottom: spacing.xxl }}>
+          {pickerList.length === 0 ? (
+            <EmptyState icon="cow" title="No animals" subtitle="Register an animal first to generate its Health Score Card." />
+          ) : (
+            pickerList.map((a) => (
+              <Pressable
+                key={a.id}
+                onPress={() => setSelectedId(a.id)}
+                style={({ pressed }) => [
+                  { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.divider, opacity: pressed ? 0.9 : 1 },
+                  shadow[1],
+                ]}>
+                <IconChip icon="cow" />
+                <View style={{ flex: 1 }}>
+                  <AppText variant="bodyLarge" style={{ fontWeight: '600' }}>
+                    {a.name ?? a.tag}
+                  </AppText>
+                  <AppText variant="caption" color={colors.onSurfaceVariant}>
+                    {a.accountNumber ? `${a.accountNumber} · ` : ''}
+                    {a.breed.name} · {a.locationName ?? '—'}
+                  </AppText>
+                </View>
+                <Icon name="chevron-right" size={20} color={colors.onSurfaceVariant} />
+              </Pressable>
+            ))
+          )}
+        </Screen>
       </View>
     );
   }
@@ -129,7 +189,6 @@ export default function HealthScoreCard() {
           The source of truth for this animal’s data — identity, devices, full health history, visits and telemetry.
         </AppText>
 
-        {/* Health summary stats */}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.xs }}>
           <Stat value={summary.total} label="Health records" tint="#2563EB" />
           <Stat value={summary.vaccinations} label="Vaccinations" tint="#16A34A" />
@@ -154,7 +213,6 @@ export default function HealthScoreCard() {
           <DetailRow label="Telemetry" value={hasTelemetry ? 'Ceres synced' : 'No synced telemetry'} last />
         </Section>
 
-        {/* Health history */}
         <AppText variant="title" style={{ marginTop: spacing.lg, marginBottom: spacing.sm }}>
           Health history ({health.length})
         </AppText>
@@ -178,22 +236,14 @@ export default function HealthScoreCard() {
                 {r.medication ? <AppText variant="caption" color={colors.onSurfaceVariant}>{r.medication}</AppText> : null}
                 {r.diagnosis ? <AppText variant="caption" color={colors.onSurfaceVariant}>Dx: {r.diagnosis}</AppText> : null}
                 <AppText variant="body" color={colors.onSurface}>{r.notes}</AppText>
-                {r.observations?.length ? (
-                  <AppText variant="caption" color={colors.info}>Obs: {r.observations.join(', ')}</AppText>
-                ) : null}
+                {r.observations?.length ? <AppText variant="caption" color={colors.info}>Obs: {r.observations.join(', ')}</AppText> : null}
                 <AppText variant="caption" color={colors.onSurfaceVariant}>by {r.recordedBy}</AppText>
               </View>
             </View>
           ))
         )}
 
-        <Button
-          label={busy ? 'Generating…' : 'Generate & share Score Card'}
-          icon="file-document-outline"
-          loading={busy}
-          onPress={onGenerate}
-          style={{ marginTop: spacing.lg }}
-        />
+        <Button label={busy ? 'Generating…' : 'Generate & share Score Card'} icon="file-document-outline" loading={busy} onPress={onGenerate} style={{ marginTop: spacing.lg }} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm }}>
           <Icon name={'shield-check-outline' as IconName} size={14} color={colors.onSurfaceVariant} />
           <AppText variant="caption" color={colors.onSurfaceVariant}>

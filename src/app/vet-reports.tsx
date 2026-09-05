@@ -71,7 +71,7 @@ export default function VetReports() {
       <Screen contentStyle={{ paddingTop: spacing.md, paddingBottom: spacing.xxl }}>
         {/* Per-animal source of truth */}
         <Pressable
-          onPress={() => router.push('/(tabs)/animals')}
+          onPress={() => router.push('/health-scorecard' as never)}
           style={({ pressed }) => [
             { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.primary, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md, opacity: pressed ? 0.92 : 1 },
             shadow[1],
@@ -84,7 +84,7 @@ export default function VetReports() {
               Health Score Card
             </AppText>
             <AppText variant="caption" color="rgba(255,255,255,0.9)">
-              Open an animal to generate its full record — the source of truth.
+              Pick an animal to generate its full record — the source of truth.
             </AppText>
           </View>
           <Icon name="chevron-right" size={22} color="#fff" />
