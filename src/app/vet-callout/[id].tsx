@@ -161,6 +161,13 @@ export default function VetCallout() {
                     />
                   ))}
                 </View>
+                <Button
+                  label="Open Health Score Card"
+                  icon="file-document-outline"
+                  variant="outline"
+                  onPress={() => router.push(`/health-scorecard?key=${encodeURIComponent(req.animal)}&label=${encodeURIComponent(req.animal)}` as never)}
+                  style={{ marginBottom: spacing.sm }}
+                />
                 <Button label="Complete visit" icon="check-decagram-outline" onPress={() => setAndSync('completed', 'Visit completed')} />
               </>
             )}

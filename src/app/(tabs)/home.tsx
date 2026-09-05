@@ -74,7 +74,7 @@ const VET_ACTIONS: Action[] = [
   { icon: 'heart-pulse', label: 'Managed Health', route: '/health', tint: '#EF4444' },
   { icon: 'cow', label: 'Livestock', route: '/(tabs)/animals', tint: '#2563EB' },
   { icon: 'calendar-month-outline', label: 'Calendar', route: '/calendar', tint: '#0EA5E9' },
-  { icon: 'file-chart-outline', label: 'Reports', route: '/reports', tint: '#6D874F' },
+  { icon: 'file-chart-outline', label: 'Reports', route: '/vet-reports', tint: '#6D874F' },
   { icon: 'tag-outline', label: 'Devices', route: '/devices', tint: '#9333EA' },
   { icon: 'storefront-outline', label: 'Marketplace', route: '/marketplace', tint: '#0D9488' },
   { icon: 'message-text-outline', label: 'Messages', route: '/messaging', tint: '#F59E0B' },

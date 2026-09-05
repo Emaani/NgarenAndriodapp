@@ -170,9 +170,14 @@ export default function VetDashboard() {
       <GradientHeader
         showBack
         right={
-          <Pressable onPress={onSignOut} hitSlop={8}>
-            <Icon name="logout" size={24} color="#fff" />
-          </Pressable>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+            <Pressable onPress={() => router.push('/vet-reports' as never)} hitSlop={8} accessibilityLabel="Reports">
+              <Icon name="file-chart-outline" size={24} color="#fff" />
+            </Pressable>
+            <Pressable onPress={onSignOut} hitSlop={8}>
+              <Icon name="logout" size={24} color="#fff" />
+            </Pressable>
+          </View>
         }>
         <View style={{ marginTop: spacing.xs }}>
           <AppText variant="bodyLarge" color="rgba(255,255,255,0.9)">

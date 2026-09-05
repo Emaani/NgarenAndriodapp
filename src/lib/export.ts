@@ -39,3 +39,26 @@ export async function exportCsv(filename: string, csv: string): Promise<boolean>
     return false;
   }
 }
+
+/**
+ * Write `text` to a cache file and open the system share sheet. Used for
+ * human-readable reports (e.g. the animal Health Score Card). Returns false if
+ * writing or sharing isn't available.
+ */
+export async function exportText(filename: string, text: string): Promise<boolean> {
+  try {
+    const file = new File(Paths.cache, filename);
+    if (file.exists) file.delete();
+    file.create();
+    file.write(text);
+    if (!(await Sharing.isAvailableAsync())) return false;
+    await Sharing.shareAsync(file.uri, {
+      mimeType: 'text/plain',
+      dialogTitle: 'Share report',
+      UTI: 'public.plain-text',
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}

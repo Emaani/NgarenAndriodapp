@@ -256,7 +256,8 @@ export default function AnimalDetail() {
         )}
 
         <View style={{ gap: spacing.sm, marginBottom: spacing.lg }}>
-          <Button label="Track on Map" icon="map-marker-radius" onPress={() => router.push('/(tabs)/track')} />
+          <Button label="Health Score Card" icon="file-document-outline" onPress={() => router.push(`/health-scorecard?id=${animal.id}` as never)} />
+          <Button label="Track on Map" icon="map-marker-radius" variant="outline" onPress={() => router.push('/(tabs)/track')} />
           <Button label="Request a Vet" icon="stethoscope" variant="outline" onPress={() => router.push('/find-vet')} />
         </View>
 
