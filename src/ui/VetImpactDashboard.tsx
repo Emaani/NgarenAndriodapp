@@ -81,15 +81,23 @@ function Bar({ label, value, total, tint }: { label: string; value: number; tota
   );
 }
 
-function ObsChip({ label, value, icon, tint }: { label: string; value: number; icon: IconName; tint: string }) {
+function ObsChip({ label, sub, value, icon, tint }: { label: string; sub: string; value: number; icon: IconName; tint: string }) {
   return (
-    <View style={{ flex: 1, alignItems: 'center', gap: 2, backgroundColor: tint + '14', borderRadius: radius.md, paddingVertical: spacing.md, borderWidth: 1, borderColor: tint + '33' }}>
-      <Icon name={icon} size={20} color={tint} />
-      <AppText variant="title" style={{ fontWeight: '800' }}>
-        {value.toLocaleString()}
-      </AppText>
-      <AppText variant="caption" color={colors.onSurfaceVariant}>
+    <View style={{ flex: 1, alignItems: 'center', gap: 2, backgroundColor: tint + '14', borderRadius: radius.md, paddingVertical: spacing.md, paddingHorizontal: spacing.xs, borderWidth: 1, borderColor: tint + '33' }}>
+      <Icon name={icon} size={22} color={tint} />
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
+        <AppText variant="title" style={{ fontWeight: '800' }}>
+          {value.toLocaleString()}
+        </AppText>
+        <AppText variant="caption" color={colors.onSurfaceVariant}>
+          {value === 1 ? 'case' : 'cases'}
+        </AppText>
+      </View>
+      <AppText variant="caption" color={colors.onSurface} style={{ fontWeight: '700', textAlign: 'center' }}>
         {label}
+      </AppText>
+      <AppText variant="caption" color={colors.onSurfaceVariant} style={{ textAlign: 'center', fontSize: 11, lineHeight: 14 }}>
+        {sub}
       </AppText>
     </View>
   );
@@ -162,12 +170,15 @@ export function VetImpactDashboard({ impact }: { impact: VetImpact }) {
 
       <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm, borderWidth: 1, borderColor: colors.divider }, shadow[1]]}>
         <AppText variant="bodyLarge" style={{ fontWeight: '700' }}>
-          Key observations
+          Key health observations
         </AppText>
-        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-          <ObsChip label="Ticks" value={impact.observations.ticks} icon="bug-outline" tint="#F59E0B" />
-          <ObsChip label="Flies" value={impact.observations.flies} icon="bee" tint="#0EA5E9" />
-          <ObsChip label="Disease" value={impact.observations.disease} icon="virus-outline" tint="#EF4444" />
+        <AppText variant="caption" color={colors.onSurfaceVariant}>
+          Field signs you recorded during completed visits — the leading pest & disease indicators across the herds you served.
+        </AppText>
+        <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs }}>
+          <ObsChip label="Tick burden" sub="Ticks & tick-borne signs" value={impact.observations.ticks} icon="bug" tint="#F59E0B" />
+          <ObsChip label="Fly strike" sub="Flies, maggots & wounds" value={impact.observations.flies} icon="bee" tint="#0EA5E9" />
+          <ObsChip label="Disease signs" sub="Fever, infection & illness" value={impact.observations.disease} icon="virus-outline" tint="#EF4444" />
         </View>
       </View>
     </View>
