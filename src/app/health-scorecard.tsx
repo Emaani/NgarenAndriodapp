@@ -1,11 +1,12 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
-import { Redirect, useLocalSearchParams } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { animals as animalsFallback } from '@/data/mock';
 import { getHerd } from '@/data/herd';
 import { getLocalHealthRecords, HEALTH_TYPE_LABELS } from '@/data/localHealth';
 import { getVetVisits } from '@/data/vetVisits';
+import { getScorecards, STATUS_LABEL } from '@/data/scorecards';
 import { getCeresBehaviour } from '@/data/ceresBehaviour';
 import { healthScoreCardHtml, healthScoreCardSummary, healthScoreCardText } from '@/data/vetReports';
 import { logReportExport } from '@/data/reportAudit';
@@ -14,8 +15,9 @@ import { useAuth } from '@/services/auth';
 import { exportPdf, exportText } from '@/lib/export';
 import { notify } from '@/lib/toast';
 import { ageFromDate, formatDate } from '@/lib/date';
+import { statusVisual, bcsColor } from '@/lib/scorecardVisual';
 import { Animal } from '@/data/types';
-import { AppText, Button, DetailRow, EmptyState, GradientHeader, Icon, IconChip, IconName, Screen, SearchBar } from '@/ui';
+import { AppText, Button, DetailRow, EmptyState, GradientHeader, Icon, IconChip, IconName, LineChart, Screen, SearchBar } from '@/ui';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -26,6 +28,17 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
       <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.md }, shadow[1]]}>{children}</View>
     </>
   );
+}
+
+/** "3 days ago" / "today" style label for the last-visit KPI. */
+function relativeDayLabel(iso: string): string {
+  const then = new Date(`${iso}T00:00:00`).getTime();
+  const days = Math.round((Date.now() - then) / 864e5);
+  if (Number.isNaN(days)) return '—';
+  if (days <= 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 30) return `${days} days ago`;
+  return formatDate(iso);
 }
 
 function Stat({ value, label, tint }: { value: number; label: string; tint: string }) {
@@ -50,8 +63,9 @@ function Stat({ value, label, tint }: { value: number; label: string; tint: stri
  * Reports hub for vets, who don't have the farmer tabs).
  */
 export default function HealthScoreCard() {
+  const router = useRouter();
   const { id, key } = useLocalSearchParams<{ id?: string; key?: string; label?: string }>();
-  const { loading, isAuthenticated, user } = useAuth();
+  const { loading, isAuthenticated, canVet, user } = useAuth();
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -60,6 +74,7 @@ export default function HealthScoreCard() {
   const { data: herd } = useResource(getHerd, animalsFallback);
   const { data: allHealth } = useResource(getLocalHealthRecords, []);
   const { data: allVisits } = useResource(getVetVisits, []);
+  const { data: allScorecards } = useResource(getScorecards, []);
 
   // Resolve the animal from a route param or an in-screen selection.
   const animal: Animal | undefined = useMemo(() => {
@@ -101,6 +116,21 @@ export default function HealthScoreCard() {
   }, [animal, allVisits]);
 
   const summary = useMemo(() => healthScoreCardSummary(health), [health]);
+
+  // Visit Scorecards for this animal (Sep 7 2026) — newest first.
+  const scorecards = useMemo(() => {
+    if (!animal) return [];
+    const keys = [animal.ngarenCode, animal.tag, animal.accountNumber, animal.name].filter(Boolean).map((x) => String(x).toLowerCase());
+    return allScorecards.filter((s) => keys.includes(s.animalKey.toLowerCase()) || keys.includes(s.animalLabel.toLowerCase()));
+  }, [animal, allScorecards]);
+
+  const latestCard = scorecards[0];
+  // Body-condition trend, oldest → newest, for the trend chart.
+  const bcsSeries = useMemo(
+    () => [...scorecards].reverse().map((s) => s.vitals.bcs).filter((b): b is number => typeof b === 'number'),
+    [scorecards],
+  );
+  const openFollowUps = scorecards.filter((s) => s.flagRecheck).length;
 
   const pickerList = useMemo(() => {
     const q = query.toLowerCase();
@@ -204,6 +234,34 @@ export default function HealthScoreCard() {
           The source of truth for this animal’s data — identity, devices, full health history, visits and telemetry.
         </AppText>
 
+        {/* Current status (from the latest Visit Scorecard). */}
+        {latestCard ? (
+          (() => {
+            const sv = statusVisual(latestCard.status);
+            return (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: sv.tint, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md }}>
+                <Icon name={sv.icon} size={20} color={sv.color} />
+                <AppText variant="body" style={{ fontWeight: '700', flex: 1 }} color={sv.color}>
+                  {STATUS_LABEL[latestCard.status]}
+                </AppText>
+                <AppText variant="caption" color={sv.color}>
+                  as of {formatDate(latestCard.date)}
+                </AppText>
+              </View>
+            );
+          })()
+        ) : null}
+
+        {/* Vets capture a new visit scorecard here (Sep 7 2026). */}
+        {canVet ? (
+          <Button
+            label="New visit scorecard"
+            icon="clipboard-plus-outline"
+            onPress={() => router.push(`/vet-scorecard/new?key=${encodeURIComponent(animal.ngarenCode ?? animal.tag)}&label=${encodeURIComponent(animal.name ?? animal.tag)}` as never)}
+            style={{ marginBottom: spacing.md }}
+          />
+        ) : null}
+
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.xs }}>
           <Stat value={summary.total} label="Health records" tint="#2563EB" />
           <Stat value={summary.vaccinations} label="Vaccinations" tint="#16A34A" />
@@ -212,6 +270,76 @@ export default function HealthScoreCard() {
           <Stat value={summary.openFollowUps} label="Open follow-ups" tint="#F59E0B" />
           <Stat value={summary.observations.length} label="Obs. flagged" tint="#0EA5E9" />
         </View>
+
+        {/* Body Condition trend + KPIs + scorecard history (Sep 7 2026 design). */}
+        {scorecards.length > 0 ? (
+          <>
+            {bcsSeries.length >= 2 ? (
+              <>
+                <AppText variant="title" style={{ marginTop: spacing.lg, marginBottom: spacing.sm }}>
+                  Body condition trend
+                </AppText>
+                <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.divider }, shadow[1]]}>
+                  <LineChart actual={bcsSeries} pfi={[]} unit="BCS" xLabels={['Earliest', 'Latest']} />
+                </View>
+              </>
+            ) : null}
+
+            <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>
+              <View style={{ flex: 1, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.divider }}>
+                <AppText variant="bodyLarge" style={{ fontWeight: '800' }} color={colors.primary}>
+                  {relativeDayLabel(latestCard!.date)}
+                </AppText>
+                <AppText variant="caption" color={colors.onSurfaceVariant}>
+                  Last visit
+                </AppText>
+              </View>
+              <View style={{ flex: 1, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.divider }}>
+                <AppText variant="bodyLarge" style={{ fontWeight: '800' }} color={openFollowUps ? colors.warning : colors.primary}>
+                  {openFollowUps}
+                </AppText>
+                <AppText variant="caption" color={colors.onSurfaceVariant}>
+                  Open follow-ups
+                </AppText>
+              </View>
+            </View>
+
+            <AppText variant="title" style={{ marginTop: spacing.lg, marginBottom: spacing.sm }}>
+              Scorecard history ({scorecards.length})
+            </AppText>
+            {scorecards.map((s) => {
+              const sv = statusVisual(s.status);
+              const sub = s.diagnosisTags.length ? s.diagnosisTags.join(', ') : s.treatment.drug ? `${s.treatment.drug} given` : `Vitals ${s.vitals.bcs != null ? `· BCS ${s.vitals.bcs.toFixed(1)}` : 'recorded'}`;
+              return (
+                <Pressable
+                  key={s.id}
+                  onPress={() => router.push(`/vet-scorecard/${s.id}` as never)}
+                  style={({ pressed }) => [
+                    { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.divider, opacity: pressed ? 0.9 : 1 },
+                    shadow[1],
+                  ]}>
+                  <View style={{ width: 34, height: 34, borderRadius: radius.full, backgroundColor: sv.tint, alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon name={sv.icon} size={18} color={sv.color} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <AppText variant="bodyLarge" style={{ fontWeight: '700' }}>
+                        {s.visitType}
+                      </AppText>
+                      <AppText variant="caption" color={colors.onSurfaceVariant}>
+                        {formatDate(s.date)}
+                      </AppText>
+                    </View>
+                    <AppText variant="caption" color={colors.onSurfaceVariant}>
+                      {s.vetName} · {sub}
+                    </AppText>
+                  </View>
+                  <Icon name="chevron-right" size={18} color={colors.onSurfaceVariant} />
+                </Pressable>
+              );
+            })}
+          </>
+        ) : null}
 
         <Section title="Identity">
           {animal.accountNumber ? <DetailRow label="Account number" value={animal.accountNumber} /> : null}

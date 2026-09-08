@@ -59,6 +59,9 @@ export default function RequestCallout() {
   const [photo, setPhoto] = useState<string | null>(null);
   const [accessHours, setAccessHours] = useState(24);
   const [accessScope, setAccessScope] = useState<AccessScope>('this-animal');
+  // Onboarding simplification (Sep 7 2026): a farmer may book without first
+  // registering the animal — the vet registers it during the service visit.
+  const [noAnimalYet, setNoAnimalYet] = useState(false);
   const [tcsAccepted, setTcsAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -68,7 +71,7 @@ export default function RequestCallout() {
   // Location is auto-derived from the selected animal's registered location — no
   // manual selection needed (Aug 29 2026 standup).
   const locationName = animal?.locationName ?? '';
-  const animalLabel = animal ? animal.name ?? animal.tag : '';
+  const animalLabel = noAnimalYet ? 'New animal — vet to register' : animal ? animal.name ?? animal.tag : '';
 
   const farmerOptions = useMemo(
     () => farmers.map((f) => ({ label: f.farmerName, value: f.id })),
@@ -106,12 +109,15 @@ export default function RequestCallout() {
   };
 
   const onSubmit = async () => {
-    if (!animal || !tcsAccepted || submitting) return;
+    if ((!animal && !noAnimalYet) || !tcsAccepted || submitting) return;
     setSubmitting(true);
     try {
       const onBehalfNote = onBehalfFarmerName ? `[On behalf of ${onBehalfFarmerName}] ` : '';
-      const scopeNote =
-        accessScope === 'all-animals' ? '[Access: all animals] ' : '[Access: booked animal only] ';
+      const scopeNote = noAnimalYet
+        ? '[New animal — vet to register on-site] '
+        : accessScope === 'all-animals'
+          ? '[Access: all animals] '
+          : '[Access: booked animal only] ';
       await submitCalloutRequest({
         vetId: vet?.id,
         animal: animalLabel,
@@ -122,8 +128,8 @@ export default function RequestCallout() {
         photo: photo || undefined,
         accessBufferHours: accessHours,
         scheduledFor,
-        accessScope,
-        accessAnimals: accessScope === 'this-animal' && animalLabel ? [animalLabel] : undefined,
+        accessScope: noAnimalYet ? undefined : accessScope,
+        accessAnimals: !noAnimalYet && accessScope === 'this-animal' && animalLabel ? [animalLabel] : undefined,
       });
       notify(`Vet request sent for ${animalLabel}`);
       // A real on-device notification so the farmer has a durable record + proof
@@ -199,23 +205,36 @@ export default function RequestCallout() {
           />
         ) : null}
 
-        {/* Animal — a selection dialog; picking auto-fills the location. */}
-        <PickerField
-          label="Animal"
-          required
-          value={animal ? String(animal.id) : ''}
-          placeholder={isAdmin && !onBehalfFarmerId ? 'Select a farmer first, or any animal' : 'Select an animal'}
-          options={animalOptions}
-          onSelect={selectAnimal}
-        />
-        {animal ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: -spacing.sm, marginBottom: spacing.md }}>
-            <Icon name="map-marker-outline" size={15} color={colors.onSurfaceVariant} />
-            <AppText variant="caption" color={colors.onSurfaceVariant}>
-              Location: {locationName || 'Not set on this animal'} · auto-selected
-            </AppText>
-          </View>
+        {/* Animal — a selection dialog; picking auto-fills the location. Can be
+            skipped entirely (Sep 7 2026): the vet registers the animal on-site. */}
+        {!noAnimalYet ? (
+          <>
+            <PickerField
+              label="Animal"
+              required
+              value={animal ? String(animal.id) : ''}
+              placeholder={isAdmin && !onBehalfFarmerId ? 'Select a farmer first, or any animal' : 'Select an animal'}
+              options={animalOptions}
+              onSelect={selectAnimal}
+            />
+            {animal ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: -spacing.sm, marginBottom: spacing.sm }}>
+                <Icon name="map-marker-outline" size={15} color={colors.onSurfaceVariant} />
+                <AppText variant="caption" color={colors.onSurfaceVariant}>
+                  Location: {locationName || 'Not set on this animal'} · auto-selected
+                </AppText>
+              </View>
+            ) : null}
+          </>
         ) : null}
+        <Pressable
+          onPress={() => setNoAnimalYet((v) => !v)}
+          style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.md }}>
+          <Icon name={noAnimalYet ? 'checkbox-marked' : 'checkbox-blank-outline'} size={22} color={noAnimalYet ? colors.primary : colors.onSurfaceVariant} />
+          <AppText variant="body" color={colors.onSurface} style={{ flex: 1 }}>
+            I haven’t registered this animal yet — the vet will register it during the visit.
+          </AppText>
+        </Pressable>
 
         {/* Appointment mode */}
         <AppText variant="body" style={{ fontWeight: '600', marginBottom: spacing.sm }}>
@@ -273,7 +292,9 @@ export default function RequestCallout() {
         <PhotoField label="Live photo (optional)" value={photo} onChange={setPhoto} liveOnly />
 
         {/* Animal-specific permission (Sep 5 2026): which animals the vet may
-            access during this visit. */}
+            access during this visit. Not shown when no animal is registered yet. */}
+        {!noAnimalYet ? (
+        <>
         <AppText variant="body" style={{ fontWeight: '600', marginBottom: spacing.xs }}>
           Animals the vet may access
         </AppText>
@@ -315,19 +336,30 @@ export default function RequestCallout() {
             />
           ))}
         </View>
+        </>
+        ) : (
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, backgroundColor: colors.primaryTint, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md }}>
+            <Icon name="clipboard-account-outline" size={18} color={colors.primary} />
+            <AppText variant="caption" color={colors.primaryDark} style={{ flex: 1 }}>
+              The vet will register the animal and capture its first scorecard during the visit. You can review and approve the record afterwards.
+            </AppText>
+          </View>
+        )}
 
         {/* Consent */}
         <Pressable onPress={() => setTcsAccepted((v) => !v)} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.md }}>
           <Icon name={tcsAccepted ? 'checkbox-marked' : 'checkbox-blank-outline'} size={22} color={tcsAccepted ? colors.primary : colors.onSurfaceVariant} />
           <AppText variant="body" color={colors.onSurface} style={{ flex: 1 }}>
-            I accept the booking & managed-health terms & conditions, and consent to {accessScope === 'all-animals' ? 'all my animals’' : 'the booked animal’s'} records being accessible to the vet for this appointment window only.
+            {noAnimalYet
+              ? 'I accept the booking & managed-health terms & conditions, and consent to the vet registering my animal and recording its health data during this visit.'
+              : `I accept the booking & managed-health terms & conditions, and consent to ${accessScope === 'all-animals' ? 'all my animals’' : 'the booked animal’s'} records being accessible to the vet for this appointment window only.`}
           </AppText>
         </Pressable>
 
         <Button
           label={submitting ? 'Submitting…' : 'Submit Request'}
           onPress={onSubmit}
-          disabled={!animal || !tcsAccepted || submitting}
+          disabled={(!animal && !noAnimalYet) || !tcsAccepted || submitting}
         />
       </Screen>
     </View>

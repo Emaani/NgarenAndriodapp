@@ -53,6 +53,9 @@ export default function VetCallout() {
 
   const current = status ?? req.status;
   const accessHours = req.urgency === 'Emergency' ? 4 : 24;
+  // Reveal-on-accept: farmer identity & exact location stay hidden until the
+  // vet accepts (Sep 5 2026 anonymized vet view).
+  const revealed = current !== 'pending';
 
   const setAndSync = (next: CalloutStatus, toast: string) => {
     setStatus(next);
@@ -70,14 +73,14 @@ export default function VetCallout() {
         {/* Summary */}
         <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderColor: colors.divider }, shadow[1]]}>
           <View style={{ width: 46, height: 46, borderRadius: radius.full, backgroundColor: colors.primaryTint, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="account-outline" size={24} color={colors.primary} />
+            <Icon name={revealed ? 'account-outline' : 'account-lock-outline'} size={24} color={colors.primary} />
           </View>
           <View style={{ flex: 1 }}>
             <AppText variant="bodyLarge" style={{ fontWeight: '700' }}>
-              {req.farmerName}
+              {revealed ? req.farmerName : 'Farmer hidden'}
             </AppText>
             <AppText variant="caption" color={colors.onSurfaceVariant}>
-              {req.locationName} · {req.distanceKm} km · {req.requestedAt}
+              {revealed ? `${req.locationName} · ${req.distanceKm} km · ${req.requestedAt}` : `~${req.distanceKm} km · ${req.requestedAt} · revealed on accept`}
             </AppText>
           </View>
           <ActionChip label={current[0].toUpperCase() + current.slice(1)} variant={statusVariant(current)} />
@@ -91,8 +94,8 @@ export default function VetCallout() {
           <DetailRow label="Animal" value={req.animal} />
           <DetailRow label="Priority" value={req.urgency} />
           <DetailRow label="SLA" value={req.urgency === 'Emergency' ? 'Respond within 4 hours' : 'Respond within 48 hours'} />
-          <DetailRow label="Farmer" value={req.farmerName} />
-          <DetailRow label="Location" value={`${req.locationName} · ${req.distanceKm} km`} last={!req.notes} />
+          <DetailRow label="Farmer" value={revealed ? req.farmerName : 'Hidden until accepted'} />
+          <DetailRow label="Location" value={revealed ? `${req.locationName} · ${req.distanceKm} km` : `~${req.distanceKm} km · shown on accept`} last={!req.notes} />
           {req.notes ? <DetailRow label="Notes" value={req.notes} last /> : null}
         </View>
 
@@ -161,6 +164,12 @@ export default function VetCallout() {
                     />
                   ))}
                 </View>
+                <Button
+                  label="New Visit Scorecard"
+                  icon="clipboard-plus-outline"
+                  onPress={() => router.push(`/vet-scorecard/new?key=${encodeURIComponent(req.animal)}&label=${encodeURIComponent(req.animal)}&callout=${req.id}` as never)}
+                  style={{ marginBottom: spacing.sm }}
+                />
                 <Button
                   label="Open Health Score Card"
                   icon="file-document-outline"

@@ -57,6 +57,11 @@ function RequestCard({
   onDecline: () => void;
   onMap: () => void;
 }) {
+  // Reveal-on-accept (Sep 5 2026 anonymized vet view): before the vet accepts,
+  // the requesting farmer's identity and precise location are hidden — only the
+  // animal, priority, distance and reason show, enough to decide. Accepting
+  // reveals the farmer name and exact location so the vet can attend.
+  const revealed = req.status !== 'pending';
   return (
     <Pressable
       onPress={onOpen}
@@ -80,7 +85,7 @@ function RequestCard({
             {req.animal}
           </AppText>
           <AppText variant="caption" color={colors.onSurfaceVariant}>
-            {req.farmerName} · {req.requestedAt}
+            {revealed ? `${req.farmerName} · ${req.requestedAt}` : `Requested ${req.requestedAt}`}
           </AppText>
         </View>
         <ActionChip label={req.urgency} variant={urgencyVariant(req.urgency)} />
@@ -88,9 +93,9 @@ function RequestCard({
       </View>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-        <Icon name="map-marker" size={16} color={colors.onSurfaceVariant} />
+        <Icon name={revealed ? 'map-marker' : 'map-marker-off-outline'} size={16} color={colors.onSurfaceVariant} />
         <AppText variant="body" color={colors.onSurfaceVariant}>
-          {req.locationName} · {req.distanceKm} km away
+          {revealed ? `${req.locationName} · ${req.distanceKm} km away` : `~${req.distanceKm} km away · location shown on accept`}
         </AppText>
       </View>
 
@@ -101,10 +106,18 @@ function RequestCard({
       )}
 
       {req.status === 'pending' ? (
-        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-          <Button label="Decline" variant="outline" onPress={onDecline} style={{ flex: 1 }} />
-          <Button label="Accept" icon="check" onPress={onAccept} style={{ flex: 1 }} />
-        </View>
+        <>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+            <Icon name="shield-lock-outline" size={13} color={colors.onSurfaceVariant} />
+            <AppText variant="caption" color={colors.onSurfaceVariant}>
+              Farmer’s name & exact location are revealed once you accept.
+            </AppText>
+          </View>
+          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+            <Button label="Decline" variant="outline" onPress={onDecline} style={{ flex: 1 }} />
+            <Button label="Accept" icon="check" onPress={onAccept} style={{ flex: 1 }} />
+          </View>
+        </>
       ) : (
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <ActionChip label={req.status[0].toUpperCase() + req.status.slice(1)} variant={statusVariant(req.status)} />
