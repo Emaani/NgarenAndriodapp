@@ -65,6 +65,27 @@ export async function exportText(filename: string, text: string): Promise<boolea
 }
 
 /**
+ * Render `html` to a PDF file with a meaningful name and return its file uri
+ * (no sharing). Used when a caller needs the file itself — to attach to an
+ * email, or to persist. Returns null if printing fails.
+ */
+export async function renderPdfToFile(filename: string, html: string): Promise<string | null> {
+  try {
+    const { uri } = await Print.printToFileAsync({ html });
+    try {
+      const dest = new File(Paths.cache, filename);
+      if (dest.exists) dest.delete();
+      new File(uri).move(dest);
+      return dest.uri;
+    } catch {
+      return uri; // fall back to the print engine's temp uri
+    }
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Render `html` to a PDF and open the share sheet. Used for brand-styled
  * documents — the Health Score Card and vet practice reports (Sep 5 2026
  * standup: reports in branded PDF). Returns false if printing or sharing isn't
@@ -72,17 +93,8 @@ export async function exportText(filename: string, text: string): Promise<boolea
  */
 export async function exportPdf(filename: string, html: string): Promise<boolean> {
   try {
-    const { uri } = await Print.printToFileAsync({ html });
-    // Give the PDF a meaningful name in the share sheet where we can.
-    let shareUri = uri;
-    try {
-      const dest = new File(Paths.cache, filename);
-      if (dest.exists) dest.delete();
-      new File(uri).move(dest);
-      shareUri = dest.uri;
-    } catch {
-      // Fall back to the print engine's temp uri if the rename fails.
-    }
+    const shareUri = await renderPdfToFile(filename, html);
+    if (!shareUri) return false;
     if (!(await Sharing.isAvailableAsync())) return false;
     await Sharing.shareAsync(shareUri, {
       mimeType: 'application/pdf',

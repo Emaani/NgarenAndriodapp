@@ -9,10 +9,12 @@ import { getVetVisits } from '@/data/vetVisits';
 import { loadScorecards, STATUS_LABEL } from '@/data/scorecards';
 import { addDocument } from '@/data/documents';
 import { getCeresBehaviour } from '@/data/ceresBehaviour';
-import { healthScoreCardHtml, healthScoreCardSummary, healthScoreCardText } from '@/data/vetReports';
+import { healthScoreCardHtml, healthScoreCardSummary } from '@/data/vetReports';
 import { logReportExport } from '@/data/reportAudit';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
+import * as MailComposer from 'expo-mail-composer';
+import { exportPdf, renderPdfToFile } from '@/lib/export';
 import { notify } from '@/lib/toast';
 import { ageFromDate, formatDate } from '@/lib/date';
 import { statusVisual, bcsColor } from '@/lib/scorecardVisual';
@@ -197,38 +199,68 @@ export default function HealthScoreCard() {
   });
   const fileBase = () => (animal.accountNumber ?? animal.ngarenCode ?? animal.tag).replace(/[^A-Za-z0-9._-]/g, '');
 
-  // Generate a Health Score Card document → store it (branded HTML / text) and
-  // open the preview (Sep 12 2026 documents module). Sharing is done there.
-  const generate = async (format: 'pdf' | 'text') => {
+  const subjectRef = `${animal.accountNumber ?? animal.tag}${animal.name ? ` (${animal.name})` : ''}`;
+  const logExport = (via: string) =>
+    logReportExport({
+      report: `Health Score Card (${via})`,
+      subject: subjectRef,
+      rows: health.length + visits.length,
+      by: user?.fullName ?? user?.email ?? 'Vet',
+      actorId: user?.id,
+      shared: true,
+    });
+
+  // Download: render the branded PDF, save it into the Documents module, and
+  // open it there — so it's downloaded and accessible on the dashboard.
+  const onDownload = async () => {
     setBusy(true);
     try {
-      const content = format === 'pdf' ? healthScoreCardHtml(cardInput()) : healthScoreCardText(cardInput());
       const id = await addDocument({
         kind: 'scorecard',
         title: `Health Score Card — ${animal.name ?? animal.tag}`,
         subject: animal.accountNumber ?? animal.tag,
         ownerRole: isAdmin ? 'admin' : 'vet',
         ownerId: user?.id ?? null,
-        format,
-        filename: `health-scorecard-${fileBase()}.${format === 'pdf' ? 'pdf' : 'txt'}`,
-        content,
+        format: 'pdf',
+        filename: `health-scorecard-${fileBase()}.pdf`,
+        content: healthScoreCardHtml(cardInput()),
       });
-      await logReportExport({
-        report: `Health Score Card (${format.toUpperCase()})`,
-        subject: `${animal.accountNumber ?? animal.tag}${animal.name ? ` (${animal.name})` : ''}`,
-        rows: health.length + visits.length,
-        by: user?.fullName ?? user?.email ?? 'Vet',
-        actorId: user?.id,
-        shared: true,
-      });
-      notify('Health Score Card generated');
+      await logExport('Download');
+      notify('Score card saved to Documents');
       router.push(`/documents/${id}` as never);
     } finally {
       setBusy(false);
     }
   };
-  const onGeneratePdf = () => generate('pdf');
-  const onGenerateText = () => generate('text');
+
+  // Email: attach the branded PDF and open the mail composer so the user can
+  // enter the recipient and send it.
+  const onEmail = async () => {
+    setBusy(true);
+    try {
+      const name = `health-scorecard-${fileBase()}.pdf`;
+      const html = healthScoreCardHtml(cardInput());
+      const uri = await renderPdfToFile(name, html);
+      if (!uri) {
+        notify('Could not prepare the PDF — please try again');
+        return;
+      }
+      if (!(await MailComposer.isAvailableAsync())) {
+        // No mail app configured — fall back to the share sheet so they can
+        // still send it (e.g. via Gmail / WhatsApp).
+        await exportPdf(name, html);
+        return;
+      }
+      await MailComposer.composeAsync({
+        subject: `Health Score Card — ${animal.name ?? animal.tag} (${animal.accountNumber ?? animal.tag})`,
+        body: `Please find attached the Ngaren Health Score Card for ${animal.name ?? animal.tag}.\n\nGenerated with the Ngaren app · Ngaren Digital.`,
+        attachments: [uri],
+      });
+      await logExport('Email');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const typeTint = (t: string) => (t === 'ailment' ? colors.error : t === 'treatment' ? colors.info : t === 'vaccination' ? colors.success : colors.primary);
 
@@ -392,12 +424,12 @@ export default function HealthScoreCard() {
           ))
         )}
 
-        <Button label={busy ? 'Generating…' : 'Generate & share PDF'} icon="file-pdf-box" loading={busy} onPress={onGeneratePdf} style={{ marginTop: spacing.lg }} />
-        <Button label="Share as text" variant="outline" icon="text-box-outline" disabled={busy} onPress={onGenerateText} style={{ marginTop: spacing.sm }} />
+        <Button label={busy ? 'Working…' : 'Download Score Card'} icon="download-outline" loading={busy} onPress={onDownload} style={{ marginTop: spacing.lg }} />
+        <Button label="Share on Email" variant="outline" icon="email-outline" disabled={busy} onPress={onEmail} style={{ marginTop: spacing.sm }} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm }}>
           <Icon name={'shield-check-outline' as IconName} size={14} color={colors.onSurfaceVariant} />
           <AppText variant="caption" color={colors.onSurfaceVariant}>
-            Each generation is recorded in the report audit trail.
+            Downloads are saved to Documents; every generation is recorded in the audit trail.
           </AppText>
         </View>
       </Screen>

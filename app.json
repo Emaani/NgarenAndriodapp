@@ -19,7 +19,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.emaanidev.ngarenconnectmobile",
-      "versionCode": 40
+      "versionCode": 41
     },
     "web": {
       "output": "static",
@@ -63,7 +63,8 @@
           "locationAlwaysAndWhenInUsePermission": "Ngaren uses your location to centre the herd map on where you are."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-mail-composer"
     ],
     "experiments": {
       "typedRoutes": true,
