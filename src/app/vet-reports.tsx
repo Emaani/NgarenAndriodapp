@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { calloutRequests as calloutFallback } from '@/data/mock';
@@ -9,7 +9,7 @@ import { getReportAudit, logReportExport, ReportAuditEntry } from '@/data/report
 import { addDocument } from '@/data/documents';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
-import { toCsv, exportCsv, exportPdf } from '@/lib/export';
+import { toCsv } from '@/lib/export';
 import { brandedHtml, tableSection } from '@/lib/pdfTemplate';
 import { makeFarmerAnonymizer } from '@/lib/anon';
 import { notify } from '@/lib/toast';
@@ -120,36 +120,36 @@ export default function VetReports() {
   if (!isAuthenticated) return <Redirect href="/login" />;
   if (!canVet) return <Redirect href="/(tabs)/home" />;
 
+  // Generate a report → store it (branded HTML for PDF, or CSV) and open the
+  // preview (Sep 12 2026 documents module). Sharing happens from the preview.
   const runExport = async (r: ReportDef, format: 'pdf' | 'csv') => {
     setBusy(`${r.id}:${format}`);
     try {
       const stamp = new Date().toISOString().slice(0, 10);
-      const ok =
+      const content =
         format === 'pdf'
-          ? await exportPdf(
-              `vet-${r.id}-${stamp}.pdf`,
-              brandedHtml({ title: r.name, subtitle: r.description, body: tableSection(r.name, r.headers, r.rows) }),
-            )
-          : await exportCsv(`vet-${r.id}-${stamp}.csv`, toCsv(r.headers, r.rows));
+          ? brandedHtml({ title: r.name, subtitle: r.description, body: tableSection(r.name, r.headers, r.rows) })
+          : toCsv(r.headers, r.rows);
+      const id = await addDocument({
+        kind: 'report',
+        title: r.name,
+        subject: `${r.rows.length} row${r.rows.length === 1 ? '' : 's'}`,
+        ownerRole: isAdmin ? 'admin' : 'vet',
+        ownerId: user?.id ?? null,
+        format,
+        filename: `vet-${r.id}-${stamp}.${format}`,
+        content,
+      });
       await logReportExport({
         report: `${r.name} (${format.toUpperCase()})`,
         rows: r.rows.length,
         by: user?.fullName ?? user?.email ?? 'Vet',
         actorId: user?.id,
-        shared: ok,
+        shared: true,
       });
-      if (ok) {
-        void addDocument({
-          kind: 'report',
-          title: `${r.name} (${format.toUpperCase()})`,
-          subject: `${r.rows.length} rows`,
-          ownerRole: isAdmin ? 'admin' : 'vet',
-          ownerId: user?.id ?? null,
-        });
-      }
       reloadAudit();
-      if (!ok) Alert.alert('Sharing unavailable', 'Could not open the share sheet on this device.');
-      else notify(`${r.name} exported`);
+      notify(`${r.name} generated`);
+      router.push(`/documents/${id}` as never);
     } finally {
       setBusy(null);
     }

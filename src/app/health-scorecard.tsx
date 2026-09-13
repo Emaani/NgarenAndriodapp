@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { animals as animalsFallback } from '@/data/mock';
@@ -13,7 +13,6 @@ import { healthScoreCardHtml, healthScoreCardSummary, healthScoreCardText } from
 import { logReportExport } from '@/data/reportAudit';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
-import { exportPdf, exportText } from '@/lib/export';
 import { notify } from '@/lib/toast';
 import { ageFromDate, formatDate } from '@/lib/date';
 import { statusVisual, bcsColor } from '@/lib/scorecardVisual';
@@ -198,46 +197,38 @@ export default function HealthScoreCard() {
   });
   const fileBase = () => (animal.accountNumber ?? animal.ngarenCode ?? animal.tag).replace(/[^A-Za-z0-9._-]/g, '');
 
-  const logGeneration = async (format: string, ok: boolean) => {
-    await logReportExport({
-      report: `Health Score Card (${format})`,
-      subject: `${animal.accountNumber ?? animal.tag}${animal.name ? ` (${animal.name})` : ''}`,
-      rows: health.length + visits.length,
-      by: user?.fullName ?? user?.email ?? 'Vet',
-      actorId: user?.id,
-      shared: ok,
-    });
-    // Register in the classified documents module when actually shared.
-    if (ok) {
-      void addDocument({
+  // Generate a Health Score Card document → store it (branded HTML / text) and
+  // open the preview (Sep 12 2026 documents module). Sharing is done there.
+  const generate = async (format: 'pdf' | 'text') => {
+    setBusy(true);
+    try {
+      const content = format === 'pdf' ? healthScoreCardHtml(cardInput()) : healthScoreCardText(cardInput());
+      const id = await addDocument({
         kind: 'scorecard',
-        title: `Health Score Card — ${animal.name ?? animal.tag} (${format})`,
+        title: `Health Score Card — ${animal.name ?? animal.tag}`,
         subject: animal.accountNumber ?? animal.tag,
         ownerRole: isAdmin ? 'admin' : 'vet',
         ownerId: user?.id ?? null,
+        format,
+        filename: `health-scorecard-${fileBase()}.${format === 'pdf' ? 'pdf' : 'txt'}`,
+        content,
       });
+      await logReportExport({
+        report: `Health Score Card (${format.toUpperCase()})`,
+        subject: `${animal.accountNumber ?? animal.tag}${animal.name ? ` (${animal.name})` : ''}`,
+        rows: health.length + visits.length,
+        by: user?.fullName ?? user?.email ?? 'Vet',
+        actorId: user?.id,
+        shared: true,
+      });
+      notify('Health Score Card generated');
+      router.push(`/documents/${id}` as never);
+    } finally {
+      setBusy(false);
     }
   };
-
-  // Primary: brand-styled PDF (Sep 5 2026 standup).
-  const onGeneratePdf = async () => {
-    setBusy(true);
-    const ok = await exportPdf(`health-scorecard-${fileBase()}.pdf`, healthScoreCardHtml(cardInput()));
-    await logGeneration('PDF', ok);
-    setBusy(false);
-    if (!ok) Alert.alert('Sharing unavailable', 'Could not generate the PDF on this device.');
-    else notify('Health Score Card PDF generated & shared');
-  };
-
-  // Secondary: plain-text version (lightweight, works anywhere).
-  const onGenerateText = async () => {
-    setBusy(true);
-    const ok = await exportText(`health-scorecard-${fileBase()}.txt`, healthScoreCardText(cardInput()));
-    await logGeneration('text', ok);
-    setBusy(false);
-    if (!ok) Alert.alert('Sharing unavailable', 'Could not open the share sheet on this device.');
-    else notify('Health Score Card shared as text');
-  };
+  const onGeneratePdf = () => generate('pdf');
+  const onGenerateText = () => generate('text');
 
   const typeTint = (t: string) => (t === 'ailment' ? colors.error : t === 'treatment' ? colors.info : t === 'vaccination' ? colors.success : colors.primary);
 

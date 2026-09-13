@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
-import { Redirect, useFocusEffect } from 'expo-router';
+import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { deleteDocument, DocumentKind, DocumentRecord, getVisibleDocuments, KIND_LABEL, RETENTION_DAYS } from '@/data/documents';
 import { useAuth } from '@/services/auth';
@@ -33,6 +33,7 @@ function daysLeft(expiresAt: string): number {
  * or farmer sees only their own) and auto-deletion after a retention window.
  */
 export default function Documents() {
+  const router = useRouter();
   const { loading, isAuthenticated, isAdmin, user } = useAuth();
   const [docs, setDocs] = useState<DocumentRecord[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
@@ -100,10 +101,11 @@ export default function Documents() {
           visible.map((d) => {
             const left = daysLeft(d.expiresAt);
             return (
-              <View
+              <Pressable
                 key={d.id}
-                style={[
-                  { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.divider },
+                onPress={() => router.push(`/documents/${d.id}` as never)}
+                style={({ pressed }) => [
+                  { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.divider, opacity: pressed ? 0.9 : 1 },
                   shadow[1],
                 ]}>
                 <View style={{ width: 38, height: 38, borderRadius: radius.full, backgroundColor: colors.primaryTint, alignItems: 'center', justifyContent: 'center' }}>
@@ -115,6 +117,7 @@ export default function Documents() {
                   </AppText>
                   <AppText variant="caption" color={colors.onSurfaceVariant}>
                     {KIND_LABEL[d.kind]}
+                    {d.format ? ` · ${d.format.toUpperCase()}` : ''}
                     {d.subject ? ` · ${d.subject}` : ''} · {formatDate(d.createdAt.slice(0, 10))}
                     {isAdmin ? ` · ${d.ownerRole}` : ''}
                   </AppText>
@@ -125,7 +128,7 @@ export default function Documents() {
                 <Pressable onPress={() => confirmDelete(d)} hitSlop={8}>
                   <Icon name="trash-can-outline" size={20} color={colors.onSurfaceVariant} />
                 </Pressable>
-              </View>
+              </Pressable>
             );
           })
         )}

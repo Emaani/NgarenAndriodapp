@@ -233,6 +233,28 @@ export default function VetDashboard() {
           <VetSchedule bookings={requests} onOpenBooking={(bid) => router.push(`/vet-callout/${bid}` as never)} />
         </View>
 
+        {/* Documents module (Sep 12 2026): generated scorecards & reports, stored
+            and openable here. */}
+        <Pressable
+          onPress={() => router.push('/documents' as never)}
+          style={({ pressed }) => [
+            { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.lg, borderWidth: 1, borderColor: colors.divider, opacity: pressed ? 0.92 : 1 },
+            shadow[1],
+          ]}>
+          <View style={{ width: 44, height: 44, borderRadius: radius.full, backgroundColor: colors.primaryTint, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="folder-multiple-outline" size={22} color={colors.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <AppText variant="bodyLarge" style={{ fontWeight: '700' }}>
+              Documents
+            </AppText>
+            <AppText variant="caption" color={colors.onSurfaceVariant}>
+              Generated scorecards & reports — preview, share, auto-deleted after 30 days.
+            </AppText>
+          </View>
+          <Icon name="chevron-right" size={22} color={colors.onSurfaceVariant} />
+        </Pressable>
+
         <AppText variant="title" style={{ marginBottom: spacing.sm }}>
           Call-out requests
         </AppText>

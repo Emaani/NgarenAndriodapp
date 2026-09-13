@@ -5,6 +5,8 @@
  * engine has no external assets.
  */
 
+import { NGAREN_LOGO_DATA_URI } from './ngarenLogo';
+
 // Ngaren brand palette (kept in sync with the app's green accent).
 const BRAND = '#6D874F';
 const BRAND_DARK = '#3f4d2d';
@@ -36,8 +38,11 @@ export function brandedHtml(opts: { title: string; subtitle?: string; body: stri
 <style>
   * { box-sizing: border-box; }
   body { font-family: -apple-system, 'Helvetica Neue', Roboto, Arial, sans-serif; color: ${INK}; margin: 0; padding: 0; }
-  .header { background: ${BRAND}; color: #fff; padding: 28px 32px; }
-  .wordmark { font-size: 13px; letter-spacing: 3px; text-transform: uppercase; opacity: .9; font-weight: 700; }
+  .header { background: ${BRAND}; color: #fff; padding: 24px 32px; }
+  .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .brand img { width: 40px; height: 40px; border-radius: 9px; background: #fff; padding: 3px; }
+  .wordmark { font-size: 15px; letter-spacing: 3px; text-transform: uppercase; font-weight: 800; }
+  .wordmark .sub { display: block; font-size: 9px; letter-spacing: 2px; opacity: .85; font-weight: 600; margin-top: 1px; }
   .title { font-size: 24px; font-weight: 800; margin: 6px 0 2px; }
   .subtitle { font-size: 14px; opacity: .95; }
   .content { padding: 24px 32px 8px; }
@@ -61,7 +66,10 @@ export function brandedHtml(opts: { title: string; subtitle?: string; body: stri
 </head>
 <body>
   <div class="header">
-    <div class="wordmark">Ngaren</div>
+    <div class="brand">
+      <img src="${NGAREN_LOGO_DATA_URI}" alt="Ngaren" />
+      <div class="wordmark">Ngaren<span class="sub">Digital Livestock</span></div>
+    </div>
     <div class="title">${esc(opts.title)}</div>
     ${opts.subtitle ? `<div class="subtitle">${esc(opts.subtitle)}</div>` : ''}
   </div>
