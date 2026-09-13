@@ -30,11 +30,14 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-/** "3 days ago" / "today" style label for the last-visit KPI. */
+/** "3 days ago" / "Today" style label for the last-visit KPI. */
 function relativeDayLabel(iso: string): string {
-  const then = new Date(`${iso}T00:00:00`).getTime();
-  const days = Math.round((Date.now() - then) / 864e5);
-  if (Number.isNaN(days)) return '—';
+  const target = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(target.getTime())) return '—';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  // Whole-day difference between calendar dates (no fractional rounding).
+  const days = Math.round((today.getTime() - target.getTime()) / 864e5);
   if (days <= 0) return 'Today';
   if (days === 1) return 'Yesterday';
   if (days < 30) return `${days} days ago`;
