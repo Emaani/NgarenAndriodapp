@@ -7,7 +7,7 @@ import { getCalloutRequests, updateCalloutStatus } from '@/data/api';
 import { getMyVetImpact } from '@/data/vetProfiles';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
-import { ActionChip, AppText, Button, GradientHeader, Icon, IconChip, Screen, VetImpactDashboard, VetSchedule } from '@/ui';
+import { ActionChip, AppText, Button, GradientHeader, Icon, IconChip, Screen, SyncStatus, VetImpactDashboard, VetSchedule } from '@/ui';
 
 const EMPTY_IMPACT: VetImpact = {
   totalVisits: 0,
@@ -211,6 +211,11 @@ export default function VetDashboard() {
       </GradientHeader>
 
       <Screen contentStyle={{ paddingTop: spacing.md }}>
+        {/* Offline sync status — scorecards & photos reaching the backend. */}
+        <View style={{ marginBottom: spacing.md }}>
+          <SyncStatus />
+        </View>
+
         {/* Veterinary impact dashboard — the vet's reach, counted from records. */}
         <AppText variant="title" style={{ marginBottom: spacing.sm }}>
           My impact
