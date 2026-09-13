@@ -404,6 +404,10 @@ export interface CalloutRequest {
   notes?: string;
   requestedAt: string;
   status: CalloutStatus;
+  /** Booked calendar day (ISO date), when the farmer picked a slot (Sep 12 2026). */
+  scheduledFor?: string;
+  /** Booked time slot within the day, e.g. "08:00–10:00" (Sep 12 2026). */
+  scheduledSlot?: string;
 }
 
 /** A subscription plan shown on the Payments screen. */

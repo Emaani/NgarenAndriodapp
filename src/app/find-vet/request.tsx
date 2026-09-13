@@ -6,6 +6,7 @@ import { animals as animalsFallback, vets } from '@/data/mock';
 import { submitCalloutRequest } from '@/data/api';
 import { getHerd } from '@/data/herd';
 import { getFarmerPortfolio } from '@/data/portfolio';
+import { BOOKING_SLOTS } from '@/data/scheduleSlots';
 import { notify } from '@/lib/toast';
 import { formatDate } from '@/lib/date';
 import { sendLocalNotification } from '@/services/push';
@@ -29,7 +30,7 @@ const MODES: { key: AppointmentMode; label: string; icon: 'map-marker-check-outl
 
 // Specific booking time slots (Sep 12 2026): the appointment takes a slot, not
 // the whole day, and access is driven by the calendar slot (no preset buffers).
-const TIME_SLOTS = ['08:00–10:00', '10:00–12:00', '12:00–14:00', '14:00–16:00', '16:00–18:00'];
+const TIME_SLOTS = BOOKING_SLOTS;
 
 export default function RequestCallout() {
   const router = useRouter();

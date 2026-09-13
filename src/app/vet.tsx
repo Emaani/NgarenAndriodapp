@@ -7,7 +7,7 @@ import { getCalloutRequests, updateCalloutStatus } from '@/data/api';
 import { getMyVetImpact } from '@/data/vetProfiles';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
-import { ActionChip, AppText, Button, GradientHeader, Icon, IconChip, Screen, VetImpactDashboard } from '@/ui';
+import { ActionChip, AppText, Button, GradientHeader, Icon, IconChip, Screen, VetImpactDashboard, VetSchedule } from '@/ui';
 
 const EMPTY_IMPACT: VetImpact = {
   totalVisits: 0,
@@ -217,6 +217,20 @@ export default function VetDashboard() {
         </AppText>
         <View style={{ marginBottom: spacing.lg }}>
           <VetImpactDashboard impact={impact} />
+        </View>
+
+        {/* My calendar — received bookings shown as time slots (Sep 12 2026). */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }}>
+          <AppText variant="title">My calendar</AppText>
+          <Pressable onPress={() => router.push('/calendar' as never)} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+            <AppText variant="body" color={colors.primary} style={{ fontWeight: '600' }}>
+              Full calendar
+            </AppText>
+            <Icon name="chevron-right" size={18} color={colors.primary} />
+          </Pressable>
+        </View>
+        <View style={{ marginBottom: spacing.lg }}>
+          <VetSchedule bookings={requests} onOpenBooking={(bid) => router.push(`/vet-callout/${bid}` as never)} />
         </View>
 
         <AppText variant="title" style={{ marginBottom: spacing.sm }}>
