@@ -176,15 +176,92 @@ export async function getScorecards(): Promise<Scorecard[]> {
   }
 }
 
-/** Scorecards for one animal, keyed by ngaren code / tag / account / name. */
+/**
+ * Scorecards for one animal (local + remote, RLS-scoped), keyed by ngaren code
+ * / tag / account / name.
+ */
 export async function getScorecardsForAnimal(keys: string[]): Promise<Scorecard[]> {
   const wanted = keys.filter(Boolean).map((k) => k.toLowerCase());
-  const all = await getScorecards();
+  const all = await loadScorecards();
   return all.filter((s) => wanted.includes(s.animalKey.toLowerCase()) || wanted.includes(s.animalLabel.toLowerCase()));
 }
 
+/** Map a Supabase `livestock_scorecards` row back to a Scorecard. */
+function rowToScorecard(r: Record<string, unknown>): Scorecard {
+  const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
+  return {
+    id: String(r.id),
+    animalKey: str(r.animal_key) ?? '',
+    animalLabel: str(r.animal_label) ?? '',
+    farmName: str(r.farm_name) ?? null,
+    breed: str(r.breed) ?? null,
+    farmerId: str(r.farmer_id) ?? null,
+    status: (str(r.status) as ScorecardStatus) ?? 'healthy',
+    visitType: str(r.visit_type) ?? '',
+    vitals: (r.vitals as Scorecard['vitals']) ?? { bcs: null },
+    diagnosisTags: Array.isArray(r.diagnosis_tags) ? (r.diagnosis_tags as string[]) : [],
+    diagnosisNotes: str(r.diagnosis_notes) ?? null,
+    treatment: (r.treatment as Scorecard['treatment']) ?? {},
+    grooming: Array.isArray(r.grooming) ? (r.grooming as string[]) : [],
+    pregnancy: (r.pregnancy as Scorecard['pregnancy']) ?? null,
+    notes: str(r.notes) ?? null,
+    flagRecheck: r.flag_recheck === true,
+    photo: str(r.photo_url) ?? null,
+    vetName: str(r.vet_name) ?? 'Vet',
+    vetId: str(r.vet_id) ?? null,
+    date: str(r.visit_date) ?? str(r.created_at)?.slice(0, 10) ?? '',
+    createdAt: str(r.created_at) ?? '',
+    locked: true,
+  };
+}
+
+/**
+ * Read scorecards the current user is allowed to see from Supabase. RLS scopes
+ * this automatically: admins get all, a vet gets their own, and a FARMER gets
+ * the scorecards recorded for their own animals — which is how a farmer sees a
+ * record the vet captured on a different device. Empty when offline / not
+ * configured (the local copy still shows).
+ */
+export async function fetchRemoteScorecards(): Promise<Scorecard[]> {
+  if (!isSupabaseConfigured()) return [];
+  try {
+    const { data, error } = await supabase
+      .from('livestock_scorecards')
+      .select('*')
+      .order('visit_date', { ascending: false })
+      .limit(500);
+    if (error || !data) return [];
+    return (data as Record<string, unknown>[]).map(rowToScorecard);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The scorecards to DISPLAY: local (this device's own) merged with remote (RLS-
+ * scoped) — deduped by id, newest first. This is what the Health Score Card
+ * reads, so farmers and cross-device vets see records they didn't author.
+ */
+export async function loadScorecards(): Promise<Scorecard[]> {
+  const [local, remote] = await Promise.all([getScorecards(), fetchRemoteScorecards()]);
+  const byId = new Map<string, Scorecard>();
+  for (const s of remote) byId.set(s.id, s);
+  for (const s of local) byId.set(s.id, s); // local wins for its own records
+  return [...byId.values()].sort((a, b) => (a.date < b.date ? 1 : -1));
+}
+
 export async function getScorecardById(id: string): Promise<Scorecard | undefined> {
-  return (await getScorecards()).find((s) => s.id === id);
+  const local = (await getScorecards()).find((s) => s.id === id);
+  if (local) return local;
+  // Fall back to the shared store (e.g. a farmer opening a vet-authored record).
+  if (!isSupabaseConfigured()) return undefined;
+  try {
+    const { data, error } = await supabase.from('livestock_scorecards').select('*').eq('id', id).maybeSingle();
+    if (error || !data) return undefined;
+    return rowToScorecard(data as Record<string, unknown>);
+  } catch {
+    return undefined;
+  }
 }
 
 export async function addScorecard(input: Omit<Scorecard, 'id' | 'createdAt' | 'locked'>): Promise<Scorecard> {

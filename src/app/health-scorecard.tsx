@@ -6,7 +6,7 @@ import { animals as animalsFallback } from '@/data/mock';
 import { getHerd } from '@/data/herd';
 import { getLocalHealthRecords, HEALTH_TYPE_LABELS } from '@/data/localHealth';
 import { getVetVisits } from '@/data/vetVisits';
-import { getScorecards, STATUS_LABEL } from '@/data/scorecards';
+import { loadScorecards, STATUS_LABEL } from '@/data/scorecards';
 import { addDocument } from '@/data/documents';
 import { getCeresBehaviour } from '@/data/ceresBehaviour';
 import { healthScoreCardHtml, healthScoreCardSummary, healthScoreCardText } from '@/data/vetReports';
@@ -78,7 +78,7 @@ export default function HealthScoreCard() {
   const { data: herd } = useResource(getHerd, animalsFallback);
   const { data: allHealth } = useResource(getLocalHealthRecords, []);
   const { data: allVisits } = useResource(getVetVisits, []);
-  const { data: allScorecards } = useResource(getScorecards, []);
+  const { data: allScorecards } = useResource(loadScorecards, []);
 
   // Resolve the animal from a route param or an in-screen selection.
   const animal: Animal | undefined = useMemo(() => {
