@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { Animal } from './types';
 import { syncAnimalToLineage } from './herd';
+import { Scorecard, syncScorecardToSupabase } from './scorecards';
 import { uploadAnimalPhotos } from '../lib/imageUpload';
 import { reportDataFailure, reportDataSuccess } from '../services/dataHealth';
 
@@ -38,7 +39,20 @@ interface AnimalSyncOp {
   };
 }
 
-export type SyncOp = AnimalSyncOp;
+interface ScorecardSyncOp {
+  id: string;
+  type: 'scorecardSync';
+  attempts: number;
+  createdAt: string;
+  failed?: boolean;
+  lastError?: string;
+  payload: {
+    scorecard: Scorecard;
+    userId?: string;
+  };
+}
+
+export type SyncOp = AnimalSyncOp | ScorecardSyncOp;
 
 let processing = false;
 // Single-watcher guard — ensures only one NetInfo subscription is ever live.
@@ -92,8 +106,26 @@ export async function enqueueAnimalSync(input: {
   await writeQueue([...q, op]);
 }
 
+/** Enqueue a locked scorecard to be written through to Supabase (Sep 2026). */
+export async function enqueueScorecardSync(input: { scorecard: Scorecard; userId?: string }): Promise<void> {
+  const op: ScorecardSyncOp = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    type: 'scorecardSync',
+    attempts: 0,
+    createdAt: new Date().toISOString(),
+    payload: input,
+  };
+  const q = await readQueue();
+  await writeQueue([...q, op]);
+  // Try to drain immediately (no-op if offline; the watcher retries later).
+  void processSyncQueue();
+}
+
 /** Run a single op. Returns true on success (remove) or false (keep & retry). */
 async function runOp(op: SyncOp): Promise<boolean> {
+  if (op.type === 'scorecardSync') {
+    return syncScorecardToSupabase(op.payload.scorecard, op.payload.userId);
+  }
   if (op.type === 'animalSync') {
     const { animal, userId, photoUris, aan } = op.payload;
     if (!userId) return true; // nothing we can do without an owner; drop it.

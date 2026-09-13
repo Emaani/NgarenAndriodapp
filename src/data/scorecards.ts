@@ -15,6 +15,7 @@
  * shape maps onto a future `livestock_scorecards` table for write-through.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isSupabaseConfigured, supabase } from '../services/supabase';
 
 const KEY = 'ngaren.vet.scorecards.v1';
 
@@ -99,6 +100,8 @@ export interface Scorecard {
   farmName?: string | null;
   breed?: string | null;
   sex?: string | null;
+  /** The animal's owner (auth uid), so farmers can read their own scorecards. */
+  farmerId?: string | null;
   status: ScorecardStatus;
   visitType: string;
   vitals: ScorecardVitals;
@@ -194,4 +197,54 @@ export async function addScorecard(input: Omit<Scorecard, 'id' | 'createdAt' | '
     throw new Error('Could not save the scorecard');
   }
   return record;
+}
+
+/**
+ * Write-through a locked scorecard to Supabase (drained by the offline sync
+ * queue). Idempotent: the client id is the primary key, so a scorecard that is
+ * already stored is treated as success and never duplicated on retry. Returns
+ * true on success (drop from queue) or false to retry later.
+ */
+export async function syncScorecardToSupabase(card: Scorecard, userId?: string): Promise<boolean> {
+  // Nowhere to sync (no backend) — the local copy is the record; drop the op.
+  if (!isSupabaseConfigured()) return true;
+  if (!userId) return false; // need an author for RLS; keep and retry.
+  try {
+    const { data: existing, error: selErr } = await supabase
+      .from('livestock_scorecards')
+      .select('id')
+      .eq('id', card.id)
+      .maybeSingle();
+    if (selErr) return false; // e.g. table not yet migrated — keep & retry.
+    if (existing) return true; // already synced (locked records never change).
+
+    const row = {
+      id: card.id,
+      animal_key: card.animalKey,
+      animal_label: card.animalLabel,
+      farm_name: card.farmName ?? null,
+      breed: card.breed ?? null,
+      status: card.status,
+      visit_type: card.visitType,
+      vitals: card.vitals,
+      diagnosis_tags: card.diagnosisTags,
+      diagnosis_notes: card.diagnosisNotes ?? null,
+      treatment: card.treatment,
+      grooming: card.grooming,
+      pregnancy: card.pregnancy ?? null,
+      notes: card.notes ?? null,
+      flag_recheck: card.flagRecheck,
+      photo_url: card.photo ?? null,
+      vet_name: card.vetName,
+      vet_id: card.vetId ?? null,
+      farmer_id: card.farmerId ?? null,
+      visit_date: card.date || null,
+      locked: true,
+      created_by_user: userId,
+    };
+    const { error } = await supabase.from('livestock_scorecards').insert(row);
+    return !error;
+  } catch {
+    return false;
+  }
 }

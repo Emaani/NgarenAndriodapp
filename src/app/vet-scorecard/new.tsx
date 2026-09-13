@@ -17,6 +17,7 @@ import {
 } from '@/data/scorecards';
 import { addLocalEvent } from '@/data/localEvents';
 import { addDocument } from '@/data/documents';
+import { enqueueScorecardSync } from '@/data/syncQueue';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { scheduleLocalReminder } from '@/services/push';
@@ -145,11 +146,13 @@ export default function NewScorecard() {
     setSaving(true);
     try {
       const vetName = user?.fullName ?? user?.email ?? 'Vet';
-      await addScorecard({
+      const saved = await addScorecard({
         animalKey,
         animalLabel,
         farmName: animal?.locationName ?? null,
         breed: animal?.breed?.name ?? null,
+        // The animal's owner, so the farmer can read their own scorecard once synced.
+        farmerId: animal?.farmerId ?? null,
         status,
         visitType,
         vitals: {
@@ -171,6 +174,11 @@ export default function NewScorecard() {
         vetId: user?.id ?? null,
         date: new Date().toISOString().slice(0, 10),
       });
+
+      // Durable write-through to Supabase via the offline queue — the scorecard
+      // is the source of truth, so it must reach the shared store (and the
+      // farmer / surveillance views), surviving a flaky connection.
+      void enqueueScorecardSync({ scorecard: saved, userId: user?.id });
 
       // Follow-up: schedule a reminder + calendar item for the next-due date.
       if (nextDue) {
