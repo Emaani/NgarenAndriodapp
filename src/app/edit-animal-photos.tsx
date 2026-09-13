@@ -5,6 +5,7 @@ import { colors, radius, spacing } from '@/theme';
 import { animals as animalsFallback } from '@/data/mock';
 import { getHerdAnimalById } from '@/data/herd';
 import { addLocalAnimal } from '@/data/localAnimals';
+import { enqueueAnimalSync } from '@/data/syncQueue';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { formatDate } from '@/lib/date';
@@ -80,15 +81,23 @@ export default function EditAnimalPhotos() {
         changed && previous.length > 0
           ? [{ at: new Date().toISOString(), photos: previous, by: user?.fullName ?? user?.email ?? undefined }, ...history]
           : history;
-      await addLocalAnimal({
+      const aan = animal.ngarenCode ?? generateNgarenCode();
+      const updated = {
         ...animal,
         // Give previously-created animals a proper primary key if they lack one.
-        ngarenCode: animal.ngarenCode ?? generateNgarenCode(),
+        ngarenCode: aan,
         photos,
         // Lock the first captured set as the permanent onboarding record.
         onboardingPhotos: isLocked ? onboarding : photos,
         photoHistory: nextHistory,
-      });
+      };
+      await addLocalAnimal(updated);
+      // Durability: upload the photos to Storage and write the primary photo
+      // through animal_lineage via the offline queue, so the animal's ID photos
+      // survive a reinstall instead of dangling as device-only file URIs.
+      if (changed && photos.length && user?.id) {
+        void enqueueAnimalSync({ animal: updated, userId: user.id, photoUris: photos, aan });
+      }
       router.back();
     } catch {
       setSaving(false);

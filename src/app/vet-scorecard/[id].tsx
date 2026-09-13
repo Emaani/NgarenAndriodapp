@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { View } from 'react-native';
+import { Image, View } from 'react-native';
 import { Redirect, useLocalSearchParams } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { getScorecardById, STATUS_LABEL } from '@/data/scorecards';
@@ -98,7 +98,10 @@ export default function ScorecardView() {
         <Tile icon="stethoscope" title="Diagnosis">
           {card.diagnosisTags.length ? <Line>{card.diagnosisTags.join(', ')}</Line> : null}
           {card.diagnosisNotes ? <AppText variant="caption" color={colors.onSurfaceVariant}>{card.diagnosisNotes}</AppText> : null}
-          {!card.diagnosisTags.length && !card.diagnosisNotes ? <AppText variant="caption" color={colors.onSurfaceVariant}>No diagnosis recorded.</AppText> : null}
+          {!card.diagnosisTags.length && !card.diagnosisNotes && !card.photo ? <AppText variant="caption" color={colors.onSurfaceVariant}>No diagnosis recorded.</AppText> : null}
+          {card.photo ? (
+            <Image source={{ uri: card.photo }} style={{ width: '100%', height: 200, borderRadius: radius.sm, backgroundColor: colors.divider, marginTop: spacing.xs }} resizeMode="cover" />
+          ) : null}
         </Tile>
 
         <Tile icon="needle" title="Medication & Treatment">

@@ -16,6 +16,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isSupabaseConfigured, supabase } from '../services/supabase';
+import { uploadPhoto } from '../lib/imageUpload';
 
 const KEY = 'ngaren.vet.scorecards.v1';
 
@@ -295,6 +296,15 @@ export async function syncScorecardToSupabase(card: Scorecard, userId?: string):
     if (selErr) return false; // e.g. table not yet migrated — keep & retry.
     if (existing) return true; // already synced (locked records never change).
 
+    // Upload a live diagnosis photo to Storage first, so the DB only ever holds
+    // a durable URL — never a device-only file URI. Retry if the upload fails.
+    let photoUrl = card.photo ?? null;
+    if (photoUrl && !/^https?:\/\//.test(photoUrl)) {
+      const uploaded = await uploadPhoto(photoUrl, `${userId}/scorecards/${card.id}.jpg`);
+      if (!uploaded) return false; // keep & retry — don't persist a dangling URI.
+      photoUrl = uploaded;
+    }
+
     const row = {
       id: card.id,
       animal_key: card.animalKey,
@@ -311,7 +321,7 @@ export async function syncScorecardToSupabase(card: Scorecard, userId?: string):
       pregnancy: card.pregnancy ?? null,
       notes: card.notes ?? null,
       flag_recheck: card.flagRecheck,
-      photo_url: card.photo ?? null,
+      photo_url: photoUrl,
       vet_name: card.vetName,
       vet_id: card.vetId ?? null,
       farmer_id: card.farmerId ?? null,

@@ -24,7 +24,7 @@ import { scheduleLocalReminder } from '@/services/push';
 import { notify } from '@/lib/toast';
 import { statusVisual, bcsColor } from '@/lib/scorecardVisual';
 import { Animal } from '@/data/types';
-import { AppText, Button, DatePickerField, GradientHeader, Icon, IconName, Screen, SearchBar, TextField } from '@/ui';
+import { AppText, Button, DatePickerField, GradientHeader, Icon, IconName, PhotoField, Screen, SearchBar, TextField } from '@/ui';
 
 const VISIT_TYPES = ['Routine check', 'Treatment', 'Vaccination', 'Emergency'];
 // 1–5 body condition score in half-steps, with a short descriptor per level.
@@ -96,6 +96,7 @@ export default function NewScorecard() {
   const [dxQuery, setDxQuery] = useState('');
   const [dxTags, setDxTags] = useState<string[]>([]);
   const [dxNotes, setDxNotes] = useState('');
+  const [photo, setPhoto] = useState<string | null>(null);
   const [drug, setDrug] = useState('');
   const [dose, setDose] = useState('');
   const [route, setRoute] = useState<TreatmentRoute | null>(null);
@@ -170,6 +171,7 @@ export default function NewScorecard() {
         pregnancy: pregApplies ? { applicable: true, inCalf, dueDate: calvingDue || null } : null,
         notes: notes.trim() || null,
         flagRecheck,
+        photo,
         vetName,
         vetId: user?.id ?? null,
         date: new Date().toISOString().slice(0, 10),
@@ -343,6 +345,8 @@ export default function NewScorecard() {
             </View>
           ) : null}
           <TextField label="Notes (nuance)" value={dxNotes} onChangeText={setDxNotes} placeholder="e.g. Mild lameness — left hind hoof" multiline />
+          {/* Optional live photo of the wound / condition (Sep 9 design). */}
+          <PhotoField label="Photo (optional, live)" value={photo} onChange={setPhoto} liveOnly />
         </Tile>
 
         {/* Medication & Treatment */}
