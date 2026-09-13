@@ -3,6 +3,8 @@ import { Pressable, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { vets } from '@/data/mock';
+import { rateService } from '@/data/vetRatings';
+import { notify } from '@/lib/toast';
 import { AppText, Button, GradientHeader, Icon, Screen, TextField } from '@/ui';
 
 const TAGS = ['Punctual', 'Knowledgeable', 'Friendly', 'Great with animals', 'Fair price'];
@@ -10,15 +12,35 @@ const RATING_LABELS = ['', 'Poor', 'Fair', 'Good', 'Very good', 'Excellent'];
 
 export default function RateVet() {
   const router = useRouter();
-  const { vetId, animal, service } = useLocalSearchParams<{ vetId?: string; animal?: string; service?: string }>();
+  const { vetId, animal, service, callout } = useLocalSearchParams<{ vetId?: string; animal?: string; service?: string; callout?: string }>();
   const vet = vetId ? vets.find((v) => v.id === Number(vetId)) : vets[0];
 
   const [rating, setRating] = useState(0);
   const [tags, setTags] = useState<string[]>([]);
   const [review, setReview] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const toggleTag = (t: string) =>
     setTags((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
+
+  const onSubmit = async () => {
+    setSaving(true);
+    // Persist as a service-linked rating when we know which service it's for.
+    const calloutId = callout ? Number(callout) : NaN;
+    if (Number.isFinite(calloutId)) {
+      await rateService({
+        calloutId,
+        vetId: vetId ? Number(vetId) : undefined,
+        vetName: vet?.name,
+        animal: animal ?? undefined,
+        rating,
+        tags,
+        review: review.trim() || undefined,
+      });
+    }
+    notify('Thanks — your rating was recorded');
+    router.replace('/find-vet');
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -124,10 +146,10 @@ export default function RateVet() {
         />
 
         <Button
-          label="Submit Rating"
+          label={saving ? 'Submitting…' : 'Submit Rating'}
           icon="send"
-          disabled={rating === 0}
-          onPress={() => router.replace('/find-vet')}
+          disabled={rating === 0 || saving}
+          onPress={onSubmit}
           style={{ marginTop: spacing.sm }}
         />
       </Screen>

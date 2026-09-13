@@ -16,6 +16,7 @@ import {
   TreatmentRoute,
 } from '@/data/scorecards';
 import { addLocalEvent } from '@/data/localEvents';
+import { addDocument } from '@/data/documents';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { scheduleLocalReminder } from '@/services/push';
@@ -70,7 +71,7 @@ function TogglePill({ label, active, onPress }: { label: string; active: boolean
 export default function NewScorecard() {
   const router = useRouter();
   const { key, label, callout } = useLocalSearchParams<{ key?: string; label?: string; callout?: string }>();
-  const { loading, isAuthenticated, canVet, user } = useAuth();
+  const { loading, isAuthenticated, canVet, isAdmin, user } = useAuth();
   const { data: herd } = useResource(getHerd, animalsFallback);
 
   const animal: Animal | undefined = useMemo(() => {
@@ -190,6 +191,15 @@ export default function NewScorecard() {
       if (pregApplies && inCalf && calvingDue) {
         void addLocalEvent({ title: `Expected calving: ${animalLabel}`, date: calvingDue, type: 'vet_visit' });
       }
+
+      // Register the locked scorecard in the classified documents module.
+      void addDocument({
+        kind: 'scorecard',
+        title: `Scorecard — ${animalLabel}`,
+        subject: visitType,
+        ownerRole: isAdmin ? 'admin' : 'vet',
+        ownerId: user?.id ?? null,
+      });
 
       notify('Scorecard saved & locked');
       if (callout) router.back();

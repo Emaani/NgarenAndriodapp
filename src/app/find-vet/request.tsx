@@ -16,36 +16,26 @@ import { AppText, Button, GradientHeader, Icon, PhotoField, PickerField, Screen,
 
 const URGENCY = ['Routine', 'Emergency'] as const;
 // SLA per priority tier (Sep 3 2026 standup): routine sits up to 48h before
-// escalation; emergency has a 4h response window. The records-access buffer
-// defaults from the tier so it matches the appointment window.
-const SLA: Record<(typeof URGENCY)[number], { responseHrs: number; defaultAccess: number; note: string }> = {
-  Routine: { responseHrs: 48, defaultAccess: 24, note: 'Response within 48 hours' },
-  Emergency: { responseHrs: 4, defaultAccess: 4, note: 'Response within 4 hours' },
+// escalation; emergency has a 4h response window.
+const SLA: Record<(typeof URGENCY)[number], { responseHrs: number; note: string }> = {
+  Routine: { responseHrs: 48, note: 'Response within 48 hours' },
+  Emergency: { responseHrs: 4, note: 'Response within 4 hours' },
 };
 const MODES: { key: AppointmentMode; label: string; icon: 'map-marker-check-outline' | 'video-outline' | 'account-switch-outline' }[] = [
   { key: 'onsite', label: 'On-site', icon: 'map-marker-check-outline' },
   { key: 'video', label: 'Video', icon: 'video-outline' },
   { key: 'hybrid', label: 'Hybrid', icon: 'account-switch-outline' },
 ];
-// Access = appointment + buffer. Keeps a vet from having perpetual access to
-// farm data: access lapses after the window.
-const ACCESS_BUFFERS = [
-  { hours: 4, label: 'Within 4 hours' },
-  { hours: 24, label: 'Within 24 hours' },
-];
 
-// Animal-access scope for the visit (Sep 5 2026 standup): the farmer decides
-// which animals the vet may access during the appointment window.
-type AccessScope = 'this-animal' | 'all-animals';
-const ACCESS_SCOPES: { key: AccessScope; label: string; icon: 'cow' | 'cow-off' | 'select-group' }[] = [
-  { key: 'this-animal', label: 'This animal only', icon: 'cow' },
-  { key: 'all-animals', label: 'All my animals', icon: 'select-group' },
-];
+// Specific booking time slots (Sep 12 2026): the appointment takes a slot, not
+// the whole day, and access is driven by the calendar slot (no preset buffers).
+const TIME_SLOTS = ['08:00–10:00', '10:00–12:00', '12:00–14:00', '14:00–16:00', '16:00–18:00'];
 
 export default function RequestCallout() {
   const router = useRouter();
-  const { vetId, date } = useLocalSearchParams<{ vetId?: string; date?: string }>();
+  const { vetId, date, emergency } = useLocalSearchParams<{ vetId?: string; date?: string; emergency?: string }>();
   const vet = vetId ? vets.find((v) => v.id === Number(vetId)) : undefined;
+  const isEmergency = emergency === '1';
   const { isAdmin } = useAuth();
   const { data: animals } = useResource(getHerd, animalsFallback);
   // Admins can book on a farmer's behalf (Sep 3 2026 standup).
@@ -53,12 +43,16 @@ export default function RequestCallout() {
 
   const [onBehalfFarmerId, setOnBehalfFarmerId] = useState('');
   const [animal, setAnimal] = useState<Animal | null>(null);
-  const [urgency, setUrgency] = useState<(typeof URGENCY)[number]>('Routine');
+  const [urgency, setUrgency] = useState<(typeof URGENCY)[number]>(emergency === '1' ? 'Emergency' : 'Routine');
   const [mode, setMode] = useState<AppointmentMode>('onsite');
   const [notes, setNotes] = useState('');
   const [photo, setPhoto] = useState<string | null>(null);
-  const [accessHours, setAccessHours] = useState(24);
-  const [accessScope, setAccessScope] = useState<AccessScope>('this-animal');
+  // Multi-animal booking permission (Sep 12 2026): grant access to all animals,
+  // or pick specific ones. Clinical work is still recorded per-animal later.
+  const [allAnimals, setAllAnimals] = useState(false);
+  const [permittedIds, setPermittedIds] = useState<number[]>([]);
+  // Chosen time slot within the selected day (Sep 12 2026).
+  const [slot, setSlot] = useState('');
   // Onboarding simplification (Sep 7 2026): a farmer may book without first
   // registering the animal — the vet registers it during the service visit.
   const [noAnimalYet, setNoAnimalYet] = useState(false);
@@ -96,40 +90,54 @@ export default function RequestCallout() {
       })),
     [bookableAnimals],
   );
-  const selectAnimal = (v: string) => setAnimal(bookableAnimals.find((a) => String(a.id) === v) ?? null);
+  const selectAnimal = (v: string) => {
+    const a = bookableAnimals.find((x) => String(x.id) === v) ?? null;
+    setAnimal(a);
+    // The visit's primary animal is permitted by default.
+    if (a && !permittedIds.includes(a.id)) setPermittedIds((prev) => [...prev, a.id]);
+  };
   const pickFarmer = (v: string) => {
     setOnBehalfFarmerId(v);
     setAnimal(null); // re-scope the animal list to the chosen farmer
+    setPermittedIds([]);
   };
+  const togglePermitted = (id: number) =>
+    setPermittedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
-  // Picking a priority sets the matching records-access window from its SLA.
-  const pickUrgency = (u: (typeof URGENCY)[number]) => {
-    setUrgency(u);
-    setAccessHours(SLA[u].defaultAccess);
-  };
+  const pickUrgency = (u: (typeof URGENCY)[number]) => setUrgency(u);
+
+  // Labels of animals the vet will be permitted to access.
+  const permittedLabels = allAnimals
+    ? bookableAnimals.map((a) => a.name ?? a.tag)
+    : bookableAnimals.filter((a) => permittedIds.includes(a.id)).map((a) => a.name ?? a.tag);
+
+  const permissionOk = noAnimalYet || allAnimals || permittedIds.length > 0;
+  const slotOk = !scheduledFor || !!slot;
+  const canSubmit = (!!animal || noAnimalYet) && tcsAccepted && permissionOk && slotOk;
 
   const onSubmit = async () => {
-    if ((!animal && !noAnimalYet) || !tcsAccepted || submitting) return;
+    if (!canSubmit || submitting) return;
     setSubmitting(true);
     try {
       const onBehalfNote = onBehalfFarmerName ? `[On behalf of ${onBehalfFarmerName}] ` : '';
       const scopeNote = noAnimalYet
         ? '[New animal — vet to register on-site] '
-        : accessScope === 'all-animals'
+        : allAnimals
           ? '[Access: all animals] '
-          : '[Access: booked animal only] ';
+          : `[Access: ${permittedLabels.length || 1} animal${permittedLabels.length === 1 ? '' : 's'}] `;
+      const slotNote = scheduledFor && slot ? `[Slot: ${formatDate(scheduledFor)} ${slot}] ` : '';
       await submitCalloutRequest({
         vetId: vet?.id,
         animal: animalLabel,
         locationName: locationName || 'Farm',
         urgency: urgency as CalloutUrgency,
-        notes: `${onBehalfNote}${scopeNote}${notes}`.trim() || undefined,
+        notes: `${onBehalfNote}${scopeNote}${slotNote}${notes}`.trim() || undefined,
         mode,
         photo: photo || undefined,
-        accessBufferHours: accessHours,
         scheduledFor,
-        accessScope: noAnimalYet ? undefined : accessScope,
-        accessAnimals: !noAnimalYet && accessScope === 'this-animal' && animalLabel ? [animalLabel] : undefined,
+        scheduledSlot: slot || undefined,
+        accessScope: noAnimalYet ? undefined : allAnimals ? 'all-animals' : 'selected',
+        accessAnimals: !noAnimalYet && !allAnimals ? permittedLabels : undefined,
       });
       notify(`Vet request sent for ${animalLabel}`);
       // A real on-device notification so the farmer has a durable record + proof
@@ -148,8 +156,16 @@ export default function RequestCallout() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Request a Vet" subtitle={vet ? vet.name : 'A nearby vet will be matched'} showBack />
+      <GradientHeader title={isEmergency ? 'Emergency call-out' : 'Request a Vet'} subtitle={vet ? vet.name : isEmergency ? 'Available vets will be alerted now' : 'A nearby vet will be matched'} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
+        {isEmergency ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.errorTint, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.error }}>
+            <Icon name="alarm-light-outline" size={20} color={colors.error} />
+            <AppText variant="caption" color={colors.error} style={{ flex: 1, fontWeight: '600' }}>
+              Emergency request — we’ll alert available vets near you immediately. No time slot needed.
+            </AppText>
+          </View>
+        ) : null}
         {vet && (
           <View
             style={[
@@ -192,6 +208,30 @@ export default function RequestCallout() {
               </AppText>
             </View>
           </View>
+        ) : null}
+
+        {/* Specific time slot (Sep 12 2026) — books a slot, not the whole day. */}
+        {scheduledFor ? (
+          <>
+            <AppText variant="body" style={{ fontWeight: '600', marginBottom: spacing.xs }}>
+              Time slot *
+            </AppText>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.md }}>
+              {TIME_SLOTS.map((s) => {
+                const active = slot === s;
+                return (
+                  <Pressable
+                    key={s}
+                    onPress={() => setSlot(s)}
+                    style={{ paddingHorizontal: spacing.mdMinus, paddingVertical: spacing.xs, borderRadius: radius.full, backgroundColor: active ? colors.primary : colors.surface, borderWidth: 1, borderColor: active ? colors.primary : colors.divider }}>
+                    <AppText variant="caption" color={active ? '#fff' : colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
+                      {s}
+                    </AppText>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </>
         ) : null}
 
         {/* Admin-only: book on behalf of a farmer. */}
@@ -291,50 +331,52 @@ export default function RequestCallout() {
         {/* Symptom photo — live capture only (authenticity). */}
         <PhotoField label="Live photo (optional)" value={photo} onChange={setPhoto} liveOnly />
 
-        {/* Animal-specific permission (Sep 5 2026): which animals the vet may
-            access during this visit. Not shown when no animal is registered yet. */}
+        {/* Multi-animal permission (Sep 12 2026): grant the vet access to all
+            animals, or pick specific ones. Clinical work stays per-animal. */}
         {!noAnimalYet ? (
         <>
         <AppText variant="body" style={{ fontWeight: '600', marginBottom: spacing.xs }}>
           Animals the vet may access
         </AppText>
         <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>
-          Limit the visit to the booked animal, or grant access to your whole herd for this appointment.
+          Grant access for this visit’s window only. Pick specific animals, or all your animals. The vet records each intervention per animal on-site.
         </AppText>
-        <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
-          {ACCESS_SCOPES.map((sc) => {
-            const active = accessScope === sc.key;
-            return (
-              <Pressable
-                key={sc.key}
-                onPress={() => setAccessScope(sc.key)}
-                style={{ flex: 1, alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.sm, borderRadius: radius.md, backgroundColor: active ? colors.primary : colors.surface, borderWidth: 1, borderColor: active ? colors.primary : colors.divider }}>
-                <Icon name={sc.icon} size={20} color={active ? '#fff' : colors.onSurfaceVariant} />
-                <AppText variant="caption" color={active ? '#fff' : colors.onSurfaceVariant} style={{ fontWeight: '600', textAlign: 'center' }}>
-                  {sc.label}
-                </AppText>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        {/* Time-limited access window */}
-        <AppText variant="body" style={{ fontWeight: '600', marginBottom: spacing.xs }}>
-          Access time window
-        </AppText>
-        <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>
-          The vet can view the {accessScope === 'all-animals' ? 'herd’s' : 'animal’s'} health records for the appointment plus this buffer — access lapses after.
-        </AppText>
-        <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
-          {ACCESS_BUFFERS.map((b) => (
-            <Button
-              key={b.hours}
-              label={b.label}
-              variant={accessHours === b.hours ? 'primary' : 'outline'}
-              onPress={() => setAccessHours(b.hours)}
-              style={{ flex: 1, paddingHorizontal: spacing.sm }}
-            />
-          ))}
+        <Pressable
+          onPress={() => setAllAnimals((v) => !v)}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm, borderRadius: radius.md, backgroundColor: allAnimals ? colors.primary : colors.surface, borderWidth: 1, borderColor: allAnimals ? colors.primary : colors.divider, paddingHorizontal: spacing.md, marginBottom: spacing.sm }}>
+          <Icon name="select-group" size={20} color={allAnimals ? '#fff' : colors.onSurfaceVariant} />
+          <AppText variant="body" color={allAnimals ? '#fff' : colors.onSurface} style={{ fontWeight: '600', flex: 1 }}>
+            All my animals ({bookableAnimals.length})
+          </AppText>
+          {allAnimals ? <Icon name="check" size={18} color="#fff" /> : null}
+        </Pressable>
+        {!allAnimals ? (
+          <View style={{ marginBottom: spacing.md, gap: spacing.xs }}>
+            {bookableAnimals.slice(0, 12).map((a) => {
+              const on = permittedIds.includes(a.id);
+              return (
+                <Pressable
+                  key={a.id}
+                  onPress={() => togglePermitted(a.id)}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs }}>
+                  <Icon name={on ? 'checkbox-marked' : 'checkbox-blank-outline'} size={20} color={on ? colors.primary : colors.onSurfaceVariant} />
+                  <AppText variant="body" color={colors.onSurface} style={{ flex: 1 }}>
+                    {a.accountNumber ?? a.tag}
+                    {a.name ? ` · ${a.name}` : ''}
+                  </AppText>
+                </Pressable>
+              );
+            })}
+            {bookableAnimals.length === 0 ? (
+              <AppText variant="caption" color={colors.onSurfaceVariant}>No registered animals to select.</AppText>
+            ) : null}
+          </View>
+        ) : null}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.md }}>
+          <Icon name="calendar-clock" size={15} color={colors.onSurfaceVariant} />
+          <AppText variant="caption" color={colors.onSurfaceVariant}>
+            Access lapses automatically at the end of the booked time slot.
+          </AppText>
         </View>
         </>
         ) : (
@@ -352,14 +394,14 @@ export default function RequestCallout() {
           <AppText variant="body" color={colors.onSurface} style={{ flex: 1 }}>
             {noAnimalYet
               ? 'I accept the booking & managed-health terms & conditions, and consent to the vet registering my animal and recording its health data during this visit.'
-              : `I accept the booking & managed-health terms & conditions, and consent to ${accessScope === 'all-animals' ? 'all my animals’' : 'the booked animal’s'} records being accessible to the vet for this appointment window only.`}
+              : `I accept the booking & managed-health terms & conditions, and consent to ${allAnimals ? 'all my animals’' : 'the selected animals’'} records being accessible to the vet for the booked time slot only.`}
           </AppText>
         </Pressable>
 
         <Button
           label={submitting ? 'Submitting…' : 'Submit Request'}
           onPress={onSubmit}
-          disabled={(!animal && !noAnimalYet) || !tcsAccepted || submitting}
+          disabled={!canSubmit || submitting}
         />
       </Screen>
     </View>

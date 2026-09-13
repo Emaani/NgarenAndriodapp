@@ -184,6 +184,9 @@ export default function VetDashboard() {
         showBack
         right={
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+            <Pressable onPress={() => router.push('/calendar' as never)} hitSlop={8} accessibilityLabel="Calendar">
+              <Icon name="calendar-month-outline" size={24} color="#fff" />
+            </Pressable>
             <Pressable onPress={() => router.push('/vet-reports' as never)} hitSlop={8} accessibilityLabel="Reports">
               <Icon name="file-chart-outline" size={24} color="#fff" />
             </Pressable>

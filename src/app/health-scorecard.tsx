@@ -7,6 +7,7 @@ import { getHerd } from '@/data/herd';
 import { getLocalHealthRecords, HEALTH_TYPE_LABELS } from '@/data/localHealth';
 import { getVetVisits } from '@/data/vetVisits';
 import { getScorecards, STATUS_LABEL } from '@/data/scorecards';
+import { addDocument } from '@/data/documents';
 import { getCeresBehaviour } from '@/data/ceresBehaviour';
 import { healthScoreCardHtml, healthScoreCardSummary, healthScoreCardText } from '@/data/vetReports';
 import { logReportExport } from '@/data/reportAudit';
@@ -68,7 +69,7 @@ function Stat({ value, label, tint }: { value: number; label: string; tint: stri
 export default function HealthScoreCard() {
   const router = useRouter();
   const { id, key } = useLocalSearchParams<{ id?: string; key?: string; label?: string }>();
-  const { loading, isAuthenticated, canVet, user } = useAuth();
+  const { loading, isAuthenticated, canVet, isAdmin, user } = useAuth();
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -197,8 +198,8 @@ export default function HealthScoreCard() {
   });
   const fileBase = () => (animal.accountNumber ?? animal.ngarenCode ?? animal.tag).replace(/[^A-Za-z0-9._-]/g, '');
 
-  const logGeneration = (format: string, ok: boolean) =>
-    logReportExport({
+  const logGeneration = async (format: string, ok: boolean) => {
+    await logReportExport({
       report: `Health Score Card (${format})`,
       subject: `${animal.accountNumber ?? animal.tag}${animal.name ? ` (${animal.name})` : ''}`,
       rows: health.length + visits.length,
@@ -206,6 +207,17 @@ export default function HealthScoreCard() {
       actorId: user?.id,
       shared: ok,
     });
+    // Register in the classified documents module when actually shared.
+    if (ok) {
+      void addDocument({
+        kind: 'scorecard',
+        title: `Health Score Card — ${animal.name ?? animal.tag} (${format})`,
+        subject: animal.accountNumber ?? animal.tag,
+        ownerRole: isAdmin ? 'admin' : 'vet',
+        ownerId: user?.id ?? null,
+      });
+    }
+  };
 
   // Primary: brand-styled PDF (Sep 5 2026 standup).
   const onGeneratePdf = async () => {

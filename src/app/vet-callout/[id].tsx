@@ -36,7 +36,10 @@ export default function VetCallout() {
 
   const req: CalloutRequest | undefined = requests.find((r) => r.id === Number(id));
   const [status, setStatus] = useState<CalloutStatus | null>(null);
-  const [presencePhoto, setPresencePhoto] = useState<string | null>(null);
+  // Per-task on-site activation (Sep 12 2026): each service task is activated
+  // individually with a live Face-ID check before it can be opened.
+  const [activated, setActivated] = useState<Record<string, string>>({});
+  const [activeCapture, setActiveCapture] = useState<string | null>(null);
 
   if (loading) return null;
   if (!isAuthenticated) return <Redirect href="/login" />;
@@ -56,6 +59,15 @@ export default function VetCallout() {
   // Reveal-on-accept: farmer identity & exact location stay hidden until the
   // vet accepts (Sep 5 2026 anonymized vet view).
   const revealed = current !== 'pending';
+
+  // On-site tasks the vet can activate individually (Sep 12 2026). The Visit
+  // Scorecard is the comprehensive record; the others jump to focused screens.
+  const TASKS: { key: string; label: string; icon: IconName; route: string }[] = req
+    ? [
+        { key: 'scorecard', label: 'Visit Scorecard', icon: 'clipboard-plus-outline', route: `/vet-scorecard/new?key=${encodeURIComponent(req.animal)}&label=${encodeURIComponent(req.animal)}&callout=${req.id}` },
+        ...SERVICES.map((s) => ({ key: s.key, label: s.label, icon: s.icon, route: s.route(req.animal) })),
+      ]
+    : [];
 
   const setAndSync = (next: CalloutStatus, toast: string) => {
     setStatus(next);
@@ -127,59 +139,72 @@ export default function VetCallout() {
         {current === 'accepted' ? (
           <>
             <AppText variant="title" style={{ marginBottom: spacing.xs }}>
-              On-site services
+              On-site service activation
             </AppText>
-            {/* Presence verification gate (facial-recognition placeholder): a live
-                photo proves the vet is on-site before service actions unlock. */}
-            {!presencePhoto ? (
-              <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.divider, gap: spacing.xs }, shadow[1]]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                  <Icon name="face-recognition" size={20} color={colors.primary} />
-                  <AppText variant="body" style={{ fontWeight: '700', flex: 1 }}>
-                    Verify presence to unlock services
-                  </AppText>
-                </View>
-                <AppText variant="caption" color={colors.onSurfaceVariant}>
-                  Take a live photo on the farm — this proves you’re on-site and stamps the service for accountability.
-                </AppText>
-                <PhotoField label="Live presence check" value={presencePhoto} onChange={setPresencePhoto} liveOnly />
-              </View>
-            ) : (
-              <>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm }}>
-                  <Icon name="check-decagram" size={18} color={colors.success} />
-                  <AppText variant="caption" color={colors.success} style={{ fontWeight: '600' }}>
-                    Presence verified — services unlocked
-                  </AppText>
-                </View>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg }}>
-                  {SERVICES.map((s) => (
-                    <Button
-                      key={s.key}
-                      label={s.label}
-                      icon={s.icon}
-                      variant="outline"
-                      onPress={() => router.push(s.route(req.animal) as never)}
-                      style={{ flexGrow: 1, flexBasis: '47%' }}
-                    />
-                  ))}
-                </View>
-                <Button
-                  label="New Visit Scorecard"
-                  icon="clipboard-plus-outline"
-                  onPress={() => router.push(`/vet-scorecard/new?key=${encodeURIComponent(req.animal)}&label=${encodeURIComponent(req.animal)}&callout=${req.id}` as never)}
-                  style={{ marginBottom: spacing.sm }}
-                />
-                <Button
-                  label="Open Health Score Card"
-                  icon="file-document-outline"
-                  variant="outline"
-                  onPress={() => router.push(`/health-scorecard?key=${encodeURIComponent(req.animal)}&label=${encodeURIComponent(req.animal)}` as never)}
-                  style={{ marginBottom: spacing.sm }}
-                />
-                <Button label="Complete visit" icon="check-decagram-outline" onPress={() => setAndSync('completed', 'Visit completed')} />
-              </>
-            )}
+            {/* 45-minute activation window from the scheduled time (Sep 12 2026). */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.primaryTint, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md }}>
+              <Icon name="clock-alert-outline" size={18} color={colors.primary} />
+              <AppText variant="caption" color={colors.primary} style={{ flex: 1, fontWeight: '600' }}>
+                Activate each task on-site within 45 minutes of the scheduled time. Each task needs a live Face-ID check for accountability.
+              </AppText>
+            </View>
+
+            <View style={{ gap: spacing.sm, marginBottom: spacing.lg }}>
+              {TASKS.map((t) => {
+                const isActive = !!activated[t.key];
+                const capturing = activeCapture === t.key;
+                return (
+                  <View key={t.key} style={[{ backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: isActive ? colors.success : colors.divider, gap: spacing.sm }, shadow[1]]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                      <View style={{ width: 34, height: 34, borderRadius: radius.full, backgroundColor: isActive ? colors.successTint : colors.primaryTint, alignItems: 'center', justifyContent: 'center' }}>
+                        <Icon name={t.icon} size={18} color={isActive ? colors.success : colors.primary} />
+                      </View>
+                      <AppText variant="bodyLarge" style={{ fontWeight: '700', flex: 1 }}>
+                        {t.label}
+                      </AppText>
+                      {isActive ? <Icon name="check-decagram" size={20} color={colors.success} /> : <Icon name="face-recognition" size={20} color={colors.onSurfaceVariant} />}
+                    </View>
+
+                    {isActive ? (
+                      <Button label={`Open ${t.label}`} icon={t.icon} onPress={() => router.push(t.route as never)} />
+                    ) : capturing ? (
+                      <>
+                        <AppText variant="caption" color={colors.onSurfaceVariant}>
+                          Take a live Face-ID photo on the farm to activate this task.
+                        </AppText>
+                        <PhotoField
+                          label="Face ID"
+                          value={null}
+                          onChange={(uri) => {
+                            if (uri) {
+                              setActivated((prev) => ({ ...prev, [t.key]: uri }));
+                              setActiveCapture(null);
+                              notify(`${t.label} activated`);
+                            }
+                          }}
+                          liveOnly
+                        />
+                        <Button label="Cancel" variant="outline" onPress={() => setActiveCapture(null)} />
+                      </>
+                    ) : (
+                      <Button label="Activate with Face ID" icon="face-recognition" variant="outline" onPress={() => setActiveCapture(t.key)} />
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+
+            <Button
+              label="Complete visit"
+              icon="check-decagram-outline"
+              disabled={Object.keys(activated).length === 0}
+              onPress={() => setAndSync('completed', 'Visit completed')}
+            />
+            {Object.keys(activated).length === 0 ? (
+              <AppText variant="caption" color={colors.onSurfaceVariant} style={{ textAlign: 'center', marginTop: spacing.xs }}>
+                Activate at least one task on-site before completing.
+              </AppText>
+            ) : null}
           </>
         ) : null}
 

@@ -611,11 +611,12 @@ export interface CalloutRequestPayload {
   accessBufferHours?: number;
   /** Chosen calendar slot (ISO date) when booking a preferred vet (Sep 5 2026). */
   scheduledFor?: string;
+  /** Specific time slot within the day, e.g. "08:00–10:00" (Sep 12 2026). */
+  scheduledSlot?: string;
   /**
-   * What the vet may access during the visit window (Sep 5 2026 standup —
-   * time-bound + animal-specific permissions). 'this-animal' limits access to
-   * the booked animal; 'all-animals' grants the whole herd; 'selected' limits
-   * to `accessAnimals`.
+   * What the vet may access during the visit window (Sep 5/12 2026 standups —
+   * time-bound + animal-specific permissions). 'all-animals' grants the whole
+   * herd; 'selected' limits to `accessAnimals` (one or more).
    */
   accessScope?: 'this-animal' | 'all-animals' | 'selected';
   /** Animal labels the vet may access when scope is 'selected'. */

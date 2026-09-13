@@ -6,6 +6,7 @@ import { calloutRequests as calloutFallback } from '@/data/mock';
 import { getCalloutRequests } from '@/data/api';
 import { getMyVetImpact } from '@/data/vetProfiles';
 import { getReportAudit, logReportExport, ReportAuditEntry } from '@/data/reportAudit';
+import { addDocument } from '@/data/documents';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { toCsv, exportCsv, exportPdf } from '@/lib/export';
@@ -38,7 +39,7 @@ interface ReportDef {
 
 export default function VetReports() {
   const router = useRouter();
-  const { loading, isAuthenticated, canVet, user } = useAuth();
+  const { loading, isAuthenticated, canVet, isAdmin, user } = useAuth();
   const { data: impact } = useResource(getMyVetImpact, EMPTY_IMPACT);
   const { data: callouts } = useResource(() => getCalloutRequests(), calloutFallback);
   const { data: audit, reload: reloadAudit } = useResource(getReportAudit, []);
@@ -137,6 +138,15 @@ export default function VetReports() {
         actorId: user?.id,
         shared: ok,
       });
+      if (ok) {
+        void addDocument({
+          kind: 'report',
+          title: `${r.name} (${format.toUpperCase()})`,
+          subject: `${r.rows.length} rows`,
+          ownerRole: isAdmin ? 'admin' : 'vet',
+          ownerId: user?.id ?? null,
+        });
+      }
       reloadAudit();
       if (!ok) Alert.alert('Sharing unavailable', 'Could not open the share sheet on this device.');
       else notify(`${r.name} exported`);
@@ -168,6 +178,25 @@ export default function VetReports() {
             </AppText>
           </View>
           <Icon name="chevron-right" size={22} color="#fff" />
+        </Pressable>
+
+        {/* Classified documents module (Sep 12 2026). */}
+        <Pressable
+          onPress={() => router.push('/documents' as never)}
+          style={({ pressed }) => [
+            { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.divider, opacity: pressed ? 0.92 : 1 },
+            shadow[1],
+          ]}>
+          <IconChip icon="folder-multiple-outline" />
+          <View style={{ flex: 1 }}>
+            <AppText variant="bodyLarge" style={{ fontWeight: '700' }}>
+              Documents
+            </AppText>
+            <AppText variant="caption" color={colors.onSurfaceVariant}>
+              Generated scorecards & reports — auto-deleted after 30 days.
+            </AppText>
+          </View>
+          <Icon name="chevron-right" size={22} color={colors.onSurfaceVariant} />
         </Pressable>
 
         <AppText variant="title" style={{ marginBottom: spacing.xs }}>
