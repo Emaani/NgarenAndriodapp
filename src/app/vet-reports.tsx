@@ -174,7 +174,7 @@ export default function VetReports() {
               Health Score Card
             </AppText>
             <AppText variant="caption" color="rgba(255,255,255,0.9)">
-              Pick an animal to generate its full record — branded PDF, the source of truth.
+              Pick an animal to generate its full record — a branded PDF.
             </AppText>
           </View>
           <Icon name="chevron-right" size={22} color="#fff" />

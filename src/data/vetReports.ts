@@ -93,7 +93,7 @@ export function healthScoreCardText(input: HealthScoreCardInput): string {
   const s = healthScoreCardSummary(health);
   const L: string[] = [];
   L.push('NGAREN — ANIMAL HEALTH SCORE CARD');
-  L.push('The source of truth for this animal’s data.');
+  L.push('Complete health record for this animal.');
   L.push(`Generated: ${formatDateTime(new Date().toISOString())} by ${generatedBy}`);
   L.push('');
   L.push('— IDENTITY —');
@@ -217,7 +217,7 @@ export function healthScoreCardHtml(input: HealthScoreCardInput): string {
 
   return brandedHtml({
     title: 'Animal Health Score Card',
-    subtitle: `${animal.accountNumber ?? animal.tag}${animal.name ? ` · ${animal.name}` : ''} — the source of truth · by ${generatedBy}`,
+    subtitle: `${animal.accountNumber ?? animal.tag}${animal.name ? ` · ${animal.name}` : ''} · by ${generatedBy}`,
     body: stats + identity + devices + history + visitsTable + telemetry + summary,
   });
 }

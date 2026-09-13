@@ -269,7 +269,7 @@ export default function HealthScoreCard() {
       <GradientHeader title="Health Score Card" subtitle={animal.accountNumber ?? animal.name ?? animal.tag} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md, paddingBottom: spacing.xxl }}>
         <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.md }}>
-          The source of truth for this animal’s data — identity, devices, full health history, visits and telemetry.
+          This animal’s complete record — identity, devices, full health history, visits and telemetry.
         </AppText>
 
         {/* Current status (from the latest Visit Scorecard). */}
