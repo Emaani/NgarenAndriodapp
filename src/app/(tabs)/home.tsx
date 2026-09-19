@@ -59,6 +59,7 @@ const ADMIN_ACTIONS: Action[] = [
   { icon: 'shield-check-outline', label: 'Linkage Health', route: '/linkage-health', tint: '#0891B2' },
   { icon: 'cloud-alert', label: 'Alert History', route: '/alerts', tint: '#EF4444' },
   { icon: 'heart-pulse', label: 'Managed Health', route: '/health', tint: '#DC2626' },
+  { icon: 'radar', label: 'Disease Surveillance', route: '/surveillance', tint: '#0D9488' },
   { icon: 'calendar-month-outline', label: 'Calendar', route: '/calendar', tint: '#0EA5E9' },
   { icon: 'account-group-outline', label: 'Team & Users', route: '/users', tint: '#0284C7' },
   { icon: 'clipboard-pulse-outline', label: 'Vet Call-outs', route: '/vet', tint: '#F59E0B' },
