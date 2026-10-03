@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+import * as Location from 'expo-location';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { calloutRequests as calloutFallback } from '@/data/mock';
 import { getCalloutRequests, updateCalloutStatus } from '@/data/api';
@@ -10,6 +11,20 @@ import { notify } from '@/lib/toast';
 import { sendLocalNotification } from '@/services/push';
 import { CalloutRequest, CalloutStatus } from '@/data/types';
 import { ActionChip, AppText, Button, DetailRow, EmptyState, GradientHeader, Icon, IconName, PhotoField, Screen } from '@/ui';
+
+/** An on-site task activation: live photo + best-effort GPS + timestamp. */
+interface TaskStamp {
+  photo: string;
+  at: string;
+  lat?: number;
+  lng?: number;
+}
+
+/** Short HH:MM from an ISO string (Hermes-safe, no Intl). */
+function hhmm(iso: string): string {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
 
 const statusVariant = (s: CalloutStatus) =>
   s === 'accepted' ? 'success' : s === 'completed' ? 'info' : s === 'declined' ? 'error' : 'warning';
@@ -37,9 +52,26 @@ export default function VetCallout() {
   const req: CalloutRequest | undefined = requests.find((r) => r.id === Number(id));
   const [status, setStatus] = useState<CalloutStatus | null>(null);
   // Per-task on-site activation (Sep 12 2026): each service task is activated
-  // individually with a live Face-ID check before it can be opened.
-  const [activated, setActivated] = useState<Record<string, string>>({});
+  // individually with a live Face-ID photo, stamped with GPS location + time so
+  // the on-site check is genuinely accountable (not just a photo).
+  const [activated, setActivated] = useState<Record<string, TaskStamp>>({});
   const [activeCapture, setActiveCapture] = useState<string | null>(null);
+
+  // Capture a live photo + best-effort GPS + timestamp as the activation stamp.
+  const activateTask = async (key: string, label: string, photo: string) => {
+    const at = new Date().toISOString();
+    setActivated((prev) => ({ ...prev, [key]: { photo, at } }));
+    setActiveCapture(null);
+    notify(`${label} activated`);
+    try {
+      const perm = await Location.requestForegroundPermissionsAsync();
+      if (!perm.granted) return;
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      setActivated((prev) => ({ ...prev, [key]: { ...(prev[key] ?? { photo, at }), lat: pos.coords.latitude, lng: pos.coords.longitude } }));
+    } catch {
+      // GPS best-effort — the photo + time still stand.
+    }
+  };
 
   if (loading) return null;
   if (!isAuthenticated) return <Redirect href="/login" />;
@@ -55,7 +87,6 @@ export default function VetCallout() {
   }
 
   const current = status ?? req.status;
-  const accessHours = req.urgency === 'Emergency' ? 4 : 24;
   // Reveal-on-accept: farmer identity & exact location stay hidden until the
   // vet accepts (Sep 5 2026 anonymized vet view).
   const revealed = current !== 'pending';
@@ -111,11 +142,12 @@ export default function VetCallout() {
           {req.notes ? <DetailRow label="Notes" value={req.notes} last /> : null}
         </View>
 
-        {/* Time-limited access */}
+        {/* Accountability through the deliverable, not a hard clock (Oct 2026
+            standup — strict time limits removed for MVP1). */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.primaryTint, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.lg }}>
-          <Icon name="lock-clock" size={18} color={colors.primary} />
+          <Icon name="shield-check-outline" size={18} color={colors.primary} />
           <AppText variant="caption" color={colors.primary} style={{ flex: 1, fontWeight: '600' }}>
-            Records access is limited to this appointment window + {accessHours}h. It lapses automatically afterwards.
+            Take the time you need on-site — field conditions vary. Accountability comes from the scorecard you submit and your stamped on-site check, not a countdown.
           </AppText>
         </View>
 
@@ -145,7 +177,7 @@ export default function VetCallout() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.primaryTint, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md }}>
               <Icon name="clock-alert-outline" size={18} color={colors.primary} />
               <AppText variant="caption" color={colors.primary} style={{ flex: 1, fontWeight: '600' }}>
-                Activate each task on-site within 45 minutes of the scheduled time. Each task needs a live Face-ID check for accountability.
+                Activate each task when you arrive on the farm. Each activation takes a live Face ID photo, stamped with your GPS location & time for accountability — no strict time limit.
               </AppText>
             </View>
 
@@ -166,21 +198,28 @@ export default function VetCallout() {
                     </View>
 
                     {isActive ? (
-                      <Button label={`Open ${t.label}`} icon={t.icon} onPress={() => router.push(t.route as never)} />
+                      <>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                          <Icon name="map-marker-check-outline" size={13} color={colors.success} />
+                          <AppText variant="caption" color={colors.success} style={{ fontWeight: '600' }}>
+                            Verified {hhmm(activated[t.key].at)}
+                            {activated[t.key].lat != null
+                              ? ` · GPS ${activated[t.key].lat!.toFixed(4)}, ${activated[t.key].lng!.toFixed(4)}`
+                              : ' · location unavailable'}
+                          </AppText>
+                        </View>
+                        <Button label={`Open ${t.label}`} icon={t.icon} onPress={() => router.push(t.route as never)} />
+                      </>
                     ) : capturing ? (
                       <>
                         <AppText variant="caption" color={colors.onSurfaceVariant}>
-                          Take a live Face-ID photo on the farm to activate this task.
+                          Take a live Face ID photo on the farm — it’s stamped with your GPS location & time.
                         </AppText>
                         <PhotoField
                           label="Face ID"
                           value={null}
                           onChange={(uri) => {
-                            if (uri) {
-                              setActivated((prev) => ({ ...prev, [t.key]: uri }));
-                              setActiveCapture(null);
-                              notify(`${t.label} activated`);
-                            }
+                            if (uri) void activateTask(t.key, t.label, uri);
                           }}
                           liveOnly
                         />
@@ -193,6 +232,17 @@ export default function VetCallout() {
                 );
               })}
             </View>
+
+            {/* Unregistered-animal capture (Oct 2026 standup): the vet can
+                register an animal found on-site; it goes for admin + farmer
+                approval before its records are finalized. */}
+            <Button
+              label="Register a new animal"
+              icon="plus-circle-outline"
+              variant="outline"
+              onPress={() => router.push('/register-animal' as never)}
+              style={{ marginBottom: spacing.sm }}
+            />
 
             <Button
               label="Complete visit"

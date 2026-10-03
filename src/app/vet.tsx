@@ -7,7 +7,7 @@ import { getCalloutRequests, updateCalloutStatus } from '@/data/api';
 import { getMyVetImpact } from '@/data/vetProfiles';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
-import { ActionChip, AppText, Button, GradientHeader, Icon, IconChip, Screen, SyncStatus, VetImpactDashboard, VetSchedule } from '@/ui';
+import { ActionChip, AppText, Button, GradientHeader, Icon, IconChip, IconName, Screen, SyncStatus, VetImpactDashboard, VetSchedule } from '@/ui';
 
 const EMPTY_IMPACT: VetImpact = {
   totalVisits: 0,
@@ -23,6 +23,15 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: 'pending', label: 'Pending' },
   { key: 'accepted', label: 'Accepted' },
   { key: 'all', label: 'All' },
+];
+
+// Vet-side quick actions (Oct 2026 standup): register an (unregistered) animal,
+// start a scorecard, and the core service entry points.
+const QUICK_ACTIONS: { label: string; icon: IconName; route: string; tint: string }[] = [
+  { label: 'Register Animal', icon: 'plus-circle-outline', route: '/register-animal', tint: '#6D874F' },
+  { label: 'New Scorecard', icon: 'clipboard-plus-outline', route: '/health-scorecard', tint: '#2563EB' },
+  { label: 'Stock-take', icon: 'clipboard-list-outline', route: '/stock-take', tint: '#F59E0B' },
+  { label: 'Log a Visit', icon: 'clipboard-edit-outline', route: '/log-visit', tint: '#16A34A' },
 ];
 
 const urgencyVariant = (u: CalloutUrgency) =>
@@ -214,6 +223,30 @@ export default function VetDashboard() {
         {/* Offline sync status — scorecards & photos reaching the backend. */}
         <View style={{ marginBottom: spacing.md }}>
           <SyncStatus />
+        </View>
+
+        {/* Quick actions (Oct 2026 standup): animal registration + service entry
+            points on the vet side, with clear navigation. */}
+        <AppText variant="title" style={{ marginBottom: spacing.sm }}>
+          Quick actions
+        </AppText>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg }}>
+          {QUICK_ACTIONS.map((a) => (
+            <Pressable
+              key={a.label}
+              onPress={() => router.push(a.route as never)}
+              style={({ pressed }) => [
+                { flexGrow: 1, flexBasis: '47%', flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.divider, opacity: pressed ? 0.9 : 1 },
+                shadow[1],
+              ]}>
+              <View style={{ width: 36, height: 36, borderRadius: radius.full, backgroundColor: a.tint + '1A', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name={a.icon} size={19} color={a.tint} />
+              </View>
+              <AppText variant="body" style={{ fontWeight: '600', flex: 1 }}>
+                {a.label}
+              </AppText>
+            </Pressable>
+          ))}
         </View>
 
         {/* Veterinary impact dashboard — the vet's reach, counted from records. */}

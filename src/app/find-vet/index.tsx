@@ -9,6 +9,7 @@ import { getNearbyRadiusKm, setNearbyRadiusKm, RADIUS_OPTIONS } from '@/data/vet
 import { getCalloutRequests } from '@/data/api';
 import { getUnratedCompleted } from '@/data/vetRatings';
 import { CalloutRequest, Vet } from '@/data/types';
+import { useT } from '@/i18n';
 import { AppText, Button, EmptyState, GradientHeader, Icon, Screen, SearchBar } from '@/ui';
 
 function initials(name: string): string {
@@ -27,7 +28,8 @@ function Tag({ icon, label }: { icon: 'video' | 'cash-multiple'; label: string }
   );
 }
 
-function VetCard({ vet, isPrimary, ctaLabel = 'Request', onOpen, onRequest }: { vet: Vet; isPrimary?: boolean; ctaLabel?: string; onOpen: () => void; onRequest: () => void }) {
+function VetCard({ vet, isPrimary, ctaLabel, onOpen, onRequest }: { vet: Vet; isPrimary?: boolean; ctaLabel?: string; onOpen: () => void; onRequest: () => void }) {
+  const t = useT();
   return (
     <Pressable
       onPress={onOpen}
@@ -64,7 +66,7 @@ function VetCard({ vet, isPrimary, ctaLabel = 'Request', onOpen, onRequest }: { 
               {vet.rating.toFixed(2)}
             </AppText>
             <AppText variant="caption" color={colors.onSurfaceVariant}>
-              · {vet.reviews} reviews
+              · {vet.reviews} {t('common.reviews')}
             </AppText>
           </View>
         </View>
@@ -76,7 +78,7 @@ function VetCard({ vet, isPrimary, ctaLabel = 'Request', onOpen, onRequest }: { 
             </AppText>
           </View>
           <AppText variant="caption" color={vet.available ? colors.success : colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
-            {vet.available ? 'Available' : 'Busy'}
+            {vet.available ? t('common.available') : t('common.busy')}
           </AppText>
         </View>
       </View>
@@ -87,7 +89,7 @@ function VetCard({ vet, isPrimary, ctaLabel = 'Request', onOpen, onRequest }: { 
         <View style={{ flex: 1 }} />
         <Pressable onPress={onRequest} disabled={!vet.available} hitSlop={8} style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.full, backgroundColor: vet.available ? colors.primary : colors.divider }}>
           <AppText variant="body" color={vet.available ? '#fff' : colors.onSurfaceVariant} style={{ fontWeight: '700' }}>
-            {ctaLabel}
+            {ctaLabel ?? t('findVet.request')}
           </AppText>
         </Pressable>
       </View>
@@ -97,6 +99,7 @@ function VetCard({ vet, isPrimary, ctaLabel = 'Request', onOpen, onRequest }: { 
 
 export default function FindVet() {
   const router = useRouter();
+  const t = useT();
   const [query, setQuery] = useState('');
   const [primaryIds, setPrimaryIds] = useState<number[]>([]);
   const [enlisted, setEnlisted] = useState<Vet[]>([]);
@@ -167,9 +170,9 @@ export default function FindVet() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Find a Vet" subtitle={hasPreferred ? 'Your preferred vets, plus top-rated nearby' : `Top-rated vets within ${radiusKm} km`} showBack />
+      <GradientHeader title={t('findVet.title')} subtitle={hasPreferred ? t('findVet.subtitlePreferred') : t('findVet.subtitleTopRated', { km: radiusKm })} showBack />
       <View style={{ padding: spacing.md, paddingBottom: 0 }}>
-        <SearchBar value={query} onChangeText={setQuery} placeholder="Search by name, clinic or specialty..." />
+        <SearchBar value={query} onChangeText={setQuery} placeholder={t('findVet.search')} />
       </View>
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         {/* Emergency workflow (Sep 12 2026): a separate fast path that alerts
@@ -182,10 +185,10 @@ export default function FindVet() {
           <Icon name="alarm-light-outline" size={22} color={colors.error} />
           <View style={{ flex: 1 }}>
             <AppText variant="bodyLarge" style={{ fontWeight: '700' }} color={colors.error}>
-              Emergency call-out
+              {t('findVet.emergency')}
             </AppText>
             <AppText variant="caption" color={colors.error}>
-              Alerts available vets near you right away.
+              {t('findVet.emergencySub')}
             </AppText>
           </View>
           <Icon name="chevron-right" size={20} color={colors.error} />
@@ -197,7 +200,7 @@ export default function FindVet() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
               <Icon name="star-check-outline" size={18} color="#B45309" />
               <AppText variant="body" style={{ fontWeight: '700' }} color="#B45309">
-                Rate your recent {unrated.length === 1 ? 'visit' : 'visits'}
+                {t('findVet.rateRecent', { label: unrated.length === 1 ? t('findVet.visit') : t('findVet.visits') })}
               </AppText>
             </View>
             {unrated.slice(0, 3).map((c) => (
@@ -210,7 +213,7 @@ export default function FindVet() {
                   {c.animal} · {c.farmerName}
                 </AppText>
                 <AppText variant="caption" color={colors.primary} style={{ fontWeight: '700' }}>
-                  Rate ›
+                  {t('common.rate')} ›
                 </AppText>
               </Pressable>
             ))}
@@ -221,7 +224,7 @@ export default function FindVet() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.md, flexWrap: 'wrap' }}>
           <Icon name="map-marker-radius-outline" size={16} color={colors.onSurfaceVariant} />
           <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginRight: spacing.xs }}>
-            Within
+            {t('findVet.within')}
           </AppText>
           {RADIUS_OPTIONS.map((km) => {
             const active = radiusKm === km;
@@ -243,21 +246,21 @@ export default function FindVet() {
           <>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm }}>
               <Icon name="star" size={16} color="#FBBF24" />
-              <AppText variant="title">Your preferred vets</AppText>
+              <AppText variant="title">{t('findVet.preferred')}</AppText>
             </View>
             {preferred.map((v) => (
               <VetCard
                 key={v.id}
                 vet={v}
                 isPrimary
-                ctaLabel="Book"
+                ctaLabel={t('findVet.book')}
                 onOpen={() => router.push(`/find-vet/${v.id}` as never)}
                 onRequest={() => router.push(`/find-vet/${v.id}` as never)}
               />
             ))}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.md, marginBottom: spacing.sm }}>
               <Icon name="star-circle-outline" size={16} color={colors.primary} />
-              <AppText variant="title">Top-rated near you</AppText>
+              <AppText variant="title">{t('findVet.topRated')}</AppText>
             </View>
           </>
         ) : (
@@ -266,12 +269,12 @@ export default function FindVet() {
             <View style={{ flexDirection: 'row', gap: spacing.sm, backgroundColor: colors.primaryTint, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md }}>
               <Icon name="star-outline" size={20} color={colors.primary} />
               <AppText variant="caption" color={colors.primaryDark} style={{ flex: 1 }}>
-                You haven’t chosen a preferred vet yet. Book a top-rated vet below and tap ★ on their profile to set them as your preferred provider — future bookings tie to their calendar.
+                {t('findVet.noPreferred')}
               </AppText>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm }}>
               <Icon name="star-circle-outline" size={16} color={colors.primary} />
-              <AppText variant="title">Top-rated near you</AppText>
+              <AppText variant="title">{t('findVet.topRated')}</AppText>
             </View>
           </>
         )}
@@ -279,7 +282,7 @@ export default function FindVet() {
         {topRated.length === 0 ? (
           <EmptyState
             icon="map-marker-off-outline"
-            title={hasPreferred ? 'No other vets within range' : 'No vets within range'}
+            title={hasPreferred ? t('findVet.noneOtherTitle') : t('findVet.noneTitle')}
             subtitle={`No ${hasPreferred ? 'other ' : ''}enlisted vets are within ${radiusKm} km right now. Widen the radius above, or request a call-out and we'll match you.`}
           />
         ) : (
@@ -293,7 +296,7 @@ export default function FindVet() {
           ))
         )}
         <Button
-          label="Request a Call-out"
+          label={t('findVet.requestCallout')}
           icon="phone-outgoing"
           onPress={() => router.push('/find-vet/request')}
           style={{ marginTop: spacing.sm }}

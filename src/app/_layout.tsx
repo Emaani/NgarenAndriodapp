@@ -15,6 +15,7 @@ import { addNotificationResponseListener, routeColdStartNotification, initNotifi
 import { registerBackgroundSyncAsync } from '@/services/backgroundSync';
 import { startSyncQueueWatcher, processSyncQueue } from '@/data/syncQueue';
 import { AuthProvider } from '@/services/auth';
+import { I18nProvider } from '@/i18n';
 import { initSentry, wrapWithSentry } from '@/services/sentry';
 import { AppErrorBoundary } from '@/components/AppErrorBoundary';
 import { StatusBanner } from '@/ui';
@@ -65,6 +66,7 @@ function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AppErrorBoundary>
         <SafeAreaProvider>
+          <I18nProvider>
           <AuthProvider>
           <StatusBar style="dark" />
           {/* Honest connectivity / stale-data strip above the whole app. */}
@@ -118,6 +120,7 @@ function RootLayout() {
           </Stack>
           </View>
           </AuthProvider>
+          </I18nProvider>
         </SafeAreaProvider>
       </AppErrorBoundary>
     </GestureHandlerRootView>

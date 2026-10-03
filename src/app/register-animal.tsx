@@ -413,7 +413,7 @@ export default function RegisterAnimal() {
         <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.md }}>
           {autoApprove
             ? 'As the farm owner, this record is created and activated automatically.'
-            : 'On submit the record is Created, then Validated, then Activated by Ngaren after a completeness check (target 48 hours). You’ll be notified once activated.'}
+            : 'On submit this record is captured, then sent for admin validation and the farmer’s confirmation before its scorecard & vaccination records are finalized (Oct 2026 standup). You’ll be notified once activated.'}
         </AppText>
         <Button
           label={autoApprove ? 'Create AAN' : 'Submit for activation'}
