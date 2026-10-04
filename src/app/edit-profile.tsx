@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, spacing } from '@/theme';
 import { useAuth } from '@/services/auth';
+import { useT } from '@/i18n';
 import { AppText, Button, GradientHeader, Input, Screen } from '@/ui';
 
 /**
@@ -13,6 +14,7 @@ import { AppText, Button, GradientHeader, Input, Screen } from '@/ui';
  */
 export default function EditProfile() {
   const router = useRouter();
+  const t = useT();
   const { user, updateProfile } = useAuth();
   const [fullName, setFullName] = useState(user?.fullName ?? '');
   const [farmName, setFarmName] = useState(user?.farmName ?? '');
@@ -39,11 +41,11 @@ export default function EditProfile() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Edit Profile" subtitle="Update your account details" showBack />
+      <GradientHeader title={t('profile.row.editProfile')} subtitle={t('edit.subtitle')} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         <View style={{ gap: spacing.md }}>
           <Input
-            label="Full name"
+            label={t('signup.fullName')}
             value={fullName}
             onChangeText={setFullName}
             placeholder="Your name"
@@ -51,20 +53,20 @@ export default function EditProfile() {
             icon="account-outline"
           />
           <Input
-            label="Farm name"
+            label={t('edit.farmName')}
             value={farmName}
             onChangeText={setFarmName}
-            placeholder="e.g. Nakasero Farm"
+            placeholder={t('edit.farmPlaceholder')}
             autoCapitalize="words"
             icon="barn"
             helper={
               <AppText variant="body" color={colors.onSurfaceVariant}>
-                Synced to your web account.
+                {t('edit.farmHelper')}
               </AppText>
             }
           />
           <Input
-            label="Email address"
+            label={t('auth.email')}
             value={user?.email ?? ''}
             onChangeText={() => {}}
             editable={false}
@@ -72,7 +74,7 @@ export default function EditProfile() {
             icon="email-outline"
             helper={
               <AppText variant="body" color={colors.onSurfaceVariant}>
-                Email is managed by your sign-in and can&apos;t be changed here.
+                {t('edit.emailHelper')}
               </AppText>
             }
           />
@@ -84,7 +86,7 @@ export default function EditProfile() {
           )}
 
           <Button
-            label={saving ? 'Saving…' : 'Save changes'}
+            label={saving ? t('common.saving') : t('common.save')}
             onPress={onSave}
             loading={saving}
             disabled={!canSave}

@@ -4,10 +4,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { colors, radius, spacing } from '@/theme';
 import { AppText, Button, Icon } from '@/ui';
+import { useT } from '@/i18n';
 
 export default function SignUpSuccess() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const t = useT();
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background, paddingHorizontal: spacing.xl }}>
@@ -26,14 +28,14 @@ export default function SignUpSuccess() {
           <Icon name="check-bold" size={64} color="#fff" />
         </LinearGradient>
         <AppText variant="headline" style={{ textAlign: 'center' }}>
-          You're all set!
+          {t('success.title')}
         </AppText>
         <AppText variant="bodyLarge" color={colors.onSurfaceVariant} style={{ textAlign: 'center' }}>
-          Your account has been created successfully. Welcome to Ngaren.
+          {t('success.body')}
         </AppText>
       </View>
       <Button
-        label="Continue"
+        label={t('common.continue')}
         onPress={() => router.replace('/(tabs)/home')}
         style={{ marginBottom: insets.bottom + spacing.lg }}
       />

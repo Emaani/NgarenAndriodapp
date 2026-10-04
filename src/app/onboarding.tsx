@@ -5,30 +5,22 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { colors, radius, spacing } from '@/theme';
 import { AppText, Button, Icon, IconName } from '@/ui';
+import { useT } from '@/i18n';
 
 const { width } = Dimensions.get('window');
 
+// title/body hold i18n keys, translated at render so the carousel follows the
+// selected language.
 const SLIDES: { icon: IconName; title: string; body: string }[] = [
-  {
-    icon: 'cow',
-    title: 'Manage your livestock',
-    body: 'Register animals, track their health and keep your whole herd in one place.',
-  },
-  {
-    icon: 'map-marker-radius',
-    title: 'Track via satellite',
-    body: 'See where your animals are in real time with Ceres Tag GPS tracking.',
-  },
-  {
-    icon: 'stethoscope',
-    title: 'Find a vet, fast',
-    body: 'Search nearby vets, request a call-out and rate the service after.',
-  },
+  { icon: 'cow', title: 'onb.slide1.title', body: 'onb.slide1.body' },
+  { icon: 'map-marker-radius', title: 'onb.slide2.title', body: 'onb.slide2.body' },
+  { icon: 'stethoscope', title: 'onb.slide3.title', body: 'onb.slide3.body' },
 ];
 
 export default function Onboarding() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const t = useT();
   const [index, setIndex] = useState(0);
   const listRef = useRef<FlatList>(null);
 
@@ -48,7 +40,7 @@ export default function Onboarding() {
       <View style={{ paddingTop: insets.top + spacing.sm, alignItems: 'flex-end', paddingHorizontal: spacing.md }}>
         <Pressable onPress={() => router.replace('/login')} hitSlop={8}>
           <AppText variant="bodyLarge" color={colors.onSurfaceVariant}>
-            Skip
+            {t('onb.skip')}
           </AppText>
         </Pressable>
       </View>
@@ -79,10 +71,10 @@ export default function Onboarding() {
               <Icon name={item.icon} size={96} color="#fff" />
             </LinearGradient>
             <AppText variant="headline" style={{ textAlign: 'center', marginBottom: spacing.md }}>
-              {item.title}
+              {t(item.title)}
             </AppText>
             <AppText variant="bodyLarge" color={colors.onSurfaceVariant} style={{ textAlign: 'center' }}>
-              {item.body}
+              {t(item.body)}
             </AppText>
           </View>
         )}
@@ -102,7 +94,7 @@ export default function Onboarding() {
             />
           ))}
         </View>
-        <Button label={isLast ? 'Get started' : 'Next'} onPress={next} />
+        <Button label={isLast ? t('onb.getStarted') : t('common.next')} onPress={next} />
       </View>
     </View>
   );

@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { AppText, Button, GradientHeader, Icon, IconName, Input } from '@/ui';
 import { useAuth } from '@/services/auth';
+import { useT } from '@/i18n';
 
 const ngarenLogo = require('@/assets/images/ngaren-logo.png');
 
@@ -28,6 +29,7 @@ function SocialButton({ icon, color }: { icon: IconName; color: string }) {
 
 export default function Login() {
   const router = useRouter();
+  const t = useT();
   const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -51,7 +53,7 @@ export default function Login() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Login to Ngaren" subtitle="Livestock management platform" />
+      <GradientHeader title={t('auth.loginTitle')} subtitle={t('auth.subtitle')} />
 
       <ScrollView contentContainerStyle={{ alignItems: 'center', paddingBottom: spacing.xl }}>
         <View
@@ -77,18 +79,18 @@ export default function Login() {
 
         <View style={{ flexDirection: 'row', marginTop: spacing.mdMinus, marginBottom: spacing.lg }}>
           <AppText variant="bodyLarge" color={colors.onSurfaceVariant}>
-            Don't have an account?{' '}
+            {t('auth.noAccount')}
           </AppText>
           <Pressable onPress={() => router.push('/signup')} hitSlop={6}>
             <AppText variant="bodyLarge" color={colors.accent}>
-              Sign up
+              {t('auth.signUp')}
             </AppText>
           </Pressable>
         </View>
 
         <View style={{ width: 320, gap: spacing.md }}>
           <Input
-            label="Email address"
+            label={t('auth.email')}
             value={email}
             onChangeText={setEmail}
             placeholder="patrickE@ngarendigital.com"
@@ -97,7 +99,7 @@ export default function Login() {
             icon="email-outline"
           />
           <Input
-            label="Password"
+            label={t('auth.password')}
             value={password}
             onChangeText={setPassword}
             placeholder="••••••••"
@@ -107,10 +109,10 @@ export default function Login() {
             helper={
               <View style={{ flexDirection: 'row' }}>
                 <AppText variant="bodyLarge" color={colors.onSurfaceVariant}>
-                  Forgot your password?{' '}
+                  {t('auth.forgot')}
                 </AppText>
                 <AppText variant="bodyLarge" color={colors.accent}>
-                  Reset
+                  {t('auth.reset')}
                 </AppText>
               </View>
             }
@@ -123,7 +125,7 @@ export default function Login() {
           )}
 
           <Button
-            label={submitting ? 'Signing in…' : 'Login'}
+            label={submitting ? t('auth.signingIn') : t('auth.login')}
             onPress={onLogin}
             loading={submitting}
             disabled={!email.trim() || !password || submitting}
@@ -133,7 +135,7 @@ export default function Login() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginVertical: spacing.md }}>
             <View style={{ flex: 1, height: 1, backgroundColor: colors.divider }} />
             <AppText variant="body" color={colors.onSurfaceVariant}>
-              or login with
+              {t('auth.orLoginWith')}
             </AppText>
             <View style={{ flex: 1, height: 1, backgroundColor: colors.divider }} />
           </View>

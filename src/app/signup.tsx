@@ -4,9 +4,11 @@ import { useRouter } from 'expo-router';
 import { colors, spacing } from '@/theme';
 import { AppText, Button, GradientHeader, Input } from '@/ui';
 import { useAuth } from '@/services/auth';
+import { useT } from '@/i18n';
 
 export default function SignUp() {
   const router = useRouter();
+  const t = useT();
   const { signUp } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -35,18 +37,18 @@ export default function SignUp() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Create your account" subtitle="Join the Ngaren livestock platform" showBack />
+      <GradientHeader title={t('signup.title')} subtitle={t('signup.subtitle')} showBack />
 
       <ScrollView contentContainerStyle={{ alignItems: 'center', paddingVertical: spacing.lg, paddingBottom: spacing.xl }}>
         <View style={{ width: 320, gap: spacing.md }}>
-          <Input label="Full name" value={name} onChangeText={setName} placeholder="Patrick Etyang" autoCapitalize="words" icon="account-outline" />
-          <Input label="Email address" value={email} onChangeText={setEmail} placeholder="patrickE@ngarendigital.com" keyboardType="email-address" autoCapitalize="none" icon="email-outline" />
-          <Input label="Phone number" value={phone} onChangeText={setPhone} placeholder="+254 700 000 000" keyboardType="phone-pad" icon="phone-outline" />
+          <Input label={t('signup.fullName')} value={name} onChangeText={setName} placeholder="Patrick Etyang" autoCapitalize="words" icon="account-outline" />
+          <Input label={t('auth.email')} value={email} onChangeText={setEmail} placeholder="patrickE@ngarendigital.com" keyboardType="email-address" autoCapitalize="none" icon="email-outline" />
+          <Input label={t('signup.phone')} value={phone} onChangeText={setPhone} placeholder="+254 700 000 000" keyboardType="phone-pad" icon="phone-outline" />
           <Input
-            label="Password"
+            label={t('auth.password')}
             value={password}
             onChangeText={setPassword}
-            placeholder="Create a password"
+            placeholder={t('signup.passwordPlaceholder')}
             secureTextEntry={!show}
             icon={show ? 'eye-off-outline' : 'eye-outline'}
             onIconPress={() => setShow((s) => !s)}
@@ -59,7 +61,7 @@ export default function SignUp() {
           )}
 
           <Button
-            label={submitting ? 'Creating account…' : 'Create account'}
+            label={submitting ? t('signup.creating') : t('signup.create')}
             disabled={!valid || submitting}
             loading={submitting}
             onPress={onCreate}
@@ -68,11 +70,11 @@ export default function SignUp() {
 
           <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: spacing.sm }}>
             <AppText variant="bodyLarge" color={colors.onSurfaceVariant}>
-              Already have an account?{' '}
+              {t('signup.haveAccount')}
             </AppText>
             <Pressable onPress={() => router.replace('/login')} hitSlop={6}>
               <AppText variant="bodyLarge" color={colors.accent}>
-                Login
+                {t('signup.login')}
               </AppText>
             </Pressable>
           </View>
