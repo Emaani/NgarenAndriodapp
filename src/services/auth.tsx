@@ -81,6 +81,8 @@ interface AuthState {
   ) => Promise<{ error?: string; needsConfirmation?: boolean }>;
   /** Persist editable profile fields (currently full_name) to public.profiles. */
   updateProfile: (fields: { fullName: string; farmName?: string }) => Promise<{ error?: string }>;
+  /** Change the signed-in user's password via Supabase Auth (updateUser). */
+  changePassword: (newPassword: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
 }
 
@@ -262,6 +264,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user],
   );
 
+  const changePassword = useCallback<AuthState['changePassword']>(
+    async (newPassword) => {
+      if (!user) return { error: 'You are not signed in.' };
+      if (!isSupabaseConfigured()) {
+        return { error: 'Authentication is not configured. Set the Supabase env vars.' };
+      }
+      // Supabase Auth updates the password for the current session's user. RLS is
+      // not involved — this is the GoTrue identity, the same one used on the web.
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) return { error: error.message };
+      return {};
+    },
+    [user],
+  );
+
   const signOut = useCallback(async () => {
     try {
       await supabase.auth.signOut();
@@ -303,9 +320,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signUp,
       updateProfile,
+      changePassword,
       signOut,
     };
-  }, [user, membership, session, loading, signIn, signUp, updateProfile, signOut]);
+  }, [user, membership, session, loading, signIn, signUp, updateProfile, changePassword, signOut]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

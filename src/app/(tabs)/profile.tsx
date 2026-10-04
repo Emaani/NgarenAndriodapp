@@ -12,6 +12,7 @@ const ACCOUNT_SECTION: Section = {
   title: 'Account',
   rows: [
     { icon: 'account-outline', label: 'Edit Profile', route: '/edit-profile' },
+    { icon: 'lock-reset', label: 'Change Password', route: '/change-password' },
     { icon: 'map-marker-outline', label: 'My Locations', route: '/locations' },
     { icon: 'tag-outline', label: 'My Devices', route: '/devices' },
   ],

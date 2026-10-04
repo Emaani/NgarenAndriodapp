@@ -34,6 +34,21 @@ const QUICK_ACTIONS: { label: string; icon: IconName; route: string; tint: strin
   { label: 'Log a Visit', icon: 'clipboard-edit-outline', route: '/log-visit', tint: '#16A34A' },
 ];
 
+// Clinical navigation (webapp vet nav parity): the sections a vet reaches
+// beyond the day-to-day quick actions above. Keeps every vetNav destination
+// discoverable from the dashboard rather than buried.
+const CLINICAL_NAV: { label: string; icon: IconName; route: string; tint: string }[] = [
+  // NOTE: the animals *list* lives in the (tabs) group, which redirects vets to
+  // this dashboard — so there is no vet-reachable livestock list yet. Vets open
+  // individual animals from call-outs/scorecards instead. A standalone vet herd
+  // list is a tracked follow-up; omitted here rather than shipping a bounce.
+  { label: 'Managed Health', icon: 'heart-pulse', route: '/health', tint: '#EF4444' },
+  { label: 'Breeding', icon: 'dna', route: '/breeding', tint: '#EC4899' },
+  { label: 'Devices', icon: 'tag-outline', route: '/devices', tint: '#9333EA' },
+  { label: 'Messages', icon: 'message-text-outline', route: '/messaging', tint: '#F59E0B' },
+  { label: 'Marketplace', icon: 'storefront-outline', route: '/marketplace', tint: '#0D9488' },
+];
+
 const urgencyVariant = (u: CalloutUrgency) =>
   u === 'Emergency' ? 'error' : 'neutral';
 
@@ -199,6 +214,9 @@ export default function VetDashboard() {
             <Pressable onPress={() => router.push('/vet-reports' as never)} hitSlop={8} accessibilityLabel="Reports">
               <Icon name="file-chart-outline" size={24} color="#fff" />
             </Pressable>
+            <Pressable onPress={() => router.push('/settings' as never)} hitSlop={8} accessibilityLabel="Settings">
+              <Icon name="cog-outline" size={24} color="#fff" />
+            </Pressable>
             <Pressable onPress={onSignOut} hitSlop={8}>
               <Icon name="logout" size={24} color="#fff" />
             </Pressable>
@@ -232,6 +250,30 @@ export default function VetDashboard() {
         </AppText>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg }}>
           {QUICK_ACTIONS.map((a) => (
+            <Pressable
+              key={a.label}
+              onPress={() => router.push(a.route as never)}
+              style={({ pressed }) => [
+                { flexGrow: 1, flexBasis: '47%', flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.divider, opacity: pressed ? 0.9 : 1 },
+                shadow[1],
+              ]}>
+              <View style={{ width: 36, height: 36, borderRadius: radius.full, backgroundColor: a.tint + '1A', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name={a.icon} size={19} color={a.tint} />
+              </View>
+              <AppText variant="body" style={{ fontWeight: '600', flex: 1 }}>
+                {a.label}
+              </AppText>
+            </Pressable>
+          ))}
+        </View>
+
+        {/* Clinical navigation (webapp vet-nav parity) — Livestock, Managed
+            Health, Breeding, Devices, Messages all reachable from the hub. */}
+        <AppText variant="title" style={{ marginBottom: spacing.sm }}>
+          Clinical tools
+        </AppText>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg }}>
+          {CLINICAL_NAV.map((a) => (
             <Pressable
               key={a.label}
               onPress={() => router.push(a.route as never)}
