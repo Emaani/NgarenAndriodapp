@@ -7,7 +7,7 @@ import { getCalloutRequests, updateCalloutStatus } from '@/data/api';
 import { getMyVetImpact } from '@/data/vetProfiles';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
-import { ActionChip, AppText, Button, GradientHeader, Icon, IconChip, IconName, Screen, SyncStatus, VetImpactDashboard, VetSchedule } from '@/ui';
+import { ActionChip, AppText, Button, GradientHeader, Icon, IconChip, IconName, NavBanner, Screen, SyncStatus, VetImpactDashboard, VetSchedule } from '@/ui';
 
 const EMPTY_IMPACT: VetImpact = {
   totalVisits: 0,
@@ -315,25 +315,13 @@ export default function VetDashboard() {
 
         {/* Documents module (Sep 12 2026): generated scorecards & reports, stored
             and openable here. */}
-        <Pressable
+        <NavBanner
+          icon="folder-multiple-outline"
+          title="Documents"
+          subtitle="Generated scorecards & reports — preview, share, auto-deleted after 30 days."
           onPress={() => router.push('/documents' as never)}
-          style={({ pressed }) => [
-            { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.lg, borderWidth: 1, borderColor: colors.divider, opacity: pressed ? 0.92 : 1 },
-            shadow[1],
-          ]}>
-          <View style={{ width: 44, height: 44, borderRadius: radius.full, backgroundColor: colors.primaryTint, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="folder-multiple-outline" size={22} color={colors.primary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <AppText variant="bodyLarge" style={{ fontWeight: '700' }}>
-              Documents
-            </AppText>
-            <AppText variant="caption" color={colors.onSurfaceVariant}>
-              Generated scorecards & reports — preview, share, auto-deleted after 30 days.
-            </AppText>
-          </View>
-          <Icon name="chevron-right" size={22} color={colors.onSurfaceVariant} />
-        </Pressable>
+          style={{ marginBottom: spacing.lg }}
+        />
 
         <AppText variant="title" style={{ marginBottom: spacing.sm }}>
           Call-out requests

@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { summary as summaryFallback } from '@/data/mock';
-import { getSummary } from '@/data/api';
+import { getSummary, getCalloutRequests } from '@/data/api';
 import { getLocalAnimals } from '@/data/localAnimals';
 import { getHerd } from '@/data/herd';
 import { getFarmerPortfolio, portfolioTotals } from '@/data/portfolio';
@@ -15,7 +15,7 @@ import { useAuth } from '@/services/auth';
 import { roleTheme } from '@/lib/roles';
 import { Permission } from '@/lib/permissions';
 import { TAGGING_META, TaggingMethod, taggingMeta } from '@/lib/tagging';
-import { AppText, Icon, IconName, NotificationBell } from '@/ui';
+import { AppText, Icon, IconName, NavBanner, NotificationBell } from '@/ui';
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -148,6 +148,7 @@ export default function Home() {
   const { data: vetMetrics } = useResource(getVetMetrics, VET_METRICS_FALLBACK);
   const { data: localAnimals } = useResource(getLocalAnimals, []);
   const { data: herd } = useResource(getHerd, []);
+  const { data: callouts } = useResource(getCalloutRequests, []);
 
   // Stock-take/validation reporting categorized by device type (management
   // decision), across the whole live herd. Only animals whose tagging method is
@@ -170,6 +171,17 @@ export default function Home() {
     () => localAnimals.filter((a) => a.approvalStatus === 'pending').length,
     [localAnimals],
   );
+  // Farmer call-out awareness: how many vet requests are still in flight
+  // (pending accept) or accepted and incoming. Same source the Vet Requests
+  // screen reads, so the counts agree.
+  const vetReqCounts = useMemo(() => {
+    const active = callouts.filter((c) => c.status === 'pending' || c.status === 'accepted');
+    return {
+      total: active.length,
+      pending: active.filter((c) => c.status === 'pending').length,
+      accepted: active.filter((c) => c.status === 'accepted').length,
+    };
+  }, [callouts]);
 
   const theme = roleTheme(appRole);
   const isAdmin = appRole === 'admin';
@@ -307,22 +319,27 @@ export default function Home() {
 
         {/* Maker-checker: pending-approval prompt for approvers. */}
         {canApprove && pendingCount > 0 && (
-          <Pressable
+          <NavBanner
+            variant="alert"
+            tint="#F59E0B"
+            icon="clipboard-alert-outline"
+            title={`${pendingCount} animal${pendingCount === 1 ? '' : 's'} awaiting activation`}
+            subtitle="Validate and activate newly created records."
             onPress={() => router.push('/approvals' as never)}
-            style={({ pressed }) => [
-              { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: '#F59E0B1A', borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.lg, borderWidth: 1, borderColor: '#F59E0B55', opacity: pressed ? 0.9 : 1 },
-            ]}>
-            <Icon name="clipboard-alert-outline" size={22} color="#B45309" />
-            <View style={{ flex: 1 }}>
-              <AppText variant="bodyLarge" style={{ fontWeight: '700' }}>
-                {pendingCount} animal{pendingCount === 1 ? '' : 's'} awaiting activation
-              </AppText>
-              <AppText variant="caption" color={colors.onSurfaceVariant}>
-                Validate and activate newly created records.
-              </AppText>
-            </View>
-            <Icon name="chevron-right" size={22} color={colors.onSurfaceVariant} />
-          </Pressable>
+            style={{ marginBottom: spacing.lg }}
+          />
+        )}
+
+        {/* Farmer vet-request awareness: in-flight call-outs, tap to track. */}
+        {!isAdmin && !isVet && can('book_vet') && vetReqCounts.total > 0 && (
+          <NavBanner
+            tint="#21C45D"
+            icon="clipboard-pulse-outline"
+            title={`${vetReqCounts.total} active vet request${vetReqCounts.total === 1 ? '' : 's'}`}
+            subtitle={`${vetReqCounts.pending} awaiting a vet · ${vetReqCounts.accepted} accepted`}
+            onPress={() => router.push('/vet-requests' as never)}
+            style={{ marginBottom: spacing.lg }}
+          />
         )}
 
         {/* Reporting categorized by device type (management decision). */}
@@ -344,6 +361,16 @@ export default function Home() {
             </View>
           </>
         )}
+
+        {/* Documents module — generated scorecards & reports, reachable from the
+            dashboard for every role (farmers/admins land here, not only vets). */}
+        <NavBanner
+          icon="folder-multiple-outline"
+          title="Documents"
+          subtitle="Scorecards & reports — preview, share, auto-deleted after 30 days."
+          onPress={() => router.push('/documents' as never)}
+          style={{ marginBottom: spacing.lg }}
+        />
 
         <AppText variant="title" style={{ marginBottom: spacing.md }}>
           {isAdmin ? 'Control center' : isVet ? 'Clinical tools' : 'Quick actions'}

@@ -24,6 +24,7 @@ export { PickerField, DatePickerField, formatIsoDate, type PickerOption } from '
 export { PhotoField } from './PhotoField';
 export { GradientHeader } from './GradientHeader';
 export { StatusBanner } from './StatusBanner';
+export { NavBanner } from './NavBanner';
 export { NotificationBell } from './NotificationBell';
 export { Input } from './Input';
 export { DonutChart } from './charts/DonutChart';
