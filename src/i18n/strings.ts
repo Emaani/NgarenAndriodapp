@@ -1,10 +1,14 @@
 /**
- * Localization strings (robustness/usability: English-only is a barrier for
- * smallholders). This is the FOUNDATION: English is complete, Kiswahili is a
- * working demonstration locale, and the structure accepts Luganda / Runyankole
- * once native translators provide them (missing keys fall back to English, so a
- * partial locale is safe). Clinical / consent / legal copy is deliberately NOT
- * machine-translated — those keys stay English until professionally reviewed.
+ * Localization strings. English is the source/complete locale; Kiswahili covers
+ * the app's navigation and primary surfaces (tab bar, dashboards, actions,
+ * profile, settings, common controls). Missing keys fall back to English, so a
+ * partial locale is always safe.
+ *
+ * Deliberately NOT machine-translated: clinical / consent / legal / medical copy
+ * (diagnoses, treatment guidance, scorecard clinical wording, data-consent
+ * notices). Those keys stay English until a professional review, so a mistaken
+ * translation can never change clinical meaning. The structure accepts Luganda /
+ * Runyankole the same way once native translators provide them.
  */
 export type Locale = 'en' | 'sw';
 
@@ -17,12 +21,202 @@ export const LOCALES: { code: Locale; label: string; english: string }[] = [
 type Dict = Record<string, string>;
 
 const en: Dict = {
+  // Common
   'common.rate': 'Rate',
   'common.language': 'Language',
   'common.chooseLanguage': 'Choose your preferred language',
   'common.available': 'Available',
   'common.busy': 'Busy',
   'common.reviews': 'reviews',
+  'common.save': 'Save changes',
+  'common.cancel': 'Cancel',
+  'common.retry': 'Retry',
+  'common.signOut': 'Sign Out',
+  'common.logOut': 'Log Out',
+
+  // Bottom tab bar
+  'tabs.home': 'Home',
+  'tabs.animals': 'Animals',
+  'tabs.track': 'Track',
+  'tabs.profile': 'Profile',
+
+  // Roles + console titles (header)
+  'role.admin': 'Admin',
+  'role.farmer': 'Farmer',
+  'role.veterinary': 'Vet Doctor',
+  'console.admin': 'Enterprise Control Center',
+  'console.farmer': 'Herd Operations Console',
+  'console.veterinary': 'Health Intelligence System',
+
+  // Home — header + stats
+  'home.welcome': 'Welcome back,',
+  'home.stat.farmers': 'Farmers',
+  'home.stat.animals': 'Animals',
+  'home.stat.devices': 'Devices',
+  'home.stat.activeTags': 'Active tags',
+  'home.stat.locations': 'Locations',
+  'home.stat.myAnimals': 'My Animals',
+  'home.stat.urgent': 'Urgent',
+  'home.stat.openCases': 'Open cases',
+  'home.stat.requests': 'Requests',
+
+  // Home — section titles
+  'home.section.portfolio': 'Portfolio overview',
+  'home.section.clinical': 'Clinical overview',
+  'home.section.byDevice': 'By device type',
+  'home.section.controlCenter': 'Control center',
+  'home.section.quickActions': 'Quick actions',
+  'home.section.clinicalTools': 'Clinical tools',
+
+  // Home — KPI tiles
+  'home.kpi.farmers': 'Farmers',
+  'home.kpi.needAttention': 'Need attention',
+  'home.kpi.activeTags': 'Active tags',
+  'home.kpi.devicesOffline': 'Devices offline',
+  'home.kpi.inactiveTags': 'Inactive tags',
+  'home.kpi.immediateAttention': 'Immediate attention',
+  'home.kpi.pendingRequests': 'Pending requests',
+  'home.kpi.openCases': 'Open cases',
+  'home.kpi.reviewed': 'Reviewed',
+
+  // Home — banners
+  'home.banner.awaitingActivation': '{count} animals awaiting activation',
+  'home.banner.awaitingActivationOne': '1 animal awaiting activation',
+  'home.banner.validateActivate': 'Validate and activate newly created records.',
+  'home.banner.vetRequests': '{count} active vet requests',
+  'home.banner.vetRequestsOne': '1 active vet request',
+  'home.banner.vetRequestsSub': '{pending} awaiting a vet · {accepted} accepted',
+  'home.banner.documents': 'Documents',
+  'home.banner.documentsSub': 'Scorecards & reports — preview, share, auto-deleted after 30 days.',
+
+  // Action tile labels (home grids + vet hub)
+  'action.findVet': 'Find a Vet',
+  'action.vetRequests': 'Vet Requests',
+  'action.registerAnimal': 'Register Animal',
+  'action.activation': 'Activation',
+  'action.managedHealth': 'Managed Health',
+  'action.breeding': 'Breeding',
+  'action.calendar': 'Calendar',
+  'action.stockTake': 'Stock Take',
+  'action.viewAnimals': 'View Animals',
+  'action.trackAnimals': 'Track Animals',
+  'action.farmMap': 'Farm Map',
+  'action.messages': 'Messages',
+  'action.marketplace': 'Marketplace',
+  'action.teamSeats': 'Team & Seats',
+  'action.payments': 'Payments',
+  'action.farmersPortfolio': 'Farmers Portfolio',
+  'action.livestock': 'Livestock',
+  'action.track': 'Track',
+  'action.insights': 'Insights',
+  'action.telemetry': 'Telemetry',
+  'action.reports': 'Reports',
+  'action.webhookMonitor': 'Webhook Monitor',
+  'action.linkageHealth': 'Linkage Health',
+  'action.alertHistory': 'Alert History',
+  'action.diseaseSurveillance': 'Disease Surveillance',
+  'action.teamUsers': 'Team & Users',
+  'action.vetCallouts': 'Vet Call-outs',
+  'action.enlistVet': 'Enlist a Vet',
+  'action.devices': 'Devices',
+  'action.locations': 'Locations',
+  'action.calloutQueue': 'Call-out Queue',
+  'action.logVisit': 'Log a Visit',
+  'action.newScorecard': 'New Scorecard',
+
+  // Vet dashboard
+  'vet.dashboard': 'Vet dashboard',
+  'vet.veterinarian': 'Veterinarian',
+  'vet.stat.pending': 'Pending',
+  'vet.stat.accepted': 'Accepted',
+  'vet.stat.completed': 'Completed',
+  'vet.section.myImpact': 'My impact',
+  'vet.section.myCalendar': 'My calendar',
+  'vet.fullCalendar': 'Full calendar',
+  'vet.section.calloutRequests': 'Call-out requests',
+  'vet.filter.pending': 'Pending',
+  'vet.filter.accepted': 'Accepted',
+  'vet.filter.all': 'All',
+  'vet.noRequests': 'No requests here',
+  'vet.revealNote': 'Farmer’s name & exact location are revealed once you accept.',
+  'vet.decline': 'Decline',
+  'vet.accept': 'Accept',
+  'vet.viewOnMap': 'View on map',
+
+  // Animals tab (farmer/admin)
+  'animals.title': 'Your animals',
+  'animals.registered': '{count} registered',
+  'animals.registeredSyncing': '{count} registered · {pending} syncing…',
+  'animals.search': 'Search by account #, tag, name or breed...',
+  'animals.emptyTitle': 'No animals found',
+  'animals.emptySub': 'Register an animal to get started.',
+
+  // Vet livestock list
+  'vetHerd.title': 'Livestock',
+  'vetHerd.subtitle': '{count} registered',
+  'vetHerd.search': 'Search by account #, tag, name or breed...',
+  'vetHerd.scopeNote': 'Showing animals from the farms you serve.',
+  'vetHerd.emptyTitle': 'No animals found',
+  'vetHerd.emptySub': 'Pull to refresh, or register an animal.',
+
+  // Profile
+  'profile.section.account': 'Account',
+  'profile.section.administration': 'Administration',
+  'profile.section.billing': 'Billing',
+  'profile.section.support': 'Support',
+  'profile.row.editProfile': 'Edit Profile',
+  'profile.row.changePassword': 'Change Password',
+  'profile.row.myLocations': 'My Locations',
+  'profile.row.myDevices': 'My Devices',
+  'profile.row.teamManagement': 'Team Management',
+  'profile.row.incidentsSla': 'Incidents & SLA',
+  'profile.row.vetCallouts': 'Vet Call-outs',
+  'profile.row.paymentsSubscription': 'Payments & Subscription',
+  'profile.row.billingHistory': 'Billing History',
+  'profile.row.messages': 'Messages',
+  'profile.row.notifications': 'Notifications',
+  'profile.row.settings': 'Settings',
+  'profile.row.helpSupport': 'Help & Support',
+
+  // Settings
+  'settings.section.preferences': 'Preferences',
+  'settings.section.administration': 'Administration',
+  'settings.section.about': 'About',
+  'settings.row.editProfile': 'Edit Profile',
+  'settings.row.changePassword': 'Change Password',
+  'settings.row.notificationPrefs': 'Notification Preferences',
+  'settings.row.messages': 'Messages',
+  'settings.row.teamUsers': 'Team & Users',
+  'settings.row.incidentsSla': 'Incidents & SLA',
+  'settings.row.role': 'Role',
+  'settings.row.appVersion': 'App version',
+  'settings.row.poweredBy': 'Powered by',
+  'settings.row.helpSupport': 'Help & Support',
+
+  // Sync status
+  'sync.syncing': 'Syncing…',
+  'sync.allSynced': 'All records synced',
+  'sync.failed': '{count} writes failed — tap to retry',
+  'sync.failedOne': '1 write failed — tap to retry',
+  'sync.pending': '{count} writes pending — tap to sync',
+  'sync.pendingOne': '1 write pending — tap to sync',
+
+  // Change password
+  'changePwd.title': 'Change Password',
+  'changePwd.subtitle': 'Update your sign-in password',
+  'changePwd.new': 'New password',
+  'changePwd.newPlaceholder': 'At least 8 characters',
+  'changePwd.confirm': 'Confirm new password',
+  'changePwd.confirmPlaceholder': 'Re-enter the new password',
+  'changePwd.helpStrong': 'Choose a strong, unique password.',
+  'changePwd.helpTooShort': 'Use at least {min} characters.',
+  'changePwd.mismatch': 'Passwords don’t match.',
+  'changePwd.update': 'Update password',
+  'changePwd.updating': 'Updating…',
+  'changePwd.updated': 'Updated',
+  'changePwd.successNote': 'Password updated. You’ll stay signed in on this device.',
+
+  // Find a Vet
   'findVet.title': 'Find a Vet',
   'findVet.subtitlePreferred': 'Your preferred vets, plus top-rated nearby',
   'findVet.subtitleTopRated': 'Top-rated vets within {km} km',
@@ -44,14 +238,204 @@ const en: Dict = {
   'findVet.noneOtherTitle': 'No other vets within range',
 };
 
-// Kiswahili — demonstration locale. Common, non-clinical UI strings only.
+// Kiswahili — navigation + primary surfaces. UI copy only (no clinical/consent).
 const sw: Dict = {
+  // Common
   'common.rate': 'Kadiria',
   'common.language': 'Lugha',
   'common.chooseLanguage': 'Chagua lugha unayopendelea',
   'common.available': 'Anapatikana',
   'common.busy': 'Ana shughuli',
   'common.reviews': 'maoni',
+  'common.save': 'Hifadhi mabadiliko',
+  'common.cancel': 'Ghairi',
+  'common.retry': 'Jaribu tena',
+  'common.signOut': 'Toka',
+  'common.logOut': 'Toka',
+
+  // Bottom tab bar
+  'tabs.home': 'Nyumbani',
+  'tabs.animals': 'Wanyama',
+  'tabs.track': 'Fuatilia',
+  'tabs.profile': 'Wasifu',
+
+  // Roles + console titles
+  'role.admin': 'Msimamizi',
+  'role.farmer': 'Mkulima',
+  'role.veterinary': 'Daktari wa Mifugo',
+  'console.admin': 'Kituo cha Udhibiti',
+  'console.farmer': 'Kituo cha Shughuli za Kundi',
+  'console.veterinary': 'Mfumo wa Akili ya Afya',
+
+  // Home — header + stats
+  'home.welcome': 'Karibu tena,',
+  'home.stat.farmers': 'Wakulima',
+  'home.stat.animals': 'Wanyama',
+  'home.stat.devices': 'Vifaa',
+  'home.stat.activeTags': 'Lebo hai',
+  'home.stat.locations': 'Maeneo',
+  'home.stat.myAnimals': 'Wanyama Wangu',
+  'home.stat.urgent': 'Dharura',
+  'home.stat.openCases': 'Kesi wazi',
+  'home.stat.requests': 'Maombi',
+
+  // Home — section titles
+  'home.section.portfolio': 'Muhtasari wa jumla',
+  'home.section.clinical': 'Muhtasari wa kliniki',
+  'home.section.byDevice': 'Kwa aina ya kifaa',
+  'home.section.controlCenter': 'Kituo cha udhibiti',
+  'home.section.quickActions': 'Vitendo vya haraka',
+  'home.section.clinicalTools': 'Zana za kliniki',
+
+  // Home — KPI tiles
+  'home.kpi.farmers': 'Wakulima',
+  'home.kpi.needAttention': 'Yanahitaji uangalizi',
+  'home.kpi.activeTags': 'Lebo hai',
+  'home.kpi.devicesOffline': 'Vifaa havipo mtandaoni',
+  'home.kpi.inactiveTags': 'Lebo zisizo hai',
+  'home.kpi.immediateAttention': 'Uangalizi wa haraka',
+  'home.kpi.pendingRequests': 'Maombi yanayosubiri',
+  'home.kpi.openCases': 'Kesi zilizo wazi',
+  'home.kpi.reviewed': 'Yaliyokaguliwa',
+
+  // Home — banners
+  'home.banner.awaitingActivation': 'Wanyama {count} wanasubiri kuwezeshwa',
+  'home.banner.awaitingActivationOne': 'Mnyama 1 anasubiri kuwezeshwa',
+  'home.banner.validateActivate': 'Thibitisha na uwezeshe rekodi mpya.',
+  'home.banner.vetRequests': 'Maombi {count} ya daktari yanayoendelea',
+  'home.banner.vetRequestsOne': 'Ombi 1 la daktari linaloendelea',
+  'home.banner.vetRequestsSub': '{pending} yanasubiri daktari · {accepted} yamekubaliwa',
+  'home.banner.documents': 'Nyaraka',
+  'home.banner.documentsSub': 'Kadi za alama na ripoti — kagua, shiriki, hufutwa baada ya siku 30.',
+
+  // Action tile labels
+  'action.findVet': 'Tafuta Daktari',
+  'action.vetRequests': 'Maombi ya Daktari',
+  'action.registerAnimal': 'Sajili Mnyama',
+  'action.activation': 'Uwezeshaji',
+  'action.managedHealth': 'Afya Inayosimamiwa',
+  'action.breeding': 'Uzalishaji',
+  'action.calendar': 'Kalenda',
+  'action.stockTake': 'Kuhesabu Mifugo',
+  'action.viewAnimals': 'Ona Wanyama',
+  'action.trackAnimals': 'Fuatilia Wanyama',
+  'action.farmMap': 'Ramani ya Shamba',
+  'action.messages': 'Ujumbe',
+  'action.marketplace': 'Soko',
+  'action.teamSeats': 'Timu na Nafasi',
+  'action.payments': 'Malipo',
+  'action.farmersPortfolio': 'Orodha ya Wakulima',
+  'action.livestock': 'Mifugo',
+  'action.track': 'Fuatilia',
+  'action.insights': 'Maarifa',
+  'action.telemetry': 'Telemetri',
+  'action.reports': 'Ripoti',
+  'action.webhookMonitor': 'Mfuatiliaji wa Webhook',
+  'action.linkageHealth': 'Afya ya Uunganishaji',
+  'action.alertHistory': 'Historia ya Arifa',
+  'action.diseaseSurveillance': 'Ufuatiliaji wa Magonjwa',
+  'action.teamUsers': 'Timu na Watumiaji',
+  'action.vetCallouts': 'Miito ya Daktari',
+  'action.enlistVet': 'Sajili Daktari',
+  'action.devices': 'Vifaa',
+  'action.locations': 'Maeneo',
+  'action.calloutQueue': 'Foleni ya Miito',
+  'action.logVisit': 'Rekodi Ziara',
+  'action.newScorecard': 'Kadi Mpya ya Alama',
+
+  // Vet dashboard
+  'vet.dashboard': 'Dashibodi ya Daktari',
+  'vet.veterinarian': 'Daktari wa Mifugo',
+  'vet.stat.pending': 'Yanasubiri',
+  'vet.stat.accepted': 'Yamekubaliwa',
+  'vet.stat.completed': 'Yamekamilika',
+  'vet.section.myImpact': 'Athari Yangu',
+  'vet.section.myCalendar': 'Kalenda Yangu',
+  'vet.fullCalendar': 'Kalenda kamili',
+  'vet.section.calloutRequests': 'Maombi ya Miito',
+  'vet.filter.pending': 'Yanasubiri',
+  'vet.filter.accepted': 'Yamekubaliwa',
+  'vet.filter.all': 'Yote',
+  'vet.noRequests': 'Hakuna maombi hapa',
+  'vet.revealNote': 'Jina la mkulima na eneo kamili hufichuliwa ukikubali.',
+  'vet.decline': 'Kataa',
+  'vet.accept': 'Kubali',
+  'vet.viewOnMap': 'Ona kwenye ramani',
+
+  // Animals tab (farmer/admin)
+  'animals.title': 'Wanyama Wako',
+  'animals.registered': 'Wamesajiliwa {count}',
+  'animals.registeredSyncing': 'Wamesajiliwa {count} · {pending} wanasawazishwa…',
+  'animals.search': 'Tafuta kwa akaunti, lebo, jina au aina...',
+  'animals.emptyTitle': 'Hakuna wanyama',
+  'animals.emptySub': 'Sajili mnyama ili kuanza.',
+
+  // Vet livestock list
+  'vetHerd.title': 'Mifugo',
+  'vetHerd.subtitle': 'Wamesajiliwa {count}',
+  'vetHerd.search': 'Tafuta kwa akaunti, lebo, jina au aina...',
+  'vetHerd.scopeNote': 'Inaonyesha wanyama kutoka mashamba unayohudumia.',
+  'vetHerd.emptyTitle': 'Hakuna wanyama',
+  'vetHerd.emptySub': 'Vuta kuonyesha upya, au sajili mnyama.',
+
+  // Profile
+  'profile.section.account': 'Akaunti',
+  'profile.section.administration': 'Usimamizi',
+  'profile.section.billing': 'Malipo',
+  'profile.section.support': 'Msaada',
+  'profile.row.editProfile': 'Hariri Wasifu',
+  'profile.row.changePassword': 'Badilisha Nenosiri',
+  'profile.row.myLocations': 'Maeneo Yangu',
+  'profile.row.myDevices': 'Vifaa Vyangu',
+  'profile.row.teamManagement': 'Usimamizi wa Timu',
+  'profile.row.incidentsSla': 'Matukio na SLA',
+  'profile.row.vetCallouts': 'Miito ya Daktari',
+  'profile.row.paymentsSubscription': 'Malipo na Usajili',
+  'profile.row.billingHistory': 'Historia ya Malipo',
+  'profile.row.messages': 'Ujumbe',
+  'profile.row.notifications': 'Arifa',
+  'profile.row.settings': 'Mipangilio',
+  'profile.row.helpSupport': 'Msaada',
+
+  // Settings
+  'settings.section.preferences': 'Mapendeleo',
+  'settings.section.administration': 'Usimamizi',
+  'settings.section.about': 'Kuhusu',
+  'settings.row.editProfile': 'Hariri Wasifu',
+  'settings.row.changePassword': 'Badilisha Nenosiri',
+  'settings.row.notificationPrefs': 'Mapendeleo ya Arifa',
+  'settings.row.messages': 'Ujumbe',
+  'settings.row.teamUsers': 'Timu na Watumiaji',
+  'settings.row.incidentsSla': 'Matukio na SLA',
+  'settings.row.role': 'Jukumu',
+  'settings.row.appVersion': 'Toleo la programu',
+  'settings.row.poweredBy': 'Inaendeshwa na',
+  'settings.row.helpSupport': 'Msaada',
+
+  // Sync status
+  'sync.syncing': 'Inasawazisha…',
+  'sync.allSynced': 'Rekodi zote zimesawazishwa',
+  'sync.failed': 'Maandishi {count} yameshindwa — gusa kujaribu tena',
+  'sync.failedOne': 'Andishi 1 limeshindwa — gusa kujaribu tena',
+  'sync.pending': 'Maandishi {count} yanasubiri — gusa kusawazisha',
+  'sync.pendingOne': 'Andishi 1 linasubiri — gusa kusawazisha',
+
+  // Change password
+  'changePwd.title': 'Badilisha Nenosiri',
+  'changePwd.subtitle': 'Sasisha nenosiri lako la kuingia',
+  'changePwd.new': 'Nenosiri jipya',
+  'changePwd.newPlaceholder': 'Angalau herufi 8',
+  'changePwd.confirm': 'Thibitisha nenosiri jipya',
+  'changePwd.confirmPlaceholder': 'Andika tena nenosiri jipya',
+  'changePwd.helpStrong': 'Chagua nenosiri imara na la kipekee.',
+  'changePwd.helpTooShort': 'Tumia angalau herufi {min}.',
+  'changePwd.mismatch': 'Manenosiri hayalingani.',
+  'changePwd.update': 'Sasisha nenosiri',
+  'changePwd.updating': 'Inasasisha…',
+  'changePwd.updated': 'Limesasishwa',
+  'changePwd.successNote': 'Nenosiri limesasishwa. Utabaki umeingia kwenye kifaa hiki.',
+
+  // Find a Vet
   'findVet.title': 'Tafuta Daktari wa Mifugo',
   'findVet.subtitlePreferred': 'Madaktari wako pendwa, pamoja na bora walio karibu',
   'findVet.subtitleTopRated': 'Madaktari bora ndani ya km {km}',

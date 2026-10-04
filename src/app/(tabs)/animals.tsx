@@ -7,10 +7,12 @@ import { animals as animalsFallback } from '@/data/mock';
 import { getHerd } from '@/data/herd';
 import { failedSyncCount, pendingSyncCount, processSyncQueue, syncNow } from '@/data/syncQueue';
 import { useResource } from '@/data/hooks';
+import { useT } from '@/i18n';
 import { AnimalListItem, AppText, EmptyState, Fab, GradientHeader, Icon, NotificationBell, SearchBar } from '@/ui';
 
 export default function AnimalsTab() {
   const router = useRouter();
+  const t = useT();
   const [query, setQuery] = useState('');
   // Live herd from Supabase animal_lineage, with locally-onboarded animals on top.
   const { data: allAnimals, loading, reload } = useResource(getHerd, animalsFallback);
@@ -68,12 +70,12 @@ export default function AnimalsTab() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <GradientHeader
-        title="Your animals"
-        subtitle={pending > 0 ? `${allAnimals.length} registered · ${pending} syncing…` : `${allAnimals.length} registered`}
+        title={t('animals.title')}
+        subtitle={pending > 0 ? t('animals.registeredSyncing', { count: allAnimals.length, pending }) : t('animals.registered', { count: allAnimals.length })}
         right={<NotificationBell />}
       />
       <View style={{ padding: spacing.md, paddingBottom: 0 }}>
-        <SearchBar value={query} onChangeText={setQuery} placeholder="Search by account #, tag, name or breed..." />
+        <SearchBar value={query} onChangeText={setQuery} placeholder={t('animals.search')} />
       </View>
       {/* Sync status + manual trigger. Failed writes are never dropped — they
           park here until a manual retry succeeds. */}
@@ -85,10 +87,10 @@ export default function AnimalsTab() {
           <Icon name={syncing ? 'sync' : failed > 0 ? 'cloud-alert' : 'cloud-sync-outline'} size={16} color={failed > 0 ? colors.error : colors.primary} />
           <AppText variant="caption" color={failed > 0 ? colors.error : colors.primary} style={{ flex: 1, fontWeight: '600' }}>
             {syncing
-              ? 'Syncing…'
+              ? t('sync.syncing')
               : failed > 0
-                ? `${failed} write${failed === 1 ? '' : 's'} failed to sync — tap to retry`
-                : `${pending} write${pending === 1 ? '' : 's'} pending — tap to sync now`}
+                ? failed === 1 ? t('sync.failedOne') : t('sync.failed', { count: failed })
+                : pending === 1 ? t('sync.pendingOne') : t('sync.pending', { count: pending })}
           </AppText>
         </Pressable>
       ) : null}
@@ -111,7 +113,7 @@ export default function AnimalsTab() {
               <ActivityIndicator color={colors.primary} />
             </View>
           ) : (
-            <EmptyState icon="cow" title="No animals found" subtitle="Register an animal to get started." />
+            <EmptyState icon="cow" title={t('animals.emptyTitle')} subtitle={t('animals.emptySub')} />
           )
         }
       />

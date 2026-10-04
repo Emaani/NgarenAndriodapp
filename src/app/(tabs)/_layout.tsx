@@ -4,6 +4,7 @@ import { ColorValue, Platform } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { colors, font, layout } from '@/theme';
 import { useAuth } from '@/services/auth';
+import { useT } from '@/i18n';
 import { CowGlyph } from '@/ui';
 
 type Mdi = keyof typeof MaterialCommunityIcons.glyphMap;
@@ -20,6 +21,7 @@ const cowTab = ({ color, size }: { color: ColorValue; size: number }) =>
 
 export default function TabsLayout() {
   const { isAuthenticated, role, loading } = useAuth();
+  const t = useT();
 
   // Wait for the persisted session to restore before redirecting, otherwise a
   // returning user briefly flashes the login screen on launch.
@@ -44,10 +46,10 @@ export default function TabsLayout() {
         },
         tabBarLabelStyle: { fontSize: 11, fontFamily: font.medium },
       }}>
-      <Tabs.Screen name="home" options={{ title: 'Home', tabBarIcon: tab('home-variant', 'home-variant-outline') }} />
-      <Tabs.Screen name="animals" options={{ title: 'Animals', tabBarIcon: cowTab }} />
-      <Tabs.Screen name="track" options={{ title: 'Track', tabBarIcon: tab('map-marker-radius', 'map-marker-radius-outline') }} />
-      <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: tab('account', 'account-outline') }} />
+      <Tabs.Screen name="home" options={{ title: t('tabs.home'), tabBarIcon: tab('home-variant', 'home-variant-outline') }} />
+      <Tabs.Screen name="animals" options={{ title: t('tabs.animals'), tabBarIcon: cowTab }} />
+      <Tabs.Screen name="track" options={{ title: t('tabs.track'), tabBarIcon: tab('map-marker-radius', 'map-marker-radius-outline') }} />
+      <Tabs.Screen name="profile" options={{ title: t('tabs.profile'), tabBarIcon: tab('account', 'account-outline') }} />
     </Tabs>
   );
 }

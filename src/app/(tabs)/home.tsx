@@ -15,6 +15,7 @@ import { useAuth } from '@/services/auth';
 import { roleTheme } from '@/lib/roles';
 import { Permission } from '@/lib/permissions';
 import { TAGGING_META, TaggingMethod, taggingMeta } from '@/lib/tagging';
+import { useT } from '@/i18n';
 import { AppText, Icon, IconName, NavBanner, NotificationBell } from '@/ui';
 
 function initials(name: string): string {
@@ -24,67 +25,69 @@ function initials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+// `label` holds an i18n key (translated at render via t()), so the grids switch
+// language with the rest of the app.
 type Action = { icon: IconName; label: string; route: string; tint: string; perm?: Permission };
 
 // Farmer "Herd Operations Console" — day-to-day herd work. `perm` gates the
 // action for delegated seat members; owners/solo farmers hold every permission
 // so they see the full grid unchanged. Team & Payments are owner-only.
 const FARMER_ACTIONS: Action[] = [
-  { icon: 'stethoscope', label: 'Find a Vet', route: '/find-vet', tint: '#21C45D', perm: 'book_vet' },
-  { icon: 'clipboard-pulse-outline', label: 'Vet Requests', route: '/vet-requests', tint: '#EF4444', perm: 'book_vet' },
-  { icon: 'plus-circle-outline', label: 'Register Animal', route: '/register-animal', tint: '#6D874F', perm: 'register_animal' },
-  { icon: 'check-decagram-outline', label: 'Activation', route: '/approvals', tint: '#F59E0B' },
-  { icon: 'heart-pulse', label: 'Managed Health', route: '/health', tint: '#EF4444', perm: 'view_health' },
-  { icon: 'dna', label: 'Breeding', route: '/breeding', tint: '#EC4899', perm: 'view_animals' },
-  { icon: 'calendar-month-outline', label: 'Calendar', route: '/calendar', tint: '#0EA5E9' },
-  { icon: 'clipboard-list-outline', label: 'Stock Take', route: '/stock-take', tint: '#F59E0B', perm: 'stock_take' },
-  { icon: 'cow', label: 'View Animals', route: '/(tabs)/animals', tint: '#2563EB', perm: 'view_animals' },
-  { icon: 'map-marker-radius', label: 'Track Animals', route: '/(tabs)/track', tint: '#16A34A', perm: 'view_track' },
-  { icon: 'map-marker-outline', label: 'Farm Map', route: '/locations', tint: '#0D9488' },
-  { icon: 'message-text-outline', label: 'Messages', route: '/messaging', tint: '#F59E0B' },
-  { icon: 'storefront-outline', label: 'Marketplace', route: '/marketplace', tint: '#0D9488' },
-  { icon: 'account-group-outline', label: 'Team & Seats', route: '/team', tint: '#0284C7' },
-  { icon: 'wallet-outline', label: 'Payments', route: '/payments', tint: '#9333EA' },
+  { icon: 'stethoscope', label: 'action.findVet', route: '/find-vet', tint: '#21C45D', perm: 'book_vet' },
+  { icon: 'clipboard-pulse-outline', label: 'action.vetRequests', route: '/vet-requests', tint: '#EF4444', perm: 'book_vet' },
+  { icon: 'plus-circle-outline', label: 'action.registerAnimal', route: '/register-animal', tint: '#6D874F', perm: 'register_animal' },
+  { icon: 'check-decagram-outline', label: 'action.activation', route: '/approvals', tint: '#F59E0B' },
+  { icon: 'heart-pulse', label: 'action.managedHealth', route: '/health', tint: '#EF4444', perm: 'view_health' },
+  { icon: 'dna', label: 'action.breeding', route: '/breeding', tint: '#EC4899', perm: 'view_animals' },
+  { icon: 'calendar-month-outline', label: 'action.calendar', route: '/calendar', tint: '#0EA5E9' },
+  { icon: 'clipboard-list-outline', label: 'action.stockTake', route: '/stock-take', tint: '#F59E0B', perm: 'stock_take' },
+  { icon: 'cow', label: 'action.viewAnimals', route: '/(tabs)/animals', tint: '#2563EB', perm: 'view_animals' },
+  { icon: 'map-marker-radius', label: 'action.trackAnimals', route: '/(tabs)/track', tint: '#16A34A', perm: 'view_track' },
+  { icon: 'map-marker-outline', label: 'action.farmMap', route: '/locations', tint: '#0D9488' },
+  { icon: 'message-text-outline', label: 'action.messages', route: '/messaging', tint: '#F59E0B' },
+  { icon: 'storefront-outline', label: 'action.marketplace', route: '/marketplace', tint: '#0D9488' },
+  { icon: 'account-group-outline', label: 'action.teamSeats', route: '/team', tint: '#0284C7' },
+  { icon: 'wallet-outline', label: 'action.payments', route: '/payments', tint: '#9333EA' },
 ];
 
 // Admin "Enterprise Control Center" — organisation-wide oversight tools that a
 // farmer does not get (mirrors the Command Center's adminNav superset).
 const ADMIN_ACTIONS: Action[] = [
-  { icon: 'account-multiple-outline', label: 'Farmers Portfolio', route: '/farmers', tint: '#6D874F' },
-  { icon: 'check-decagram-outline', label: 'Activation', route: '/approvals', tint: '#F59E0B' },
-  { icon: 'cow', label: 'Livestock', route: '/(tabs)/animals', tint: '#2563EB' },
-  { icon: 'map-marker-radius', label: 'Track', route: '/(tabs)/track', tint: '#16A34A' },
-  { icon: 'chart-box-outline', label: 'Insights', route: '/insights', tint: '#0D9488' },
-  { icon: 'chart-timeline-variant', label: 'Telemetry', route: '/telemetry', tint: '#0EA5E9' },
-  { icon: 'file-chart-outline', label: 'Reports', route: '/reports', tint: '#6D874F' },
-  { icon: 'storefront-outline', label: 'Marketplace', route: '/marketplace', tint: '#0D9488' },
-  { icon: 'webhook', label: 'Webhook Monitor', route: '/webhook-monitor', tint: '#7C3AED' },
-  { icon: 'shield-check-outline', label: 'Linkage Health', route: '/linkage-health', tint: '#0891B2' },
-  { icon: 'cloud-alert', label: 'Alert History', route: '/alerts', tint: '#EF4444' },
-  { icon: 'heart-pulse', label: 'Managed Health', route: '/health', tint: '#DC2626' },
-  { icon: 'dna', label: 'Breeding', route: '/breeding', tint: '#EC4899' },
-  { icon: 'radar', label: 'Disease Surveillance', route: '/surveillance', tint: '#0D9488' },
-  { icon: 'alert-octagon-outline', label: 'Incidents & SLA', route: '/incidents', tint: '#DC2626' },
-  { icon: 'calendar-month-outline', label: 'Calendar', route: '/calendar', tint: '#0EA5E9' },
-  { icon: 'message-text-outline', label: 'Messages', route: '/messaging', tint: '#F59E0B' },
-  { icon: 'account-group-outline', label: 'Team & Users', route: '/users', tint: '#0284C7' },
-  { icon: 'clipboard-pulse-outline', label: 'Vet Call-outs', route: '/vet', tint: '#F59E0B' },
-  { icon: 'account-plus-outline', label: 'Enlist a Vet', route: '/enlist-vet', tint: '#21C45D' },
-  { icon: 'tag-outline', label: 'Devices', route: '/devices', tint: '#9333EA' },
-  { icon: 'map-marker-outline', label: 'Locations', route: '/locations', tint: '#0D9488' },
+  { icon: 'account-multiple-outline', label: 'action.farmersPortfolio', route: '/farmers', tint: '#6D874F' },
+  { icon: 'check-decagram-outline', label: 'action.activation', route: '/approvals', tint: '#F59E0B' },
+  { icon: 'cow', label: 'action.livestock', route: '/(tabs)/animals', tint: '#2563EB' },
+  { icon: 'map-marker-radius', label: 'action.track', route: '/(tabs)/track', tint: '#16A34A' },
+  { icon: 'chart-box-outline', label: 'action.insights', route: '/insights', tint: '#0D9488' },
+  { icon: 'chart-timeline-variant', label: 'action.telemetry', route: '/telemetry', tint: '#0EA5E9' },
+  { icon: 'file-chart-outline', label: 'action.reports', route: '/reports', tint: '#6D874F' },
+  { icon: 'storefront-outline', label: 'action.marketplace', route: '/marketplace', tint: '#0D9488' },
+  { icon: 'webhook', label: 'action.webhookMonitor', route: '/webhook-monitor', tint: '#7C3AED' },
+  { icon: 'shield-check-outline', label: 'action.linkageHealth', route: '/linkage-health', tint: '#0891B2' },
+  { icon: 'cloud-alert', label: 'action.alertHistory', route: '/alerts', tint: '#EF4444' },
+  { icon: 'heart-pulse', label: 'action.managedHealth', route: '/health', tint: '#DC2626' },
+  { icon: 'dna', label: 'action.breeding', route: '/breeding', tint: '#EC4899' },
+  { icon: 'radar', label: 'action.diseaseSurveillance', route: '/surveillance', tint: '#0D9488' },
+  { icon: 'alert-octagon-outline', label: 'profile.row.incidentsSla', route: '/incidents', tint: '#DC2626' },
+  { icon: 'calendar-month-outline', label: 'action.calendar', route: '/calendar', tint: '#0EA5E9' },
+  { icon: 'message-text-outline', label: 'action.messages', route: '/messaging', tint: '#F59E0B' },
+  { icon: 'account-group-outline', label: 'action.teamUsers', route: '/users', tint: '#0284C7' },
+  { icon: 'clipboard-pulse-outline', label: 'action.vetCallouts', route: '/vet', tint: '#F59E0B' },
+  { icon: 'account-plus-outline', label: 'action.enlistVet', route: '/enlist-vet', tint: '#21C45D' },
+  { icon: 'tag-outline', label: 'action.devices', route: '/devices', tint: '#9333EA' },
+  { icon: 'map-marker-outline', label: 'action.locations', route: '/locations', tint: '#0D9488' },
 ];
 
 // Vet "Health Intelligence System" — clinical oversight across assigned farms.
 const VET_ACTIONS: Action[] = [
-  { icon: 'clipboard-pulse-outline', label: 'Call-out Queue', route: '/vet', tint: '#3D99F5' },
-  { icon: 'clipboard-edit-outline', label: 'Log a Visit', route: '/log-visit', tint: '#16A34A' },
-  { icon: 'heart-pulse', label: 'Managed Health', route: '/health', tint: '#EF4444' },
-  { icon: 'cow', label: 'Livestock', route: '/(tabs)/animals', tint: '#2563EB' },
-  { icon: 'calendar-month-outline', label: 'Calendar', route: '/calendar', tint: '#0EA5E9' },
-  { icon: 'file-chart-outline', label: 'Reports', route: '/vet-reports', tint: '#6D874F' },
-  { icon: 'tag-outline', label: 'Devices', route: '/devices', tint: '#9333EA' },
-  { icon: 'storefront-outline', label: 'Marketplace', route: '/marketplace', tint: '#0D9488' },
-  { icon: 'message-text-outline', label: 'Messages', route: '/messaging', tint: '#F59E0B' },
+  { icon: 'clipboard-pulse-outline', label: 'action.calloutQueue', route: '/vet', tint: '#3D99F5' },
+  { icon: 'clipboard-edit-outline', label: 'action.logVisit', route: '/log-visit', tint: '#16A34A' },
+  { icon: 'heart-pulse', label: 'action.managedHealth', route: '/health', tint: '#EF4444' },
+  { icon: 'cow', label: 'action.livestock', route: '/vet-animals', tint: '#2563EB' },
+  { icon: 'calendar-month-outline', label: 'action.calendar', route: '/calendar', tint: '#0EA5E9' },
+  { icon: 'file-chart-outline', label: 'action.reports', route: '/vet-reports', tint: '#6D874F' },
+  { icon: 'tag-outline', label: 'action.devices', route: '/devices', tint: '#9333EA' },
+  { icon: 'storefront-outline', label: 'action.marketplace', route: '/marketplace', tint: '#0D9488' },
+  { icon: 'message-text-outline', label: 'action.messages', route: '/messaging', tint: '#F59E0B' },
 ];
 
 function HeaderStat({ value, label }: { value: number; label: string }) {
@@ -141,6 +144,7 @@ function KpiTile({ value, label, icon, tint }: { value: number; label: string; i
 export default function Home() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const t = useT();
   const { user, appRole, can, canManageTeam } = useAuth();
   const displayName = user?.fullName?.trim() || user?.email?.split('@')[0] || 'Ngaren user';
   const { data: summary } = useResource(getSummary, summaryFallback);
@@ -224,7 +228,7 @@ export default function Home() {
               color="#fff"
             />
             <AppText variant="caption" color="#fff" style={{ fontWeight: '700', letterSpacing: 0.5 }}>
-              {theme.label.toUpperCase()} · {theme.consoleTitle}
+              {t(`role.${appRole}`).toUpperCase()} · {t(`console.${appRole}`)}
             </AppText>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
@@ -247,7 +251,7 @@ export default function Home() {
 
         <View style={{ marginTop: spacing.md }}>
           <AppText variant="bodyLarge" color="rgba(255,255,255,0.9)">
-            Welcome back,
+            {t('home.welcome')}
           </AppText>
           <AppText variant="headline" color="#fff">
             {displayName}
@@ -257,22 +261,22 @@ export default function Home() {
         <View style={{ flexDirection: 'row', marginTop: spacing.md }}>
           {isAdmin ? (
             <>
-              <HeaderStat value={totals.farmers} label="Farmers" />
-              <HeaderStat value={totals.animals} label="Animals" />
-              <HeaderStat value={totals.devices} label="Devices" />
-              <HeaderStat value={totals.activeTags} label="Active tags" />
+              <HeaderStat value={totals.farmers} label={t('home.stat.farmers')} />
+              <HeaderStat value={totals.animals} label={t('home.stat.animals')} />
+              <HeaderStat value={totals.devices} label={t('home.stat.devices')} />
+              <HeaderStat value={totals.activeTags} label={t('home.stat.activeTags')} />
             </>
           ) : isVet ? (
             <>
-              <HeaderStat value={vetMetrics.immediateAttention} label="Urgent" />
-              <HeaderStat value={vetMetrics.openCases} label="Open cases" />
-              <HeaderStat value={vetMetrics.pendingRequests} label="Requests" />
+              <HeaderStat value={vetMetrics.immediateAttention} label={t('home.stat.urgent')} />
+              <HeaderStat value={vetMetrics.openCases} label={t('home.stat.openCases')} />
+              <HeaderStat value={vetMetrics.pendingRequests} label={t('home.stat.requests')} />
             </>
           ) : (
             <>
-              <HeaderStat value={summary.animals} label="My Animals" />
-              <HeaderStat value={summary.devices} label="Devices" />
-              <HeaderStat value={summary.locations} label="Locations" />
+              <HeaderStat value={summary.animals} label={t('home.stat.myAnimals')} />
+              <HeaderStat value={summary.devices} label={t('home.stat.devices')} />
+              <HeaderStat value={summary.locations} label={t('home.stat.locations')} />
             </>
           )}
         </View>
@@ -283,13 +287,13 @@ export default function Home() {
         {isAdmin && (
           <>
             <AppText variant="title" style={{ marginBottom: spacing.md }}>
-              Portfolio overview
+              {t('home.section.portfolio')}
             </AppText>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.lg }}>
-              <KpiTile value={totals.farmers} label="Farmers" icon="account-multiple-outline" tint="#6D874F" />
-              <KpiTile value={totals.needAttention} label="Need attention" icon="alert-outline" tint="#F59E0B" />
-              <KpiTile value={totals.activeTags} label="Active tags" icon="access-point" tint="#16A34A" />
-              <KpiTile value={summary.connectivity.unconnected} label="Devices offline" icon="access-point-off" tint="#EF4444" />
+              <KpiTile value={totals.farmers} label={t('home.kpi.farmers')} icon="account-multiple-outline" tint="#6D874F" />
+              <KpiTile value={totals.needAttention} label={t('home.kpi.needAttention')} icon="alert-outline" tint="#F59E0B" />
+              <KpiTile value={totals.activeTags} label={t('home.kpi.activeTags')} icon="access-point" tint="#16A34A" />
+              <KpiTile value={summary.connectivity.unconnected} label={t('home.kpi.devicesOffline')} icon="access-point-off" tint="#EF4444" />
             </View>
           </>
         )}
@@ -298,13 +302,13 @@ export default function Home() {
         {isVet && (
           <>
             <AppText variant="title" style={{ marginBottom: spacing.md }}>
-              Clinical overview
+              {t('home.section.clinical')}
             </AppText>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.lg }}>
-              <KpiTile value={vetMetrics.immediateAttention} label="Immediate attention" icon="alert-decagram-outline" tint="#EF4444" />
-              <KpiTile value={vetMetrics.pendingRequests} label="Pending requests" icon="clipboard-clock-outline" tint="#F59E0B" />
-              <KpiTile value={vetMetrics.openCases} label="Open cases" icon="folder-heart-outline" tint="#3D99F5" />
-              <KpiTile value={vetMetrics.recentlyReviewed} label="Reviewed" icon="check-decagram-outline" tint="#16A34A" />
+              <KpiTile value={vetMetrics.immediateAttention} label={t('home.kpi.immediateAttention')} icon="alert-decagram-outline" tint="#EF4444" />
+              <KpiTile value={vetMetrics.pendingRequests} label={t('home.kpi.pendingRequests')} icon="clipboard-clock-outline" tint="#F59E0B" />
+              <KpiTile value={vetMetrics.openCases} label={t('home.kpi.openCases')} icon="folder-heart-outline" tint="#3D99F5" />
+              <KpiTile value={vetMetrics.recentlyReviewed} label={t('home.kpi.reviewed')} icon="check-decagram-outline" tint="#16A34A" />
             </View>
           </>
         )}
@@ -312,8 +316,8 @@ export default function Home() {
         {/* Farmer-only tag-health insight band (per tester feedback). */}
         {!isAdmin && !isVet && (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.lg }}>
-            <KpiTile value={activeTags} label="Active tags" icon="access-point" tint="#16A34A" />
-            <KpiTile value={inactiveTags} label="Inactive tags" icon="access-point-off" tint="#F59E0B" />
+            <KpiTile value={activeTags} label={t('home.kpi.activeTags')} icon="access-point" tint="#16A34A" />
+            <KpiTile value={inactiveTags} label={t('home.kpi.inactiveTags')} icon="access-point-off" tint="#F59E0B" />
           </View>
         )}
 
@@ -323,8 +327,8 @@ export default function Home() {
             variant="alert"
             tint="#F59E0B"
             icon="clipboard-alert-outline"
-            title={`${pendingCount} animal${pendingCount === 1 ? '' : 's'} awaiting activation`}
-            subtitle="Validate and activate newly created records."
+            title={pendingCount === 1 ? t('home.banner.awaitingActivationOne') : t('home.banner.awaitingActivation', { count: pendingCount })}
+            subtitle={t('home.banner.validateActivate')}
             onPress={() => router.push('/approvals' as never)}
             style={{ marginBottom: spacing.lg }}
           />
@@ -335,8 +339,8 @@ export default function Home() {
           <NavBanner
             tint="#21C45D"
             icon="clipboard-pulse-outline"
-            title={`${vetReqCounts.total} active vet request${vetReqCounts.total === 1 ? '' : 's'}`}
-            subtitle={`${vetReqCounts.pending} awaiting a vet · ${vetReqCounts.accepted} accepted`}
+            title={vetReqCounts.total === 1 ? t('home.banner.vetRequestsOne') : t('home.banner.vetRequests', { count: vetReqCounts.total })}
+            subtitle={t('home.banner.vetRequestsSub', { pending: vetReqCounts.pending, accepted: vetReqCounts.accepted })}
             onPress={() => router.push('/vet-requests' as never)}
             style={{ marginBottom: spacing.lg }}
           />
@@ -346,7 +350,7 @@ export default function Home() {
         {!isVet && classifiedCount > 0 && (
           <>
             <AppText variant="title" style={{ marginBottom: spacing.md }}>
-              By device type
+              {t('home.section.byDevice')}
             </AppText>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.lg }}>
               {(Object.keys(TAGGING_META) as TaggingMethod[]).map((m) => (
@@ -366,14 +370,14 @@ export default function Home() {
             dashboard for every role (farmers/admins land here, not only vets). */}
         <NavBanner
           icon="folder-multiple-outline"
-          title="Documents"
-          subtitle="Scorecards & reports — preview, share, auto-deleted after 30 days."
+          title={t('home.banner.documents')}
+          subtitle={t('home.banner.documentsSub')}
           onPress={() => router.push('/documents' as never)}
           style={{ marginBottom: spacing.lg }}
         />
 
         <AppText variant="title" style={{ marginBottom: spacing.md }}>
-          {isAdmin ? 'Control center' : isVet ? 'Clinical tools' : 'Quick actions'}
+          {isAdmin ? t('home.section.controlCenter') : isVet ? t('home.section.clinicalTools') : t('home.section.quickActions')}
         </AppText>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
           {actions.map((a) => (
@@ -404,7 +408,7 @@ export default function Home() {
                 <Icon name={a.icon} size={26} color={a.tint} />
               </View>
               <AppText variant="bodyLarge" style={{ fontWeight: '600' }}>
-                {a.label}
+                {t(a.label)}
               </AppText>
             </Pressable>
           ))}

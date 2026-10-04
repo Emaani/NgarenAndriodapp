@@ -7,6 +7,7 @@ import { getCalloutRequests, updateCalloutStatus } from '@/data/api';
 import { getMyVetImpact } from '@/data/vetProfiles';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
+import { useT } from '@/i18n';
 import { ActionChip, AppText, Button, GradientHeader, Icon, IconChip, IconName, NavBanner, Screen, SyncStatus, VetImpactDashboard, VetSchedule } from '@/ui';
 
 const EMPTY_IMPACT: VetImpact = {
@@ -28,25 +29,24 @@ const FILTERS: { key: Filter; label: string }[] = [
 // Vet-side quick actions (Oct 2026 standup): register an (unregistered) animal,
 // start a scorecard, and the core service entry points.
 const QUICK_ACTIONS: { label: string; icon: IconName; route: string; tint: string }[] = [
-  { label: 'Register Animal', icon: 'plus-circle-outline', route: '/register-animal', tint: '#6D874F' },
-  { label: 'New Scorecard', icon: 'clipboard-plus-outline', route: '/health-scorecard', tint: '#2563EB' },
-  { label: 'Stock-take', icon: 'clipboard-list-outline', route: '/stock-take', tint: '#F59E0B' },
-  { label: 'Log a Visit', icon: 'clipboard-edit-outline', route: '/log-visit', tint: '#16A34A' },
+  { label: 'action.registerAnimal', icon: 'plus-circle-outline', route: '/register-animal', tint: '#6D874F' },
+  { label: 'action.newScorecard', icon: 'clipboard-plus-outline', route: '/health-scorecard', tint: '#2563EB' },
+  { label: 'action.stockTake', icon: 'clipboard-list-outline', route: '/stock-take', tint: '#F59E0B' },
+  { label: 'action.logVisit', icon: 'clipboard-edit-outline', route: '/log-visit', tint: '#16A34A' },
 ];
 
 // Clinical navigation (webapp vet nav parity): the sections a vet reaches
 // beyond the day-to-day quick actions above. Keeps every vetNav destination
 // discoverable from the dashboard rather than buried.
 const CLINICAL_NAV: { label: string; icon: IconName; route: string; tint: string }[] = [
-  // NOTE: the animals *list* lives in the (tabs) group, which redirects vets to
-  // this dashboard — so there is no vet-reachable livestock list yet. Vets open
-  // individual animals from call-outs/scorecards instead. A standalone vet herd
-  // list is a tracked follow-up; omitted here rather than shipping a bounce.
-  { label: 'Managed Health', icon: 'heart-pulse', route: '/health', tint: '#EF4444' },
-  { label: 'Breeding', icon: 'dna', route: '/breeding', tint: '#EC4899' },
-  { label: 'Devices', icon: 'tag-outline', route: '/devices', tint: '#9333EA' },
-  { label: 'Messages', icon: 'message-text-outline', route: '/messaging', tint: '#F59E0B' },
-  { label: 'Marketplace', icon: 'storefront-outline', route: '/marketplace', tint: '#0D9488' },
+  // Livestock uses the dedicated vet herd list (/vet-animals), not the (tabs)
+  // animals list — the tab group redirects vets back to this dashboard.
+  { label: 'action.livestock', icon: 'cow', route: '/vet-animals', tint: '#2563EB' },
+  { label: 'action.managedHealth', icon: 'heart-pulse', route: '/health', tint: '#EF4444' },
+  { label: 'action.breeding', icon: 'dna', route: '/breeding', tint: '#EC4899' },
+  { label: 'action.devices', icon: 'tag-outline', route: '/devices', tint: '#9333EA' },
+  { label: 'action.messages', icon: 'message-text-outline', route: '/messaging', tint: '#F59E0B' },
+  { label: 'action.marketplace', icon: 'storefront-outline', route: '/marketplace', tint: '#0D9488' },
 ];
 
 const urgencyVariant = (u: CalloutUrgency) =>
@@ -81,6 +81,7 @@ function RequestCard({
   onDecline: () => void;
   onMap: () => void;
 }) {
+  const t = useT();
   // Reveal-on-accept (Sep 5 2026 anonymized vet view): before the vet accepts,
   // the requesting farmer's identity and precise location are hidden — only the
   // animal, priority, distance and reason show, enough to decide. Accepting
@@ -134,12 +135,12 @@ function RequestCard({
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
             <Icon name="shield-lock-outline" size={13} color={colors.onSurfaceVariant} />
             <AppText variant="caption" color={colors.onSurfaceVariant}>
-              Farmer’s name & exact location are revealed once you accept.
+              {t('vet.revealNote')}
             </AppText>
           </View>
           <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-            <Button label="Decline" variant="outline" onPress={onDecline} style={{ flex: 1 }} />
-            <Button label="Accept" icon="check" onPress={onAccept} style={{ flex: 1 }} />
+            <Button label={t('vet.decline')} variant="outline" onPress={onDecline} style={{ flex: 1 }} />
+            <Button label={t('vet.accept')} icon="check" onPress={onAccept} style={{ flex: 1 }} />
           </View>
         </>
       ) : (
@@ -148,7 +149,7 @@ function RequestCard({
           <Pressable onPress={onMap} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }} hitSlop={8}>
             <Icon name="map-marker-radius" size={18} color={colors.primary} />
             <AppText variant="body" color={colors.primary} style={{ fontWeight: '600' }}>
-              View on map
+              {t('vet.viewOnMap')}
             </AppText>
           </Pressable>
         </View>
@@ -159,6 +160,7 @@ function RequestCard({
 
 export default function VetDashboard() {
   const router = useRouter();
+  const t = useT();
   const { canVet, isAuthenticated, loading, user, signOut } = useAuth();
   const [requests, setRequests] = useState<CalloutRequest[]>([]);
   const [filter, setFilter] = useState<Filter>('pending');
@@ -224,16 +226,16 @@ export default function VetDashboard() {
         }>
         <View style={{ marginTop: spacing.xs }}>
           <AppText variant="bodyLarge" color="rgba(255,255,255,0.9)">
-            Vet dashboard
+            {t('vet.dashboard')}
           </AppText>
           <AppText variant="headline" color="#fff">
-            {user?.fullName?.trim() || user?.email || 'Veterinarian'}
+            {user?.fullName?.trim() || user?.email || t('vet.veterinarian')}
           </AppText>
         </View>
         <View style={{ flexDirection: 'row', marginTop: spacing.md }}>
-          <HeaderStat value={counts.pending} label="Pending" />
-          <HeaderStat value={counts.accepted} label="Accepted" />
-          <HeaderStat value={counts.completed} label="Completed" />
+          <HeaderStat value={counts.pending} label={t('vet.stat.pending')} />
+          <HeaderStat value={counts.accepted} label={t('vet.stat.accepted')} />
+          <HeaderStat value={counts.completed} label={t('vet.stat.completed')} />
         </View>
       </GradientHeader>
 
@@ -246,7 +248,7 @@ export default function VetDashboard() {
         {/* Quick actions (Oct 2026 standup): animal registration + service entry
             points on the vet side, with clear navigation. */}
         <AppText variant="title" style={{ marginBottom: spacing.sm }}>
-          Quick actions
+          {t('home.section.quickActions')}
         </AppText>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg }}>
           {QUICK_ACTIONS.map((a) => (
@@ -261,7 +263,7 @@ export default function VetDashboard() {
                 <Icon name={a.icon} size={19} color={a.tint} />
               </View>
               <AppText variant="body" style={{ fontWeight: '600', flex: 1 }}>
-                {a.label}
+                {t(a.label)}
               </AppText>
             </Pressable>
           ))}
@@ -270,7 +272,7 @@ export default function VetDashboard() {
         {/* Clinical navigation (webapp vet-nav parity) — Livestock, Managed
             Health, Breeding, Devices, Messages all reachable from the hub. */}
         <AppText variant="title" style={{ marginBottom: spacing.sm }}>
-          Clinical tools
+          {t('home.section.clinicalTools')}
         </AppText>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg }}>
           {CLINICAL_NAV.map((a) => (
@@ -285,7 +287,7 @@ export default function VetDashboard() {
                 <Icon name={a.icon} size={19} color={a.tint} />
               </View>
               <AppText variant="body" style={{ fontWeight: '600', flex: 1 }}>
-                {a.label}
+                {t(a.label)}
               </AppText>
             </Pressable>
           ))}
@@ -293,7 +295,7 @@ export default function VetDashboard() {
 
         {/* Veterinary impact dashboard — the vet's reach, counted from records. */}
         <AppText variant="title" style={{ marginBottom: spacing.sm }}>
-          My impact
+          {t('vet.section.myImpact')}
         </AppText>
         <View style={{ marginBottom: spacing.lg }}>
           <VetImpactDashboard impact={impact} />
@@ -301,10 +303,10 @@ export default function VetDashboard() {
 
         {/* My calendar — received bookings shown as time slots (Sep 12 2026). */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }}>
-          <AppText variant="title">My calendar</AppText>
+          <AppText variant="title">{t('vet.section.myCalendar')}</AppText>
           <Pressable onPress={() => router.push('/calendar' as never)} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
             <AppText variant="body" color={colors.primary} style={{ fontWeight: '600' }}>
-              Full calendar
+              {t('vet.fullCalendar')}
             </AppText>
             <Icon name="chevron-right" size={18} color={colors.primary} />
           </Pressable>
@@ -317,14 +319,14 @@ export default function VetDashboard() {
             and openable here. */}
         <NavBanner
           icon="folder-multiple-outline"
-          title="Documents"
-          subtitle="Generated scorecards & reports — preview, share, auto-deleted after 30 days."
+          title={t('home.banner.documents')}
+          subtitle={t('home.banner.documentsSub')}
           onPress={() => router.push('/documents' as never)}
           style={{ marginBottom: spacing.lg }}
         />
 
         <AppText variant="title" style={{ marginBottom: spacing.sm }}>
-          Call-out requests
+          {t('vet.section.calloutRequests')}
         </AppText>
         <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
           {FILTERS.map((f) => {
@@ -342,7 +344,7 @@ export default function VetDashboard() {
                   borderColor: active ? colors.primary : colors.divider,
                 }}>
                 <AppText variant="body" color={active ? '#fff' : colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
-                  {f.label}
+                  {t(`vet.filter.${f.key}`)}
                 </AppText>
               </Pressable>
             );
@@ -353,7 +355,7 @@ export default function VetDashboard() {
           <View style={{ alignItems: 'center', paddingVertical: spacing.xxl, gap: spacing.sm }}>
             <Icon name="clipboard-check-outline" size={44} color={colors.onSurfaceVariant} />
             <AppText variant="bodyLarge" color={colors.onSurfaceVariant}>
-              No requests here
+              {t('vet.noRequests')}
             </AppText>
           </View>
         ) : (

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { colors, radius, spacing } from '@/theme';
 import { failedSyncCount, pendingSyncCount, processSyncQueue, syncNow } from '@/data/syncQueue';
+import { useT } from '@/i18n';
 import { AppText } from './AppText';
 import { Icon } from './Icon';
 
@@ -12,6 +13,7 @@ import { Icon } from './Icon';
  * nudges it while mounted, and drains dead-lettered writes on tap.
  */
 export function SyncStatus({ onSynced }: { onSynced?: () => void }) {
+  const t = useT();
   const [pending, setPending] = useState(0);
   const [failed, setFailed] = useState(0);
   const [syncing, setSyncing] = useState(false);
@@ -55,12 +57,16 @@ export function SyncStatus({ onSynced }: { onSynced?: () => void }) {
   const tintBg = failed > 0 ? colors.errorTint : hasWork ? colors.warningTint : colors.successTint;
   const icon = syncing ? 'sync' : failed > 0 ? 'cloud-alert' : hasWork ? 'cloud-upload-outline' : 'cloud-check-outline';
   const label = syncing
-    ? 'Syncing…'
+    ? t('sync.syncing')
     : failed > 0
-      ? `${failed} write${failed === 1 ? '' : 's'} failed — tap to retry`
+      ? failed === 1
+        ? t('sync.failedOne')
+        : t('sync.failed', { count: failed })
       : hasWork
-        ? `${pending} write${pending === 1 ? '' : 's'} pending — tap to sync`
-        : 'All records synced';
+        ? pending === 1
+          ? t('sync.pendingOne')
+          : t('sync.pending', { count: pending })
+        : t('sync.allSynced');
 
   return (
     <Pressable

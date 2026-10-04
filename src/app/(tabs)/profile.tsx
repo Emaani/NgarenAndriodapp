@@ -2,52 +2,53 @@ import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { useAuth } from '@/services/auth';
-import { LOCALES, useI18n } from '@/i18n';
+import { LOCALES, useI18n, useT } from '@/i18n';
 import { AppText, GradientHeader, Icon, IconName, Screen } from '@/ui';
 
 type Row = { icon: IconName; label: string; route?: string; tint?: string };
 type Section = { title: string; rows: Row[] };
 
 const ACCOUNT_SECTION: Section = {
-  title: 'Account',
+  title: 'profile.section.account',
   rows: [
-    { icon: 'account-outline', label: 'Edit Profile', route: '/edit-profile' },
-    { icon: 'lock-reset', label: 'Change Password', route: '/change-password' },
-    { icon: 'map-marker-outline', label: 'My Locations', route: '/locations' },
-    { icon: 'tag-outline', label: 'My Devices', route: '/devices' },
+    { icon: 'account-outline', label: 'profile.row.editProfile', route: '/edit-profile' },
+    { icon: 'lock-reset', label: 'profile.row.changePassword', route: '/change-password' },
+    { icon: 'map-marker-outline', label: 'profile.row.myLocations', route: '/locations' },
+    { icon: 'tag-outline', label: 'profile.row.myDevices', route: '/devices' },
   ],
 };
 
 // Admin-only: manage the team, incidents and the account subscription,
 // mirroring the Command Center's Users / Incidents pages and billing ownership.
 const ADMIN_SECTION: Section = {
-  title: 'Administration',
+  title: 'profile.section.administration',
   rows: [
-    { icon: 'account-group-outline', label: 'Team Management', route: '/users', tint: '#2563EB' },
-    { icon: 'alert-octagon-outline', label: 'Incidents & SLA', route: '/incidents', tint: '#DC2626' },
-    { icon: 'clipboard-pulse-outline', label: 'Vet Call-outs', route: '/vet', tint: '#EF4444' },
+    { icon: 'account-group-outline', label: 'profile.row.teamManagement', route: '/users', tint: '#2563EB' },
+    { icon: 'alert-octagon-outline', label: 'profile.row.incidentsSla', route: '/incidents', tint: '#DC2626' },
+    { icon: 'clipboard-pulse-outline', label: 'profile.row.vetCallouts', route: '/vet', tint: '#EF4444' },
   ],
 };
 
 const BILLING_SECTION: Section = {
-  title: 'Billing',
+  title: 'profile.section.billing',
   rows: [
-    { icon: 'wallet-outline', label: 'Payments & Subscription', route: '/payments', tint: '#9333EA' },
-    { icon: 'receipt', label: 'Billing History', route: '/payments' },
+    { icon: 'wallet-outline', label: 'profile.row.paymentsSubscription', route: '/payments', tint: '#9333EA' },
+    { icon: 'receipt', label: 'profile.row.billingHistory', route: '/payments' },
   ],
 };
 
 const SUPPORT_SECTION: Section = {
-  title: 'Support',
+  title: 'profile.section.support',
   rows: [
-    { icon: 'message-outline', label: 'Messages', route: '/messaging' },
-    { icon: 'bell-outline', label: 'Notifications', route: '/notifications' },
-    { icon: 'cog-outline', label: 'Settings', route: '/settings' },
-    { icon: 'help-circle-outline', label: 'Help & Support', route: '/help' },
+    { icon: 'message-outline', label: 'profile.row.messages', route: '/messaging' },
+    { icon: 'bell-outline', label: 'profile.row.notifications', route: '/notifications' },
+    { icon: 'cog-outline', label: 'profile.row.settings', route: '/settings' },
+    { icon: 'help-circle-outline', label: 'profile.row.helpSupport', route: '/help' },
   ],
 };
 
 function MenuRow({ row, onPress, last }: { row: Row; onPress: () => void; last?: boolean }) {
+  const t = useT();
   return (
     <Pressable
       onPress={onPress}
@@ -61,7 +62,7 @@ function MenuRow({ row, onPress, last }: { row: Row; onPress: () => void; last?:
       }}>
       <Icon name={row.icon} size={22} color={row.tint ?? colors.primary} />
       <AppText variant="bodyLarge" style={{ flex: 1 }}>
-        {row.label}
+        {t(row.label)}
       </AppText>
       <Icon name="chevron-right" size={22} color={colors.onSurfaceVariant} />
     </Pressable>
@@ -170,7 +171,7 @@ export default function Profile() {
         {sections.map((section) => (
           <View key={section.title} style={{ marginBottom: spacing.lg }}>
             <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm, textTransform: 'uppercase' }}>
-              {section.title}
+              {t(section.title)}
             </AppText>
             <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.md }, shadow[1]]}>
               {section.rows.map((row, i) => (
@@ -190,7 +191,7 @@ export default function Profile() {
           style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.md }}>
           <Icon name="logout" size={20} color={colors.error} />
           <AppText variant="bodyLarge" color={colors.error} style={{ fontWeight: '600' }}>
-            Log Out
+            {t('common.logOut')}
           </AppText>
         </Pressable>
       </Screen>

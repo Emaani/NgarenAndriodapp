@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, spacing } from '@/theme';
 import { useAuth } from '@/services/auth';
+import { useT } from '@/i18n';
 import { AppText, Button, GradientHeader, Input, Screen } from '@/ui';
 
 const MIN_LEN = 8;
@@ -17,6 +18,7 @@ const MIN_LEN = 8;
  */
 export default function ChangePassword() {
   const router = useRouter();
+  const t = useT();
   const { changePassword } = useAuth();
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -48,35 +50,35 @@ export default function ChangePassword() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Change Password" subtitle="Update your sign-in password" showBack />
+      <GradientHeader title={t('changePwd.title')} subtitle={t('changePwd.subtitle')} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         <View style={{ gap: spacing.md }}>
           <Input
-            label="New password"
+            label={t('changePwd.new')}
             value={next}
             onChangeText={setNext}
-            placeholder="At least 8 characters"
+            placeholder={t('changePwd.newPlaceholder')}
             secureTextEntry
             autoCapitalize="none"
             icon="lock-outline"
             helper={
               <AppText variant="body" color={tooShort ? colors.error : colors.onSurfaceVariant}>
-                {tooShort ? `Use at least ${MIN_LEN} characters.` : 'Choose a strong, unique password.'}
+                {tooShort ? t('changePwd.helpTooShort', { min: MIN_LEN }) : t('changePwd.helpStrong')}
               </AppText>
             }
           />
           <Input
-            label="Confirm new password"
+            label={t('changePwd.confirm')}
             value={confirm}
             onChangeText={setConfirm}
-            placeholder="Re-enter the new password"
+            placeholder={t('changePwd.confirmPlaceholder')}
             secureTextEntry
             autoCapitalize="none"
             icon="lock-check-outline"
             helper={
               mismatch ? (
                 <AppText variant="body" color={colors.error}>
-                  Passwords don&apos;t match.
+                  {t('changePwd.mismatch')}
                 </AppText>
               ) : undefined
             }
@@ -99,13 +101,13 @@ export default function ChangePassword() {
                 padding: spacing.md,
               }}>
               <AppText variant="body" color={colors.primary} style={{ fontWeight: '700' }}>
-                Password updated. You&apos;ll stay signed in on this device.
+                {t('changePwd.successNote')}
               </AppText>
             </View>
           )}
 
           <Button
-            label={saving ? 'Updating…' : done ? 'Updated' : 'Update password'}
+            label={saving ? t('changePwd.updating') : done ? t('changePwd.updated') : t('changePwd.update')}
             onPress={onSave}
             loading={saving}
             disabled={!canSave}

@@ -3,7 +3,7 @@ import { Redirect, useRouter } from 'expo-router';
 import Constants from 'expo-constants';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { useAuth } from '@/services/auth';
-import { roleTheme } from '@/lib/roles';
+import { useT } from '@/i18n';
 import { AppText, GradientHeader, Icon, IconName, Screen } from '@/ui';
 
 type Row = { icon: IconName; label: string; value?: string; route?: string; destructive?: boolean; onPress?: () => void };
@@ -53,12 +53,12 @@ function Section({ title, rows }: { title: string; rows: Row[] }) {
 
 export default function Settings() {
   const router = useRouter();
-  const { loading, isAuthenticated, isAdmin, displayRole, appRole, signOut } = useAuth();
+  const t = useT();
+  const { loading, isAuthenticated, isAdmin, appRole, signOut } = useAuth();
 
   if (loading) return null;
   if (!isAuthenticated) return <Redirect href="/login" />;
 
-  const theme = roleTheme(appRole);
   const version = Constants.expoConfig?.version ?? '1.0.0';
 
   const onLogout = async () => {
@@ -67,33 +67,33 @@ export default function Settings() {
   };
 
   const preferences: Row[] = [
-    { icon: 'account-outline', label: 'Edit Profile', route: '/edit-profile', onPress: () => router.push('/edit-profile') },
-    { icon: 'lock-reset', label: 'Change Password', onPress: () => router.push('/change-password' as never) },
-    { icon: 'bell-cog-outline', label: 'Notification Preferences', onPress: () => router.push('/notification-settings') },
-    { icon: 'message-outline', label: 'Messages', onPress: () => router.push('/messaging' as never) },
+    { icon: 'account-outline', label: t('settings.row.editProfile'), route: '/edit-profile', onPress: () => router.push('/edit-profile') },
+    { icon: 'lock-reset', label: t('settings.row.changePassword'), onPress: () => router.push('/change-password' as never) },
+    { icon: 'bell-cog-outline', label: t('settings.row.notificationPrefs'), onPress: () => router.push('/notification-settings') },
+    { icon: 'message-outline', label: t('settings.row.messages'), onPress: () => router.push('/messaging' as never) },
   ];
 
   const adminRows: Row[] = [
-    { icon: 'account-group-outline', label: 'Team & Users', onPress: () => router.push('/users' as never) },
-    { icon: 'alert-octagon-outline', label: 'Incidents & SLA', onPress: () => router.push('/incidents' as never) },
+    { icon: 'account-group-outline', label: t('settings.row.teamUsers'), onPress: () => router.push('/users' as never) },
+    { icon: 'alert-octagon-outline', label: t('settings.row.incidentsSla'), onPress: () => router.push('/incidents' as never) },
   ];
 
   const about: Row[] = [
-    { icon: 'shield-account-outline', label: 'Role', value: displayRole },
-    { icon: 'information-outline', label: 'App version', value: version },
-    { icon: 'satellite-variant', label: 'Powered by', value: 'Ceres Tag' },
-    { icon: 'help-circle-outline', label: 'Help & Support', onPress: () => router.push('/help') },
+    { icon: 'shield-account-outline', label: t('settings.row.role'), value: t(`role.${appRole}`) },
+    { icon: 'information-outline', label: t('settings.row.appVersion'), value: version },
+    { icon: 'satellite-variant', label: t('settings.row.poweredBy'), value: 'Ceres Tag' },
+    { icon: 'help-circle-outline', label: t('settings.row.helpSupport'), onPress: () => router.push('/help') },
   ];
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Settings" subtitle={theme.consoleTitle} showBack />
+      <GradientHeader title={t('profile.row.settings')} subtitle={t(`console.${appRole}`)} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
-        <Section title="Preferences" rows={preferences} />
-        {isAdmin && <Section title="Administration" rows={adminRows} />}
-        <Section title="About" rows={about} />
+        <Section title={t('settings.section.preferences')} rows={preferences} />
+        {isAdmin && <Section title={t('settings.section.administration')} rows={adminRows} />}
+        <Section title={t('settings.section.about')} rows={about} />
         <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.md }, shadow[1]]}>
-          <SettingsRow row={{ icon: 'logout', label: 'Log Out', destructive: true, onPress: onLogout }} last />
+          <SettingsRow row={{ icon: 'logout', label: t('common.logOut'), destructive: true, onPress: onLogout }} last />
         </View>
       </Screen>
     </View>
