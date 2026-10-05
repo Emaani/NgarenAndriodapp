@@ -6,6 +6,7 @@ import { getCalloutRequests } from '@/data/api';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { CalloutRequest, CalloutStatus, CalloutUrgency } from '@/data/types';
+import { useT, useTStatus } from '@/i18n';
 import { ActionChip, AppText, Button, EmptyState, GradientHeader, Icon, IconChip, Screen } from '@/ui';
 
 const urgencyVariant = (u: CalloutUrgency) =>
@@ -21,6 +22,8 @@ const statusVariant = (s: CalloutStatus) =>
  */
 export default function VetRequests() {
   const router = useRouter();
+  const t = useT();
+  const tStatus = useTStatus();
   const { loading, isAuthenticated } = useAuth();
   const { data: requests } = useResource(() => getCalloutRequests(), calloutFallback);
 
@@ -31,10 +34,10 @@ export default function VetRequests() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Vet Requests" subtitle={`${requests.length} requests · ${pending} pending`} showBack />
+      <GradientHeader title={t('action.vetRequests')} subtitle={t('vetReq.subtitle', { count: requests.length, pending })} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         <Button
-          label="Book a vet call-out"
+          label={t('vetReq.book')}
           icon="stethoscope"
           onPress={() => router.push('/find-vet')}
           style={{ marginBottom: spacing.md }}
@@ -43,9 +46,9 @@ export default function VetRequests() {
         {requests.length === 0 ? (
           <EmptyState
             icon="clipboard-pulse-outline"
-            title="No vet requests yet"
-            subtitle="Book a call-out and track its status here."
-            actionLabel="Find a Vet"
+            title={t('vetReq.emptyTitle')}
+            subtitle={t('vetReq.emptySub')}
+            actionLabel={t('action.findVet')}
             onAction={() => router.push('/find-vet')}
           />
         ) : (
@@ -67,7 +70,7 @@ export default function VetRequests() {
                     {r.locationName} · {r.requestedAt}
                   </AppText>
                 </View>
-                <ActionChip label={r.urgency} variant={urgencyVariant(r.urgency)} />
+                <ActionChip label={t(`urgency.${r.urgency.toLowerCase()}`)} variant={urgencyVariant(r.urgency)} />
               </View>
 
               {!!r.notes && (
@@ -78,11 +81,11 @@ export default function VetRequests() {
 
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-                  <ActionChip label={r.status[0].toUpperCase() + r.status.slice(1)} variant={statusVariant(r.status)} />
+                  <ActionChip label={tStatus(r.status)} variant={statusVariant(r.status)} />
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
                   <AppText variant="caption" color={colors.primary} style={{ fontWeight: '600' }}>
-                    View details
+                    {t('vetReq.viewDetails')}
                   </AppText>
                   <Icon name="chevron-right" size={16} color={colors.primary} />
                 </View>

@@ -46,6 +46,11 @@ const en: Dict = {
   'status.completed': 'Completed',
   'status.active': 'Active',
   'status.inactive': 'Inactive',
+  'status.approved': 'Approved',
+  'status.sold': 'Sold',
+  'status.rejected': 'Rejected',
+  'urgency.emergency': 'Emergency',
+  'urgency.routine': 'Routine',
 
   // Auth — login / signup / success / onboarding
   'auth.loginTitle': 'Login to Ngaren',
@@ -259,6 +264,36 @@ const en: Dict = {
   'stock.reviewN': 'Review ({count} not counted)',
   'stock.review': 'Review Stock Take',
 
+  // Vet requests (farmer)
+  'vetReq.subtitle': '{count} requests · {pending} pending',
+  'vetReq.book': 'Book a vet call-out',
+  'vetReq.emptyTitle': 'No vet requests yet',
+  'vetReq.emptySub': 'Book a call-out and track its status here.',
+  'vetReq.viewDetails': 'View details',
+
+  // Marketplace
+  'mkt.subtitle': '{count} listings available',
+  'mkt.sell': 'Sell an animal',
+  'mkt.pendingApproval': 'Pending approval ({count})',
+  'mkt.availableNow': 'Available now',
+  'mkt.perHead': 'per head',
+  'mkt.headMeta': '{breed} · {count} head',
+  'mkt.approve': 'Approve',
+  'mkt.noListings': 'No listings available yet.',
+  'mkt.sheetTitle': 'List an animal for sale',
+  'mkt.fTitle': 'Title',
+  'mkt.fBreed': 'Breed',
+  'mkt.fCount': 'Number of head',
+  'mkt.fPrice': 'Price per head (UGX)',
+  'mkt.fLocation': 'Location',
+  'mkt.phTitle': 'e.g. Boran heifers, in-calf',
+  'mkt.phBreed': 'e.g. Boran',
+  'mkt.phPrice': 'e.g. 620000',
+  'mkt.phLocation': 'e.g. Nakuru',
+  'mkt.submitApproval': 'Submit for approval',
+  'mkt.submittedTitle': 'Listing submitted',
+  'mkt.submittedBody': 'Your listing was sent for admin approval.',
+
   // Animals tab (farmer/admin)
   'animals.title': 'Your animals',
   'animals.registered': '{count} registered',
@@ -381,6 +416,11 @@ const sw: Dict = {
   'status.completed': 'Imekamilika',
   'status.active': 'Hai',
   'status.inactive': 'Haiko hai',
+  'status.approved': 'Imeidhinishwa',
+  'status.sold': 'Imeuzwa',
+  'status.rejected': 'Imekataliwa',
+  'urgency.emergency': 'Dharura',
+  'urgency.routine': 'Kawaida',
 
   // Auth — login / signup / success / onboarding
   'auth.loginTitle': 'Ingia Ngaren',
@@ -593,6 +633,36 @@ const sw: Dict = {
   'stock.absent': 'Hayupo',
   'stock.reviewN': 'Pitia ({count} hawajahesabiwa)',
   'stock.review': 'Pitia Kuhesabu Mifugo',
+
+  // Vet requests (farmer)
+  'vetReq.subtitle': 'Maombi {count} · {pending} yanasubiri',
+  'vetReq.book': 'Weka miadi ya daktari',
+  'vetReq.emptyTitle': 'Bado hakuna maombi ya daktari',
+  'vetReq.emptySub': 'Weka miadi na ufuatilie hali yake hapa.',
+  'vetReq.viewDetails': 'Ona maelezo',
+
+  // Marketplace
+  'mkt.subtitle': 'Matangazo {count} yanapatikana',
+  'mkt.sell': 'Uza mnyama',
+  'mkt.pendingApproval': 'Yanasubiri idhini ({count})',
+  'mkt.availableNow': 'Yanapatikana sasa',
+  'mkt.perHead': 'kwa kila mmoja',
+  'mkt.headMeta': '{breed} · {count} wanyama',
+  'mkt.approve': 'Idhinisha',
+  'mkt.noListings': 'Bado hakuna matangazo.',
+  'mkt.sheetTitle': 'Tangaza mnyama kwa mauzo',
+  'mkt.fTitle': 'Kichwa',
+  'mkt.fBreed': 'Aina',
+  'mkt.fCount': 'Idadi ya wanyama',
+  'mkt.fPrice': 'Bei kwa kila mmoja (UGX)',
+  'mkt.fLocation': 'Mahali',
+  'mkt.phTitle': 'mf. Mitamba ya Boran, wenye mimba',
+  'mkt.phBreed': 'mf. Boran',
+  'mkt.phPrice': 'mf. 620000',
+  'mkt.phLocation': 'mf. Nakuru',
+  'mkt.submitApproval': 'Wasilisha kwa idhini',
+  'mkt.submittedTitle': 'Tangazo limewasilishwa',
+  'mkt.submittedBody': 'Tangazo lako limetumwa kwa idhini ya msimamizi.',
 
   // Animals tab (farmer/admin)
   'animals.title': 'Wanyama Wako',
