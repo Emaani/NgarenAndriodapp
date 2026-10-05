@@ -7,7 +7,7 @@ import { getCalloutRequests, updateCalloutStatus } from '@/data/api';
 import { getMyVetImpact } from '@/data/vetProfiles';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
-import { useT } from '@/i18n';
+import { useT, useTStatus } from '@/i18n';
 import { ActionChip, AppText, Button, GradientHeader, Icon, IconChip, IconName, NavBanner, Screen, SyncStatus, VetImpactDashboard, VetSchedule } from '@/ui';
 
 const EMPTY_IMPACT: VetImpact = {
@@ -82,6 +82,7 @@ function RequestCard({
   onMap: () => void;
 }) {
   const t = useT();
+  const tStatus = useTStatus();
   // Reveal-on-accept (Sep 5 2026 anonymized vet view): before the vet accepts,
   // the requesting farmer's identity and precise location are hidden — only the
   // animal, priority, distance and reason show, enough to decide. Accepting
@@ -145,7 +146,7 @@ function RequestCard({
         </>
       ) : (
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <ActionChip label={req.status[0].toUpperCase() + req.status.slice(1)} variant={statusVariant(req.status)} />
+          <ActionChip label={tStatus(req.status)} variant={statusVariant(req.status)} />
           <Pressable onPress={onMap} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }} hitSlop={8}>
             <Icon name="map-marker-radius" size={18} color={colors.primary} />
             <AppText variant="body" color={colors.primary} style={{ fontWeight: '600' }}>

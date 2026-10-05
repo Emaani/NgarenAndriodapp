@@ -6,13 +6,15 @@ import { getHealthRecords, HealthCategory } from '@/data/clinical';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { formatDate } from '@/lib/date';
+import { useT, useTStatus } from '@/i18n';
 import { ActionChip, AppText, EmptyState, GradientHeader, Icon, IconChip, IconName, Screen } from '@/ui';
 
-const CATEGORY_META: Record<HealthCategory, { label: string; icon: IconName; tint: string }> = {
-  parasite: { label: 'Parasite', icon: 'bug-outline', tint: '#F59E0B' },
-  disease: { label: 'Disease', icon: 'virus-outline', tint: '#EF4444' },
-  reproduction: { label: 'Reproduction', icon: 'heart-pulse', tint: '#EC4899' },
-  disorder: { label: 'Disorder', icon: 'alert-circle-outline', tint: '#9333EA' },
+// labelKey holds an i18n key; translated at render.
+const CATEGORY_META: Record<HealthCategory, { labelKey: string; icon: IconName; tint: string }> = {
+  parasite: { labelKey: 'health.cat.parasite', icon: 'bug-outline', tint: '#F59E0B' },
+  disease: { labelKey: 'health.cat.disease', icon: 'virus-outline', tint: '#EF4444' },
+  reproduction: { labelKey: 'health.cat.reproduction', icon: 'heart-pulse', tint: '#EC4899' },
+  disorder: { labelKey: 'health.cat.disorder', icon: 'alert-circle-outline', tint: '#9333EA' },
 };
 
 type Filter = 'all' | HealthCategory;
@@ -54,18 +56,14 @@ function ActionTile({ icon, label, sublabel, tint, onPress }: { icon: IconName; 
  */
 export default function Health() {
   const router = useRouter();
+  const t = useT();
+  const tStatus = useTStatus();
   const { loading, isAuthenticated, can } = useAuth();
   const { data: records } = useResource(getHealthRecords, []);
   const [filter, setFilter] = useState<Filter>('all');
 
-  const filters = useMemo<{ key: Filter; label: string }[]>(
-    () => [
-      { key: 'all', label: 'All' },
-      { key: 'disease', label: 'Disease' },
-      { key: 'parasite', label: 'Parasite' },
-      { key: 'reproduction', label: 'Reproduction' },
-      { key: 'disorder', label: 'Disorder' },
-    ],
+  const filters = useMemo<{ key: Filter }[]>(
+    () => [{ key: 'all' }, { key: 'disease' }, { key: 'parasite' }, { key: 'reproduction' }, { key: 'disorder' }],
     [],
   );
 
@@ -81,7 +79,7 @@ export default function Health() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Managed Health" subtitle={`${records.length} records · ${ongoing} ongoing`} showBack />
+      <GradientHeader title={t('action.managedHealth')} subtitle={t('health.subtitle', { count: records.length, ongoing })} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         {/* Request a Vet — the primary managed-health action (Uber-for-vets). */}
         {canBookVet ? (
@@ -96,10 +94,10 @@ export default function Health() {
             </View>
             <View style={{ flex: 1 }}>
               <AppText variant="bodyLarge" color="#fff" style={{ fontWeight: '700' }}>
-                Request a Vet
+                {t('health.requestVet')}
               </AppText>
               <AppText variant="caption" color="rgba(255,255,255,0.9)">
-                Browse nearby vet profiles & book — for the farm or a specific animal.
+                {t('health.requestVetSub')}
               </AppText>
             </View>
             <Icon name="chevron-right" size={22} color="#fff" />
@@ -110,16 +108,16 @@ export default function Health() {
         {/* Breeding/lineage deferred to Phase 2 (Sep 3 2026 standup) — the MVP
             focuses on the managed-health workflow. */}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg }}>
-          <ActionTile icon="calendar-month-outline" label="Calendar" sublabel="Visits, vaccinations, follow-ups" tint="#0EA5E9" onPress={() => router.push('/calendar')} />
+          <ActionTile icon="calendar-month-outline" label={t('action.calendar')} sublabel={t('health.tileCalendarSub')} tint="#0EA5E9" onPress={() => router.push('/calendar')} />
           {canBookVet ? (
-            <ActionTile icon="clipboard-pulse-outline" label="My vet requests" sublabel="Track call-out status" tint="#EF4444" onPress={() => router.push('/vet-requests')} />
+            <ActionTile icon="clipboard-pulse-outline" label={t('health.tileRequests')} sublabel={t('health.tileRequestsSub')} tint="#EF4444" onPress={() => router.push('/vet-requests')} />
           ) : null}
-          <ActionTile icon="cow" label="My animals" sublabel="Open an animal to log health" tint="#16A34A" onPress={() => router.push('/(tabs)/animals')} />
+          <ActionTile icon="cow" label={t('health.tileAnimals')} sublabel={t('health.tileAnimalsSub')} tint="#16A34A" onPress={() => router.push('/(tabs)/animals')} />
         </View>
 
         {/* Clinical record history */}
         <AppText variant="title" style={{ marginBottom: spacing.sm }}>
-          Health records
+          {t('health.records')}
         </AppText>
         <View style={{ flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap', marginBottom: spacing.md }}>
           {filters.map((f) => {
@@ -137,7 +135,7 @@ export default function Health() {
                   borderColor: active ? colors.primary : colors.divider,
                 }}>
                 <AppText variant="caption" color={active ? '#fff' : colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
-                  {f.label}
+                  {t(`health.cat.${f.key}`)}
                 </AppText>
               </Pressable>
             );
@@ -145,7 +143,7 @@ export default function Health() {
         </View>
 
         {visible.length === 0 ? (
-          <EmptyState icon="heart-pulse" title="No health records" subtitle="Vaccinations, treatments and check-ups appear here." />
+          <EmptyState icon="heart-pulse" title={t('health.emptyTitle')} subtitle={t('health.emptySub')} />
         ) : (
           visible.map((r) => {
             const meta = CATEGORY_META[r.category];
@@ -163,11 +161,11 @@ export default function Health() {
                       {r.animalName}
                     </AppText>
                     <AppText variant="caption" color={colors.onSurfaceVariant}>
-                      {meta.label}
+                      {t(meta.labelKey)}
                       {r.vetName ? ` · ${r.vetName}` : ''}
                     </AppText>
                   </View>
-                  <ActionChip label={r.status[0].toUpperCase() + r.status.slice(1)} variant={statusVariant(r.status)} />
+                  <ActionChip label={tStatus(r.status)} variant={statusVariant(r.status)} />
                 </View>
 
                 {!!r.notes && (
@@ -189,7 +187,7 @@ export default function Health() {
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
                       <Icon name="calendar-clock" size={15} color={colors.onSurfaceVariant} />
                       <AppText variant="caption" color={colors.onSurfaceVariant}>
-                        Follow-up {formatDate(r.followUpDate)}
+                        {t('health.followUp', { date: formatDate(r.followUpDate) })}
                       </AppText>
                     </View>
                   )}

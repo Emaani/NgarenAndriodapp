@@ -15,10 +15,20 @@ type Translate = (key: string, vars?: Record<string, string | number>) => string
 interface I18nValue {
   locale: Locale;
   t: Translate;
+  /** Translate a data-derived status (e.g. 'ongoing'); unknown values are just
+   *  capitalized rather than shown as a raw key. */
+  tStatus: (status: string) => string;
   setLocale: (l: Locale) => void;
 }
 
-const I18nContext = createContext<I18nValue>({ locale: 'en', t: (k) => k, setLocale: () => undefined });
+const capitalize = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
+
+const I18nContext = createContext<I18nValue>({
+  locale: 'en',
+  t: (k) => k,
+  tStatus: capitalize,
+  setLocale: () => undefined,
+});
 
 function interpolate(s: string, vars?: Record<string, string | number>): string {
   if (!vars) return s;
@@ -39,11 +49,16 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const value = useMemo<I18nValue>(() => {
     const dict = DICTS[locale] ?? DICTS.en;
     const t: Translate = (key, vars) => interpolate(dict[key] ?? DICTS.en[key] ?? key, vars);
+    const tStatus = (status: string) => {
+      const key = `status.${status.toLowerCase()}`;
+      const hit = dict[key] ?? DICTS.en[key];
+      return hit ?? capitalize(status);
+    };
     const setLocale = (l: Locale) => {
       setLocaleState(l);
       void AsyncStorage.setItem(KEY, l);
     };
-    return { locale, t, setLocale };
+    return { locale, t, tStatus, setLocale };
   }, [locale]);
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
@@ -56,6 +71,11 @@ export function useI18n(): I18nValue {
 /** Shorthand for components that only need the translator. */
 export function useT(): Translate {
   return useContext(I18nContext).t;
+}
+
+/** Shorthand for translating a data-derived status chip. */
+export function useTStatus(): (status: string) => string {
+  return useContext(I18nContext).tStatus;
 }
 
 export { LOCALES };

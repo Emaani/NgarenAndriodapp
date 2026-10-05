@@ -36,6 +36,16 @@ const en: Dict = {
   'common.logOut': 'Log Out',
   'common.continue': 'Continue',
   'common.next': 'Next',
+  // Record/request statuses (data-derived chips)
+  'status.resolved': 'Resolved',
+  'status.ongoing': 'Ongoing',
+  'status.scheduled': 'Scheduled',
+  'status.pending': 'Pending',
+  'status.accepted': 'Accepted',
+  'status.declined': 'Declined',
+  'status.completed': 'Completed',
+  'status.active': 'Active',
+  'status.inactive': 'Inactive',
 
   // Auth — login / signup / success / onboarding
   'auth.loginTitle': 'Login to Ngaren',
@@ -185,6 +195,25 @@ const en: Dict = {
   'vet.accept': 'Accept',
   'vet.viewOnMap': 'View on map',
 
+  // Managed Health
+  'health.subtitle': '{count} records · {ongoing} ongoing',
+  'health.requestVet': 'Request a Vet',
+  'health.requestVetSub': 'Browse nearby vet profiles & book — for the farm or a specific animal.',
+  'health.tileCalendarSub': 'Visits, vaccinations, follow-ups',
+  'health.tileRequests': 'My vet requests',
+  'health.tileRequestsSub': 'Track call-out status',
+  'health.tileAnimals': 'My animals',
+  'health.tileAnimalsSub': 'Open an animal to log health',
+  'health.records': 'Health records',
+  'health.cat.all': 'All',
+  'health.cat.disease': 'Disease',
+  'health.cat.parasite': 'Parasite',
+  'health.cat.reproduction': 'Reproduction',
+  'health.cat.disorder': 'Disorder',
+  'health.emptyTitle': 'No health records',
+  'health.emptySub': 'Vaccinations, treatments and check-ups appear here.',
+  'health.followUp': 'Follow-up {date}',
+
   // Animals tab (farmer/admin)
   'animals.title': 'Your animals',
   'animals.registered': '{count} registered',
@@ -297,6 +326,16 @@ const sw: Dict = {
   'common.logOut': 'Toka',
   'common.continue': 'Endelea',
   'common.next': 'Ifuatayo',
+  // Record/request statuses
+  'status.resolved': 'Imetatuliwa',
+  'status.ongoing': 'Inaendelea',
+  'status.scheduled': 'Imepangwa',
+  'status.pending': 'Inasubiri',
+  'status.accepted': 'Imekubaliwa',
+  'status.declined': 'Imekataliwa',
+  'status.completed': 'Imekamilika',
+  'status.active': 'Hai',
+  'status.inactive': 'Haiko hai',
 
   // Auth — login / signup / success / onboarding
   'auth.loginTitle': 'Ingia Ngaren',
@@ -445,6 +484,25 @@ const sw: Dict = {
   'vet.decline': 'Kataa',
   'vet.accept': 'Kubali',
   'vet.viewOnMap': 'Ona kwenye ramani',
+
+  // Managed Health
+  'health.subtitle': 'Rekodi {count} · {ongoing} zinaendelea',
+  'health.requestVet': 'Omba Daktari',
+  'health.requestVetSub': 'Vinjari wasifu wa madaktari walio karibu na uweke miadi — kwa shamba au mnyama fulani.',
+  'health.tileCalendarSub': 'Ziara, chanjo, ufuatiliaji',
+  'health.tileRequests': 'Maombi yangu ya daktari',
+  'health.tileRequestsSub': 'Fuatilia hali ya mwito',
+  'health.tileAnimals': 'Wanyama wangu',
+  'health.tileAnimalsSub': 'Fungua mnyama kurekodi afya',
+  'health.records': 'Rekodi za afya',
+  'health.cat.all': 'Zote',
+  'health.cat.disease': 'Ugonjwa',
+  'health.cat.parasite': 'Vimelea',
+  'health.cat.reproduction': 'Uzazi',
+  'health.cat.disorder': 'Matatizo',
+  'health.emptyTitle': 'Hakuna rekodi za afya',
+  'health.emptySub': 'Chanjo, matibabu na uchunguzi huonekana hapa.',
+  'health.followUp': 'Ufuatiliaji {date}',
 
   // Animals tab (farmer/admin)
   'animals.title': 'Wanyama Wako',
