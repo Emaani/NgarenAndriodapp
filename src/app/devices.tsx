@@ -5,6 +5,7 @@ import { colors, spacing } from '@/theme';
 import { devices as devicesFallback } from '@/data/mock';
 import { getDevices, syncDevices } from '@/data/api';
 import { useResource } from '@/data/hooks';
+import { useT } from '@/i18n';
 import { AppText, Button, EmptyState, GradientHeader, DeviceCard, Screen } from '@/ui';
 
 /**
@@ -22,6 +23,7 @@ import { AppText, Button, EmptyState, GradientHeader, DeviceCard, Screen } from 
  */
 export default function Devices() {
   const router = useRouter();
+  const t = useT();
   const { data: devices, reload: reloadDevices } = useResource(() => getDevices(), devicesFallback);
   const linked = devices.filter((d) => d.linkedAnimalId !== null || d.linkedAnimalTag !== null).length;
   const [syncing, setSyncing] = useState(false);
@@ -34,11 +36,11 @@ export default function Devices() {
     try {
       await syncDevices();
       setSyncFailed(false);
-      setSyncMessage('Device synchronisation successful');
+      setSyncMessage(t('dev.syncOk'));
       reloadDevices();
     } catch {
       setSyncFailed(true);
-      setSyncMessage('Device synchronisation failed — check your Ceres Tag registration');
+      setSyncMessage(t('dev.syncFail'));
     } finally {
       setSyncing(false);
     }
@@ -47,12 +49,12 @@ export default function Devices() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <GradientHeader
-        title="My Devices"
-        subtitle={`${devices.length} devices · ${linked} linked`}
+        title={t('profile.row.myDevices')}
+        subtitle={t('dev.subtitle', { count: devices.length, linked })}
         showBack
       />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
-        <Button label="Sync Ceres Tags" icon="sync" loading={syncing} onPress={onSync} style={{ marginBottom: spacing.sm }} />
+        <Button label={t('dev.sync')} icon="sync" loading={syncing} onPress={onSync} style={{ marginBottom: spacing.sm }} />
         {syncMessage && (
           <AppText
             variant="caption"
@@ -64,9 +66,9 @@ export default function Devices() {
         {devices.length === 0 ? (
           <EmptyState
             icon="tag-off-outline"
-            title="No devices yet"
-            subtitle="Register an animal and link a Ceres Tag to see it here."
-            actionLabel="Register Animal"
+            title={t('dev.emptyTitle')}
+            subtitle={t('dev.emptySub')}
+            actionLabel={t('action.registerAnimal')}
             onAction={() => router.push('/register-animal')}
           />
         ) : (
@@ -75,7 +77,7 @@ export default function Devices() {
               variant="caption"
               color={colors.onSurfaceVariant}
               style={{ marginBottom: spacing.sm, textTransform: 'uppercase' }}>
-              Ceres Tag devices
+              {t('dev.ceresDevices')}
             </AppText>
             {devices.map((device) => (
               <DeviceCard
@@ -95,7 +97,7 @@ export default function Devices() {
             ))}
             <View style={{ marginTop: spacing.sm }}>
               <Button
-                label="Register a new animal"
+                label={t('common.regNewAnimal')}
                 icon="plus"
                 variant="outline"
                 onPress={() => router.push('/register-animal')}

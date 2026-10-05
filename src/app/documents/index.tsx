@@ -5,6 +5,7 @@ import { colors, radius, shadow, spacing } from '@/theme';
 import { deleteDocument, DocumentKind, DocumentRecord, getVisibleDocuments, KIND_LABEL, RETENTION_DAYS } from '@/data/documents';
 import { useAuth } from '@/services/auth';
 import { formatDate } from '@/lib/date';
+import { useT } from '@/i18n';
 import { AppText, EmptyState, GradientHeader, Icon, IconName, Screen } from '@/ui';
 
 const KIND_ICON: Record<DocumentKind, IconName> = {
@@ -15,11 +16,11 @@ const KIND_ICON: Record<DocumentKind, IconName> = {
 };
 
 type Filter = 'all' | DocumentKind;
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'scorecard', label: 'Scorecards' },
-  { key: 'report', label: 'Reports' },
-  { key: 'station-log', label: 'Station logs' },
+const FILTERS: { key: Filter; labelKey: string }[] = [
+  { key: 'all', labelKey: 'doc.all' },
+  { key: 'scorecard', labelKey: 'doc.scorecards' },
+  { key: 'report', labelKey: 'doc.reports' },
+  { key: 'station-log', labelKey: 'doc.stationLogs' },
 ];
 
 /** Days remaining before auto-delete. */
@@ -34,6 +35,7 @@ function daysLeft(expiresAt: string): number {
  */
 export default function Documents() {
   const router = useRouter();
+  const t = useT();
   const { loading, isAuthenticated, isAdmin, user } = useAuth();
   const [docs, setDocs] = useState<DocumentRecord[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
@@ -54,10 +56,10 @@ export default function Documents() {
   const visible = filter === 'all' ? docs : docs.filter((d) => d.kind === filter);
 
   const confirmDelete = (d: DocumentRecord) => {
-    Alert.alert('Delete document', `Remove “${d.title}” from the store?`, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('doc.deleteTitle'), t('doc.deleteBody', { title: d.title }), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           await deleteDocument(d.id);
@@ -69,12 +71,12 @@ export default function Documents() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Documents" subtitle={isAdmin ? 'All generated documents' : 'Your generated documents'} showBack />
+      <GradientHeader title={t('home.banner.documents')} subtitle={isAdmin ? t('doc.subtitleAdmin') : t('doc.subtitleOwn')} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md, paddingBottom: spacing.xxl }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.primaryTint, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md }}>
           <Icon name="information-outline" size={16} color={colors.primary} />
           <AppText variant="caption" color={colors.primaryDark} style={{ flex: 1 }}>
-            Documents are auto-deleted {RETENTION_DAYS} days after generation to keep storage lean. Share or forward anything you need to keep.
+            {t('doc.retention', { days: RETENTION_DAYS })}
           </AppText>
         </View>
 
@@ -88,7 +90,7 @@ export default function Documents() {
                 onPress={() => setFilter(f.key)}
                 style={{ paddingHorizontal: spacing.mdMinus, paddingVertical: spacing.xs, borderRadius: radius.full, backgroundColor: active ? colors.primary : colors.surface, borderWidth: 1, borderColor: active ? colors.primary : colors.divider }}>
                 <AppText variant="caption" color={active ? '#fff' : colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
-                  {f.label}
+                  {t(f.labelKey)}
                 </AppText>
               </Pressable>
             );
@@ -96,7 +98,7 @@ export default function Documents() {
         </View>
 
         {visible.length === 0 ? (
-          <EmptyState icon="folder-open-outline" title="No documents" subtitle="Scorecards and reports you generate are stored here for quick access." />
+          <EmptyState icon="folder-open-outline" title={t('doc.emptyTitle')} subtitle={t('doc.emptySub')} />
         ) : (
           visible.map((d) => {
             const left = daysLeft(d.expiresAt);
@@ -122,7 +124,7 @@ export default function Documents() {
                     {isAdmin ? ` · ${d.ownerRole}` : ''}
                   </AppText>
                   <AppText variant="caption" color={left <= 3 ? colors.warning : colors.onSurfaceVariant} style={{ fontWeight: left <= 3 ? '700' : '400' }}>
-                    {left === 0 ? 'Deletes today' : `Auto-deletes in ${left} day${left === 1 ? '' : 's'}`}
+                    {left === 0 ? t('doc.deletesToday') : left === 1 ? t('doc.autoDeletesOne') : t('doc.autoDeletes', { days: left })}
                   </AppText>
                 </View>
                 <Pressable onPress={() => confirmDelete(d)} hitSlop={8}>

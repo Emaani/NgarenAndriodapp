@@ -8,6 +8,7 @@ import {
   updateNotificationSettings,
 } from '@/data/api';
 import { AlertChannel, NotificationSettings } from '@/data/types';
+import { useT } from '@/i18n';
 import { AppText, Button, Card, GradientHeader, Icon, IconName, Screen } from '@/ui';
 import { enablePushNotifications, getPushPermissionStatus } from '@/services/push';
 
@@ -93,6 +94,7 @@ function AlertRow({
 
 export default function NotificationSettingsScreen() {
   const router = useRouter();
+  const t = useT();
   const [settings, setSettings] = useState<NotificationSettings>({
     deviceActivityConfig: 'EMAIL_AND_SMS',
     boundaryCheckAlertConfig: 'EMAIL_AND_SMS',
@@ -127,15 +129,15 @@ export default function NotificationSettingsScreen() {
     setPushEnabled(false);
     if (status === 'denied') {
       Alert.alert(
-        'Notifications are blocked',
-        'To receive instant alerts, enable notifications for Ngaren in your device settings.',
+        t('notifset.blockedTitle'),
+        t('notifset.blockedBody'),
         [
-          { text: 'Not now', style: 'cancel' },
-          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+          { text: t('common.notNow'), style: 'cancel' },
+          { text: t('notifset.openSettings'), onPress: () => Linking.openSettings() },
         ],
       );
     } else if (Platform.OS === 'web') {
-      Alert.alert('Not supported', 'Push notifications are only available on the mobile app.');
+      Alert.alert(t('notifset.notSupportedTitle'), t('notifset.notSupportedBody'));
     }
   };
 
@@ -151,7 +153,7 @@ export default function NotificationSettingsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Notification Preferences" subtitle="Choose how you get alerts" showBack />
+      <GradientHeader title={t('settings.row.notificationPrefs')} subtitle={t('notifset.subtitle')} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         <Card style={{ marginBottom: spacing.md }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
@@ -168,10 +170,10 @@ export default function NotificationSettingsScreen() {
             </View>
             <View style={{ flex: 1, gap: 2 }}>
               <AppText variant="bodyLarge" style={{ fontWeight: '600' }}>
-                Push notifications
+                {t('notifset.push')}
               </AppText>
               <AppText variant="caption" color={colors.onSurfaceVariant}>
-                Receive instant alerts on this device
+                {t('notifset.pushSub')}
               </AppText>
             </View>
             <Switch
@@ -184,31 +186,31 @@ export default function NotificationSettingsScreen() {
         </Card>
 
         <AppText variant="overline" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>
-          Email & SMS delivery
+          {t('notifset.emailSms')}
         </AppText>
 
         <AlertRow
           icon="flash"
-          title="Device Activity"
-          description="Battery, signal & telemetry changes"
+          title={t('notifset.deviceActivity')}
+          description={t('notifset.deviceActivitySub')}
           value={settings.deviceActivityConfig}
           onChange={(c) => setSettings((s) => ({ ...s, deviceActivityConfig: c }))}
         />
         <AlertRow
           icon="fence"
-          title="Animal Outside Boundary"
-          description="When an animal leaves a geofence"
+          title={t('notifset.boundary')}
+          description={t('notifset.boundarySub')}
           value={settings.boundaryCheckAlertConfig}
           onChange={(c) => setSettings((s) => ({ ...s, boundaryCheckAlertConfig: c }))}
         />
 
         <View style={[{ borderRadius: radius.md, padding: spacing.md, backgroundColor: colors.surface, marginTop: spacing.sm }, shadow[1]]}>
           <AppText variant="caption" color={colors.onSurfaceVariant} style={{ textAlign: 'center' }}>
-            Powered by Ceres Tag Technology
+            {t('notifset.poweredBy')}
           </AppText>
         </View>
 
-        <Button label="Save Preferences" icon="content-save" loading={saving} onPress={onSave} style={{ marginTop: spacing.md }} />
+        <Button label={t('notifset.save')} icon="content-save" loading={saving} onPress={onSave} style={{ marginTop: spacing.md }} />
       </Screen>
     </View>
   );
