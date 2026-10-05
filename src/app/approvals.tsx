@@ -10,6 +10,7 @@ import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { ageFromDate } from '@/lib/date';
 import { taggingMeta } from '@/lib/tagging';
+import { useT } from '@/i18n';
 import { AppText, Button, EmptyState, GradientHeader, Icon, IconChip, Screen } from '@/ui';
 
 /**
@@ -19,6 +20,7 @@ import { AppText, Button, EmptyState, GradientHeader, Icon, IconChip, Screen } f
  */
 export default function Approvals() {
   const router = useRouter();
+  const t = useT();
   const { loading, isAuthenticated, canManageTeam, can } = useAuth();
   const { data: pending, reload } = useResource(getPendingLocalAnimals, []);
   const [local, setLocal] = useState<Animal[] | null>(null);
@@ -41,19 +43,20 @@ export default function Approvals() {
     // sees the finalised animal. Best-effort — a local approval still stands.
     await setLineageApproval(animal.ngarenCode, status);
     setBusy(null);
-    notify(status === 'approved' ? `${animal.name ?? animal.tag} activated` : `${animal.name ?? animal.tag} rejected`);
+    const who = animal.name ?? animal.tag;
+    notify(status === 'approved' ? t('approvals.activated', { name: who }) : t('approvals.rejected', { name: who }));
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Record Activation" subtitle={`Validate & activate · ${items.length} awaiting`} showBack />
+      <GradientHeader title={t('approvals.title')} subtitle={t('approvals.subtitle', { count: items.length })} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         {items.length === 0 ? (
           <EmptyState
             icon="check-decagram-outline"
-            title="Nothing to activate"
-            subtitle="Newly created animal records appear here to be validated and activated before they go live."
-            actionLabel="Refresh"
+            title={t('approvals.emptyTitle')}
+            subtitle={t('approvals.emptySub')}
+            actionLabel={t('common.refresh')}
             onAction={reload}
           />
         ) : (
@@ -88,11 +91,11 @@ export default function Approvals() {
                   </View>
                 </View>
                 <AppText variant="caption" color={colors.onSurfaceVariant}>
-                  Tag {a.tag} · {a.color ?? '—'} · {a.locationName ?? '—'} · Age {ageFromDate(a.dateOfBirth)} · {a.photos?.length ?? 0} photos
+                  {t('approvals.rowMeta', { tag: a.tag, color: a.color ?? '—', location: a.locationName ?? '—', age: ageFromDate(a.dateOfBirth), photos: a.photos?.length ?? 0 })}
                 </AppText>
                 <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                  <Button label="Activate" icon="check" loading={busy === a.id} onPress={() => decide(a, 'approved')} style={{ flex: 1 }} />
-                  <Button label="Reject" variant="outline" onPress={() => decide(a, 'rejected')} style={{ flex: 1 }} />
+                  <Button label={t('approvals.activate')} icon="check" loading={busy === a.id} onPress={() => decide(a, 'approved')} style={{ flex: 1 }} />
+                  <Button label={t('approvals.reject')} variant="outline" onPress={() => decide(a, 'rejected')} style={{ flex: 1 }} />
                 </View>
               </View>
             );

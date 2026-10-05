@@ -8,6 +8,7 @@ import { getHerd } from '@/data/herd';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { Animal } from '@/data/types';
+import { useT } from '@/i18n';
 import { AppText, Button, GradientHeader, Icon, IconChip, IconName, Screen } from '@/ui';
 
 type Mark = 'pending' | 'present' | 'missing';
@@ -15,32 +16,13 @@ type Phase = 'method' | 'count' | 'summary';
 type StockMethod = 'photo' | 'bluetooth' | 'qr' | 'manual';
 
 // Stock take is a non-satellite verification: you confirm each animal in front
-// of you by whatever tag it carries (tester feedback Q9).
+// of you by whatever tag it carries (tester feedback Q9). title/blurb hold i18n
+// keys, translated at render.
 const METHODS: { value: StockMethod; icon: IconName; title: string; blurb: string }[] = [
-  {
-    value: 'photo',
-    icon: 'camera-outline',
-    title: 'Photo confirmation',
-    blurb: 'Take a current picture of each animal to verify its presence — no device needed.',
-  },
-  {
-    value: 'bluetooth',
-    icon: 'bluetooth',
-    title: 'Bluetooth (BLE) tags',
-    blurb: 'Scan for nearby active tags and accept the ones that respond as present.',
-  },
-  {
-    value: 'qr',
-    icon: 'qrcode-scan',
-    title: 'QR-code ear tags',
-    blurb: 'Scan each animal’s QR tag with the Ngaren app, one at a time.',
-  },
-  {
-    value: 'manual',
-    icon: 'gesture-tap',
-    title: 'Manual / visual tags',
-    blurb: 'No device — confirm each animal by eye and capture a photo where needed.',
-  },
+  { value: 'photo', icon: 'camera-outline', title: 'stock.photoTitle', blurb: 'stock.photoBlurb' },
+  { value: 'bluetooth', icon: 'bluetooth', title: 'stock.bleTitle', blurb: 'stock.bleBlurb' },
+  { value: 'qr', icon: 'qrcode-scan', title: 'stock.qrTitle', blurb: 'stock.qrBlurb' },
+  { value: 'manual', icon: 'gesture-tap', title: 'stock.manualTitle', blurb: 'stock.manualBlurb' },
 ];
 
 function ProgressBar({ value }: { value: number }) {
@@ -115,6 +97,7 @@ function AnimalRow({
   photoUri?: string;
   onCapture?: () => void;
 }) {
+  const t = useT();
   return (
     <View
       style={[
@@ -149,10 +132,10 @@ function AnimalRow({
       <View style={{ flexDirection: 'row', gap: spacing.sm }}>
         {/* Photo mode: confirming presence requires a current picture. */}
         {photoMode && mark !== 'present' ? (
-          <MarkButton label="Photo to confirm" icon="check" active={false} activeColor={colors.success} onPress={() => onCapture?.()} />
+          <MarkButton label={t('stock.photoToConfirm')} icon="check" active={false} activeColor={colors.success} onPress={() => onCapture?.()} />
         ) : (
           <MarkButton
-            label="Present"
+            label={t('stock.present')}
             icon="check"
             active={mark === 'present'}
             activeColor={colors.success}
@@ -160,7 +143,7 @@ function AnimalRow({
           />
         )}
         <MarkButton
-          label="Absent"
+          label={t('stock.absent')}
           icon="close"
           active={mark === 'missing'}
           activeColor={colors.error}
@@ -186,6 +169,7 @@ function SummaryStat({ value, label, color }: { value: number; label: string; co
 
 export default function StockTake() {
   const router = useRouter();
+  const t = useT();
   const { can } = useAuth();
   const { data: allAnimals } = useResource(getHerd, animalsFallback);
   const [marks, setMarks] = useState<Record<number, Mark>>(() =>
@@ -270,11 +254,10 @@ export default function StockTake() {
   if (phase === 'method') {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <GradientHeader title="Stock Take" subtitle="How is this herd tagged?" showBack />
+        <GradientHeader title={t('action.stockTake')} subtitle={t('stock.methodSubtitle')} showBack />
         <Screen contentStyle={{ paddingTop: spacing.md }}>
           <AppText variant="body" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.md }}>
-            Stock take confirms your animals in person. Pick the tag type you’re using so we can
-            guide the count.
+            {t('stock.intro')}
           </AppText>
           {METHODS.map((m) => {
             const selected = method === m.value;
@@ -303,10 +286,10 @@ export default function StockTake() {
                 />
                 <View style={{ flex: 1, gap: 2 }}>
                   <AppText variant="bodyLarge" style={{ fontWeight: '600' }}>
-                    {m.title}
+                    {t(m.title)}
                   </AppText>
                   <AppText variant="caption" color={colors.onSurfaceVariant}>
-                    {m.blurb}
+                    {t(m.blurb)}
                   </AppText>
                 </View>
                 {selected && <Icon name="check-circle" size={22} color={colors.primary} />}
@@ -314,7 +297,7 @@ export default function StockTake() {
             );
           })}
           <Button
-            label="Start count"
+            label={t('stock.startCount')}
             icon="arrow-right"
             onPress={() => setPhase('count')}
             style={{ marginTop: spacing.md }}
@@ -328,18 +311,18 @@ export default function StockTake() {
     const missingAnimals = allAnimals.filter((a) => marks[a.id] === 'missing');
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <GradientHeader title="Stock Take Report" subtitle="Review of today's count" showBack />
+        <GradientHeader title={t('stock.reportTitle')} subtitle={t('stock.reportSubtitle')} showBack />
         <Screen contentStyle={{ paddingTop: spacing.md }}>
           <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
-            <SummaryStat value={present} label="Present" color={colors.success} />
-            <SummaryStat value={missing} label="Missing" color={colors.error} />
-            <SummaryStat value={notCounted} label="Not counted" color={colors.onSurfaceVariant} />
+            <SummaryStat value={present} label={t('stock.present')} color={colors.success} />
+            <SummaryStat value={missing} label={t('stock.missing')} color={colors.error} />
+            <SummaryStat value={notCounted} label={t('stock.notCounted')} color={colors.onSurfaceVariant} />
           </View>
 
           {missingAnimals.length > 0 && (
             <>
               <AppText variant="overline" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>
-                Animals to follow up
+                {t('stock.followUpList')}
               </AppText>
               {missingAnimals.map((a) => (
                 <View
@@ -364,7 +347,7 @@ export default function StockTake() {
                       {a.name ?? a.tag}
                     </AppText>
                     <AppText variant="caption" color={colors.onSurfaceVariant}>
-                      Last seen: {a.locationName ?? '—'}
+                      {t('stock.lastSeen', { loc: a.locationName ?? '—' })}
                     </AppText>
                   </View>
                   <Pressable onPress={() => router.push('/(tabs)/track')} hitSlop={8}>
@@ -376,13 +359,13 @@ export default function StockTake() {
           )}
 
           <Button
-            label="Submit Report"
+            label={t('stock.submit')}
             icon="content-save-check"
             onPress={() => router.replace('/(tabs)/home')}
             style={{ marginTop: spacing.md }}
           />
           <Button
-            label="Back to Count"
+            label={t('stock.backToCount')}
             variant="outline"
             onPress={() => setPhase('count')}
             style={{ marginTop: spacing.sm }}
@@ -394,14 +377,14 @@ export default function StockTake() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Stock Take" subtitle="Verify your herd against the register" showBack>
+      <GradientHeader title={t('action.stockTake')} subtitle={t('stock.countSubtitle')} showBack>
         <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
             <AppText variant="body" color="rgba(255,255,255,0.92)">
-              {counted} of {allAnimals.length} counted
+              {t('stock.counted', { counted, total: allAnimals.length })}
             </AppText>
             <AppText variant="body" color="#fff" style={{ fontWeight: '600' }}>
-              {present} present · {missing} missing
+              {t('stock.presentMissing', { present, missing })}
             </AppText>
           </View>
           <ProgressBar value={progress} />
@@ -415,16 +398,16 @@ export default function StockTake() {
           style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
           <Icon name={activeMethod.icon} size={16} color={colors.primary} />
           <AppText variant="body" color={colors.primary} style={{ fontWeight: '600' }}>
-            {activeMethod.title}
+            {t(activeMethod.title)}
           </AppText>
           <Icon name="pencil-outline" size={13} color={colors.onSurfaceVariant} />
         </Pressable>
 
         {method === 'bluetooth' && (
-          <Button label="Scan & accept active tags" icon="bluetooth" variant="outline" onPress={associateBleTags} />
+          <Button label={t('stock.scanBle')} icon="bluetooth" variant="outline" onPress={associateBleTags} />
         )}
         {method === 'qr' && (
-          <Button label="Scan next QR tag" icon="qrcode-scan" variant="outline" onPress={scanNextTag} />
+          <Button label={t('stock.scanQr')} icon="qrcode-scan" variant="outline" onPress={scanNextTag} />
         )}
         {method === 'manual' && (
           <Pressable
@@ -432,13 +415,13 @@ export default function StockTake() {
             style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
             <Icon name="check-all" size={16} color={colors.success} />
             <AppText variant="body" color={colors.success} style={{ fontWeight: '600' }}>
-              Mark remaining present
+              {t('stock.markRemaining')}
             </AppText>
           </Pressable>
         )}
         {method === 'photo' && (
           <AppText variant="caption" color={colors.onSurfaceVariant}>
-            Tap “Photo to confirm” on each animal to record a current picture as proof of presence.
+            {t('stock.photoHint')}
           </AppText>
         )}
       </View>
@@ -469,7 +452,7 @@ export default function StockTake() {
           borderTopColor: colors.divider,
         }}>
         <Button
-          label={notCounted > 0 ? `Review (${notCounted} not counted)` : 'Review Stock Take'}
+          label={notCounted > 0 ? t('stock.reviewN', { count: notCounted }) : t('stock.review')}
           icon="clipboard-check-outline"
           onPress={() => setPhase('summary')}
         />
