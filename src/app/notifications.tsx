@@ -4,14 +4,15 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { colors, radius, spacing } from '@/theme';
 import { getNotifications } from '@/data/api';
 import { AppNotification, NotificationCategory } from '@/data/types';
+import { useT } from '@/i18n';
 import { AppText, EmptyState, GradientHeader, Icon, NotificationItem, Screen } from '@/ui';
 
 type Filter = 'all' | NotificationCategory;
 
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'device', label: 'Device' },
-  { key: 'boundary', label: 'Boundary' },
+const FILTERS: { key: Filter; labelKey: string }[] = [
+  { key: 'all', labelKey: 'notif.all' },
+  { key: 'device', labelKey: 'notif.device' },
+  { key: 'boundary', labelKey: 'notif.boundary' },
 ];
 
 function FilterChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
@@ -35,6 +36,7 @@ function FilterChip({ label, active, onPress }: { label: string; active: boolean
 
 export default function Notifications() {
   const router = useRouter();
+  const t = useT();
   const [items, setItems] = useState<AppNotification[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
   const [refreshing, setRefreshing] = useState(false);
@@ -64,8 +66,8 @@ export default function Notifications() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <GradientHeader
-        title="Notifications"
-        subtitle="Alerts from your herd & devices"
+        title={t('profile.row.notifications')}
+        subtitle={t('notif.subtitle')}
         showBack
         right={
           <Pressable onPress={() => router.push('/notification-settings')} hitSlop={8}>
@@ -75,12 +77,12 @@ export default function Notifications() {
       />
       <View style={{ flexDirection: 'row', gap: spacing.sm, padding: spacing.md, paddingBottom: 0 }}>
         {FILTERS.map((f) => (
-          <FilterChip key={f.key} label={f.label} active={filter === f.key} onPress={() => setFilter(f.key)} />
+          <FilterChip key={f.key} label={t(f.labelKey)} active={filter === f.key} onPress={() => setFilter(f.key)} />
         ))}
       </View>
       <Screen refreshing={refreshing} onRefresh={load} contentStyle={{ paddingTop: spacing.md }}>
         {filtered.length === 0 ? (
-          <EmptyState icon="bell-off-outline" title="No notifications" subtitle="You're all caught up." />
+          <EmptyState icon="bell-off-outline" title={t('notif.emptyTitle')} subtitle={t('notif.emptySub')} />
         ) : (
           filtered.map((n) => <NotificationItem key={n.id} item={n} />)
         )}

@@ -264,6 +264,27 @@ const en: Dict = {
   'stock.reviewN': 'Review ({count} not counted)',
   'stock.review': 'Review Stock Take',
 
+  // Calendar
+  'cal.scheduledOne': '{count} scheduled activity',
+  'cal.scheduled': '{count} scheduled activities',
+  'cal.none': 'No activities this month. Tap a day to schedule one.',
+  'cal.more': '+{count} more',
+
+  // Messaging
+  'msg.subtitle': 'Team & vet conversations',
+  'msg.emptyTitle': 'No conversations',
+  'msg.emptySub': 'Messages from your team and vets appear here.',
+  'msg.typePlaceholder': 'Type a message…',
+  'msg.you': 'You',
+
+  // Notifications
+  'notif.subtitle': 'Alerts from your herd & devices',
+  'notif.all': 'All',
+  'notif.device': 'Device',
+  'notif.boundary': 'Boundary',
+  'notif.emptyTitle': 'No notifications',
+  'notif.emptySub': 'You’re all caught up.',
+
   // Vet requests (farmer)
   'vetReq.subtitle': '{count} requests · {pending} pending',
   'vetReq.book': 'Book a vet call-out',
@@ -633,6 +654,27 @@ const sw: Dict = {
   'stock.absent': 'Hayupo',
   'stock.reviewN': 'Pitia ({count} hawajahesabiwa)',
   'stock.review': 'Pitia Kuhesabu Mifugo',
+
+  // Calendar
+  'cal.scheduledOne': 'shughuli {count} iliyopangwa',
+  'cal.scheduled': 'shughuli {count} zilizopangwa',
+  'cal.none': 'Hakuna shughuli mwezi huu. Gusa siku kupanga moja.',
+  'cal.more': '+{count} zaidi',
+
+  // Messaging
+  'msg.subtitle': 'Mazungumzo ya timu na daktari',
+  'msg.emptyTitle': 'Hakuna mazungumzo',
+  'msg.emptySub': 'Ujumbe kutoka kwa timu yako na madaktari huonekana hapa.',
+  'msg.typePlaceholder': 'Andika ujumbe…',
+  'msg.you': 'Wewe',
+
+  // Notifications
+  'notif.subtitle': 'Arifa kutoka kundi lako na vifaa',
+  'notif.all': 'Zote',
+  'notif.device': 'Kifaa',
+  'notif.boundary': 'Mpaka',
+  'notif.emptyTitle': 'Hakuna arifa',
+  'notif.emptySub': 'Umemaliza yote.',
 
   // Vet requests (farmer)
   'vetReq.subtitle': 'Maombi {count} · {pending} yanasubiri',

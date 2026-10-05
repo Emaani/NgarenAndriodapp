@@ -6,6 +6,7 @@ import { CalendarEvent, CalendarType, getCalendarEvents } from '@/data/clinical'
 import { getLocalEvents } from '@/data/localEvents';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
+import { useI18n } from '@/i18n';
 import { AppText, Fab, Icon } from '@/ui';
 
 const TYPE_TINT: Record<CalendarType, string> = {
@@ -16,9 +17,20 @@ const TYPE_TINT: Record<CalendarType, string> = {
   stock_take: '#F59E0B',
 };
 
-const MONTHS = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'];
-const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const WEEKDAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+// Month/weekday names per locale. Only the 3-letter month abbreviation is shown
+// (big calendar title), plus full/short weekday headers.
+const MONTHS_SHORT: Record<string, string[]> = {
+  en: ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'],
+  sw: ['JAN', 'FEB', 'MAC', 'APR', 'MEI', 'JUN', 'JUL', 'AGO', 'SEP', 'OKT', 'NOV', 'DES'],
+};
+const WEEKDAYS: Record<string, string[]> = {
+  en: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+  sw: ['Jumapili', 'Jumatatu', 'Jumanne', 'Jumatano', 'Alhamisi', 'Ijumaa', 'Jumamosi'],
+};
+const WEEKDAYS_SHORT: Record<string, string[]> = {
+  en: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+  sw: ['J2', 'J3', 'J4', 'J5', 'Alh', 'Ij', 'J1'],
+};
 
 const isoKey = (y: number, m: number, d: number) =>
   `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
@@ -33,6 +45,10 @@ const isoKey = (y: number, m: number, d: number) =>
 export default function Calendar() {
   const router = useRouter();
   const { width } = useWindowDimensions();
+  const { locale, t } = useI18n();
+  const months = MONTHS_SHORT[locale] ?? MONTHS_SHORT.en;
+  const weekdays = WEEKDAYS[locale] ?? WEEKDAYS.en;
+  const weekdaysShort = WEEKDAYS_SHORT[locale] ?? WEEKDAYS_SHORT.en;
   const { loading, isAuthenticated } = useAuth();
   const { data: events } = useResource(async () => {
     const [derived, scheduled] = await Promise.all([getCalendarEvents(), getLocalEvents()]);
@@ -107,23 +123,23 @@ export default function Calendar() {
           </View>
         </View>
         <AppText style={{ fontSize: width > 700 ? 72 : 52, lineHeight: width > 700 ? 78 : 58, fontWeight: '900', letterSpacing: 2, color: colors.onSurface, marginTop: spacing.xs }}>
-          {MONTHS[cursor.month].slice(0, 3)}
+          {months[cursor.month]}
         </AppText>
         <AppText style={{ fontSize: width > 700 ? 30 : 24, letterSpacing: 8, color: colors.onSurface, fontWeight: '400' }}>
           {cursor.year}
         </AppText>
         <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginTop: spacing.xs }}>
-          {monthEventCount} scheduled {monthEventCount === 1 ? 'activity' : 'activities'}
+          {monthEventCount === 1 ? t('cal.scheduledOne', { count: monthEventCount }) : t('cal.scheduled', { count: monthEventCount })}
         </AppText>
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: spacing.xxl }}>
         {/* Weekday header row */}
         <View style={{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: colors.divider }}>
-          {WEEKDAYS.map((w, i) => (
+          {weekdays.map((w, i) => (
             <View key={w} style={{ flex: 1, paddingVertical: spacing.xs, alignItems: 'center' }}>
               <AppText variant="caption" color={colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
-                {width > 700 ? w : WEEKDAYS_SHORT[i]}
+                {width > 700 ? w : weekdaysShort[i]}
               </AppText>
             </View>
           ))}
@@ -177,7 +193,7 @@ export default function Calendar() {
                       ))}
                       {dayEvents.length > (width > 700 ? 3 : 2) ? (
                         <AppText variant="caption" style={{ fontSize: 9 }} color={colors.onSurfaceVariant}>
-                          +{dayEvents.length - (width > 700 ? 3 : 2)} more
+                          {t('cal.more', { count: dayEvents.length - (width > 700 ? 3 : 2) })}
                         </AppText>
                       ) : null}
                     </View>
@@ -190,7 +206,7 @@ export default function Calendar() {
 
         {monthEventCount === 0 ? (
           <AppText variant="caption" color={colors.onSurfaceVariant} style={{ textAlign: 'center', marginTop: spacing.lg }}>
-            No activities this month. Tap a day to schedule one.
+            {t('cal.none')}
           </AppText>
         ) : null}
       </ScrollView>

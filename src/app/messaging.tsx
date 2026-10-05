@@ -5,6 +5,7 @@ import { colors, radius, shadow, spacing } from '@/theme';
 import { Conversation, getConversations, ThreadMessage } from '@/data/ops';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
+import { useT } from '@/i18n';
 import { AppText, EmptyState, GradientHeader, Icon, Screen } from '@/ui';
 
 function Avatar({ initials, online }: { initials: string; online: boolean }) {
@@ -41,6 +42,7 @@ function Avatar({ initials, online }: { initials: string; online: boolean }) {
 }
 
 function ThreadView({ convo, onBack }: { convo: Conversation; onBack: () => void }) {
+  const t = useT();
   const [thread, setThread] = useState<ThreadMessage[]>(convo.thread);
   const [draft, setDraft] = useState('');
 
@@ -49,7 +51,7 @@ function ThreadView({ convo, onBack }: { convo: Conversation; onBack: () => void
     if (!text) return;
     const now = new Date();
     const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    setThread((t) => [...t, { sender: 'You', text, time, mine: true }]);
+    setThread((prev) => [...prev, { sender: t('msg.you'), text, time, mine: true }]);
     setDraft('');
   };
 
@@ -90,7 +92,7 @@ function ThreadView({ convo, onBack }: { convo: Conversation; onBack: () => void
         <TextInput
           value={draft}
           onChangeText={setDraft}
-          placeholder="Type a message…"
+          placeholder={t('msg.typePlaceholder')}
           placeholderTextColor={colors.onSurfaceVariant}
           style={{
             flex: 1,
@@ -121,6 +123,7 @@ function ThreadView({ convo, onBack }: { convo: Conversation; onBack: () => void
 }
 
 export default function Messaging() {
+  const t = useT();
   const { loading, isAuthenticated } = useAuth();
   const { data: conversations } = useResource(getConversations, []);
   const [selected, setSelected] = useState<Conversation | null>(null);
@@ -132,10 +135,10 @@ export default function Messaging() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Messages" subtitle="Team & vet conversations" showBack />
+      <GradientHeader title={t('action.messages')} subtitle={t('msg.subtitle')} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         {conversations.length === 0 ? (
-          <EmptyState icon="message-outline" title="No conversations" subtitle="Messages from your team and vets appear here." />
+          <EmptyState icon="message-outline" title={t('msg.emptyTitle')} subtitle={t('msg.emptySub')} />
         ) : (
           conversations.map((c) => (
             <Pressable
