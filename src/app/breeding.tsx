@@ -6,16 +6,12 @@ import { getBreedingRecords } from '@/data/clinical';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { formatDate } from '@/lib/date';
+import { useT, useTStatus } from '@/i18n';
 import { ActionChip, AppText, EmptyState, GradientHeader, Icon, IconChip, Screen } from '@/ui';
 
 type Filter = 'all' | 'pending' | 'confirmed' | 'calved';
 
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'pending', label: 'Pending' },
-  { key: 'confirmed', label: 'Confirmed' },
-  { key: 'calved', label: 'Calved' },
-];
+const FILTERS: Filter[] = ['all', 'pending', 'confirmed', 'calved'];
 
 function statusVariant(status: string) {
   const s = status.toLowerCase();
@@ -25,6 +21,8 @@ function statusVariant(status: string) {
 }
 
 export default function Breeding() {
+  const t = useT();
+  const tStatus = useTStatus();
   const { loading, isAuthenticated } = useAuth();
   const { data: records } = useResource(getBreedingRecords, []);
   const [filter, setFilter] = useState<Filter>('all');
@@ -39,14 +37,14 @@ export default function Breeding() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Breeding" subtitle="Lineage, mating & pregnancy" showBack />
+      <GradientHeader title={t('action.breeding')} subtitle={t('brd.subtitle')} showBack />
       <View style={{ flexDirection: 'row', gap: spacing.sm, padding: spacing.md, paddingBottom: 0, flexWrap: 'wrap' }}>
         {FILTERS.map((f) => {
-          const active = filter === f.key;
+          const active = filter === f;
           return (
             <Pressable
-              key={f.key}
-              onPress={() => setFilter(f.key)}
+              key={f}
+              onPress={() => setFilter(f)}
               style={{
                 paddingHorizontal: spacing.md,
                 paddingVertical: spacing.sm,
@@ -56,7 +54,7 @@ export default function Breeding() {
                 borderColor: active ? colors.primary : colors.divider,
               }}>
               <AppText variant="body" color={active ? '#fff' : colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
-                {f.label}
+                {f === 'all' ? t('doc.all') : tStatus(f)}
               </AppText>
             </Pressable>
           );
@@ -65,7 +63,7 @@ export default function Breeding() {
 
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         {visible.length === 0 ? (
-          <EmptyState icon="dna" title="No breeding records" subtitle="Mating and pregnancy records will appear here." />
+          <EmptyState icon="dna" title={t('brd.emptyTitle')} subtitle={t('brd.emptySub')} />
         ) : (
           visible.map((r) => (
             <View
@@ -82,25 +80,25 @@ export default function Breeding() {
                       {r.damName}
                     </AppText>
                     <AppText variant="caption" color={colors.onSurfaceVariant}>
-                      Sire: {r.sireName} · {r.matingMethod}
+                      {t('brd.sire', { name: r.sireName, method: r.matingMethod })}
                     </AppText>
                   </View>
                 </View>
-                <ActionChip label={r.status[0].toUpperCase() + r.status.slice(1)} variant={statusVariant(r.status)} />
+                <ActionChip label={tStatus(r.status)} variant={statusVariant(r.status)} />
               </View>
 
               <View style={{ flexDirection: 'row', gap: spacing.lg }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
                   <Icon name="calendar-heart" size={15} color={colors.onSurfaceVariant} />
                   <AppText variant="caption" color={colors.onSurfaceVariant}>
-                    Mated {formatDate(r.matingDate)}
+                    {t('brd.mated', { date: formatDate(r.matingDate) })}
                   </AppText>
                 </View>
                 {r.expectedCalvingDate && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
                     <Icon name="baby-carriage" size={15} color={colors.onSurfaceVariant} />
                     <AppText variant="caption" color={colors.onSurfaceVariant}>
-                      Due {formatDate(r.expectedCalvingDate)}
+                      {t('brd.due', { date: formatDate(r.expectedCalvingDate) })}
                     </AppText>
                   </View>
                 )}

@@ -51,6 +51,28 @@ const en: Dict = {
   'status.rejected': 'Rejected',
   'urgency.emergency': 'Emergency',
   'urgency.routine': 'Routine',
+  'status.confirmed': 'Confirmed',
+  'status.calved': 'Calved',
+
+  // Breeding
+  'brd.subtitle': 'Lineage, mating & pregnancy',
+  'brd.emptyTitle': 'No breeding records',
+  'brd.emptySub': 'Mating and pregnancy records will appear here.',
+  'brd.sire': 'Sire: {name} · {method}',
+  'brd.mated': 'Mated {date}',
+  'brd.due': 'Due {date}',
+
+  // Document preview
+  'docView.title': 'Document',
+  'docView.notFoundTitle': 'Document not found',
+  'docView.notFoundSub': 'It may have been deleted or expired.',
+  'docView.sharingUnavailableTitle': 'Sharing unavailable',
+  'docView.sharingUnavailableBody': 'Could not open the share sheet on this device.',
+  'docView.deleteBody': 'Remove “{title}”?',
+  'docView.deleted': 'Document deleted',
+  'docView.contentGone': 'This document’s content is no longer stored on this device. You can delete this entry.',
+  'docView.share': 'Share',
+  'docView.sharing': 'Sharing…',
 
   // Auth — login / signup / success / onboarding
   'auth.loginTitle': 'Login to Ngaren',
@@ -512,6 +534,28 @@ const sw: Dict = {
   'status.rejected': 'Imekataliwa',
   'urgency.emergency': 'Dharura',
   'urgency.routine': 'Kawaida',
+  'status.confirmed': 'Imethibitishwa',
+  'status.calved': 'Amezaa',
+
+  // Breeding
+  'brd.subtitle': 'Ukoo, kupandisha na mimba',
+  'brd.emptyTitle': 'Hakuna rekodi za uzalishaji',
+  'brd.emptySub': 'Rekodi za kupandisha na mimba zitaonekana hapa.',
+  'brd.sire': 'Dume: {name} · {method}',
+  'brd.mated': 'Alipandishwa {date}',
+  'brd.due': 'Inatarajiwa {date}',
+
+  // Document preview
+  'docView.title': 'Nyaraka',
+  'docView.notFoundTitle': 'Nyaraka haipatikani',
+  'docView.notFoundSub': 'Huenda imefutwa au imeisha muda.',
+  'docView.sharingUnavailableTitle': 'Kushiriki hakupatikani',
+  'docView.sharingUnavailableBody': 'Haikuweza kufungua karatasi ya kushiriki kwenye kifaa hiki.',
+  'docView.deleteBody': 'Ondoa “{title}”?',
+  'docView.deleted': 'Nyaraka imefutwa',
+  'docView.contentGone': 'Maudhui ya nyaraka hii hayahifadhiwi tena kwenye kifaa hiki. Unaweza kufuta kiingilio hiki.',
+  'docView.share': 'Shiriki',
+  'docView.sharing': 'Inashiriki…',
 
   // Auth — login / signup / success / onboarding
   'auth.loginTitle': 'Ingia Ngaren',

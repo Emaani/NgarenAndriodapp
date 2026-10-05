@@ -8,6 +8,7 @@ import { useAuth } from '@/services/auth';
 import { exportCsv, exportPdf, exportText } from '@/lib/export';
 import { notify } from '@/lib/toast';
 import { formatDate } from '@/lib/date';
+import { useT } from '@/i18n';
 import { AppText, Button, EmptyState, GradientHeader, Icon } from '@/ui';
 
 /** Escape text so it renders literally inside the preview HTML. */
@@ -43,6 +44,7 @@ function textPreviewHtml(content: string, format: 'csv' | 'text'): string {
  */
 export default function DocumentPreview() {
   const router = useRouter();
+  const t = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { loading, isAuthenticated } = useAuth();
   const [doc, setDoc] = useState<DocumentRecord | null | undefined>(undefined);
@@ -69,15 +71,15 @@ export default function DocumentPreview() {
   if (doc === null) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <GradientHeader title="Document" showBack />
-        <EmptyState icon="file-remove-outline" title="Document not found" subtitle="It may have been deleted or expired." />
+        <GradientHeader title={t('docView.title')} showBack />
+        <EmptyState icon="file-remove-outline" title={t('docView.notFoundTitle')} subtitle={t('docView.notFoundSub')} />
       </View>
     );
   }
   if (doc === undefined) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <GradientHeader title="Document" showBack />
+        <GradientHeader title={t('docView.title')} showBack />
       </View>
     );
   }
@@ -93,21 +95,21 @@ export default function DocumentPreview() {
       const name = doc.filename ?? `${doc.title}.${format === 'pdf' ? 'pdf' : format === 'csv' ? 'csv' : 'txt'}`;
       const ok =
         format === 'pdf' ? await exportPdf(name, content) : format === 'csv' ? await exportCsv(name, content) : await exportText(name, content);
-      if (!ok) Alert.alert('Sharing unavailable', 'Could not open the share sheet on this device.');
+      if (!ok) Alert.alert(t('docView.sharingUnavailableTitle'), t('docView.sharingUnavailableBody'));
     } finally {
       setSharing(false);
     }
   };
 
   const onDelete = () => {
-    Alert.alert('Delete document', `Remove “${doc.title}”?`, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('doc.deleteTitle'), t('docView.deleteBody', { title: doc.title }), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           await deleteDocument(doc.id);
-          notify('Document deleted');
+          notify(t('docView.deleted'));
           router.back();
         },
       },
@@ -129,14 +131,14 @@ export default function DocumentPreview() {
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg }}>
             <Icon name="file-alert-outline" size={40} color={colors.onSurfaceVariant} />
             <AppText variant="body" color={colors.onSurfaceVariant} style={{ marginTop: spacing.sm, textAlign: 'center' }}>
-              This document’s content is no longer stored on this device. You can delete this entry.
+              {t('docView.contentGone')}
             </AppText>
           </View>
         )}
       </View>
       <View style={{ flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.md, paddingBottom: spacing.lg }}>
-        <Button label="Delete" variant="outline" icon="trash-can-outline" onPress={onDelete} style={{ flex: 1 }} />
-        <Button label={sharing ? 'Sharing…' : 'Share'} icon="share-variant-outline" loading={sharing} disabled={content == null} onPress={onShare} style={{ flex: 2 }} />
+        <Button label={t('common.delete')} variant="outline" icon="trash-can-outline" onPress={onDelete} style={{ flex: 1 }} />
+        <Button label={sharing ? t('docView.sharing') : t('docView.share')} icon="share-variant-outline" loading={sharing} disabled={content == null} onPress={onShare} style={{ flex: 2 }} />
       </View>
     </View>
   );

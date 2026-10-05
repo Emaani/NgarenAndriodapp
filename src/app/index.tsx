@@ -4,6 +4,7 @@ import { Redirect } from 'expo-router';
 import { colors, radius, spacing } from '@/theme';
 import { AppText } from '@/ui';
 import { useAuth } from '@/services/auth';
+import { useT } from '@/i18n';
 
 const ngarenLogo = require('@/assets/images/ngaren-logo.png');
 
@@ -17,6 +18,7 @@ const ngarenLogo = require('@/assets/images/ngaren-logo.png');
  */
 export default function Splash() {
   const { loading, isAuthenticated, role } = useAuth();
+  const t = useT();
 
   if (!loading) {
     if (isAuthenticated) {
@@ -52,12 +54,12 @@ export default function Splash() {
           Ngaren
         </AppText>
         <AppText variant="bodyLarge" color="rgba(255,255,255,0.92)">
-          Livestock management platform
+          {t('auth.subtitle')}
         </AppText>
         <ActivityIndicator color="#fff" style={{ marginTop: spacing.md }} />
       </View>
       <AppText variant="caption" color="rgba(255,255,255,0.85)" style={{ marginBottom: spacing.md }}>
-        Powered by Ceres Tag Technology
+        {t('notifset.poweredBy')}
       </AppText>
     </LinearGradient>
   );
