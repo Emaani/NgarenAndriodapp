@@ -6,6 +6,7 @@ import { getSummary } from '@/data/api';
 import { getCeresBehaviour } from '@/data/ceresBehaviour';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
+import { useT } from '@/i18n';
 import { AppText, ChartCard, DonutChart, GradientHeader, Icon, IconName, Screen } from '@/ui';
 
 /** Compact executive KPI tile. */
@@ -53,6 +54,7 @@ function SectionCard({ title, subtitle, children }: { title: string; subtitle?: 
  * then the breakdown pies, then the trends). Farmers/vets are redirected out.
  */
 export default function Insights() {
+  const t = useT();
   const { isAdmin, loading, isAuthenticated } = useAuth();
   const { data: summary } = useResource(getSummary, summaryFallback);
   // Herd-wide live Ceres behaviour (no tag filter). Empty when no telemetry.
@@ -71,43 +73,43 @@ export default function Insights() {
   const uptime = online + offline ? Math.round((online / (online + offline)) * 100) : 0;
 
   const allocation = [
-    { label: 'Linked to animals', value: linked, color: colors.primary },
-    { label: 'Free devices', value: free, color: '#F59E0B' },
+    { label: t('ins.linkedToAnimals'), value: linked, color: colors.primary },
+    { label: t('ins.freeDevices'), value: free, color: '#F59E0B' },
   ];
   const connectivity = [
-    { label: 'Online', value: online, color: colors.success },
-    { label: 'Offline', value: offline, color: colors.error },
+    { label: t('ins.online'), value: online, color: colors.success },
+    { label: t('ins.offline'), value: offline, color: colors.error },
   ];
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Insights" subtitle="Executive analytics" showBack />
+      <GradientHeader title={t('action.insights')} subtitle={t('ins.subtitle')} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         {/* Executive KPI band */}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.lg }}>
-          <Kpi value={String(totalDevices)} label="Devices" icon="tag-outline" tint="#6D874F" />
-          <Kpi value={String(summary.animals)} label="Animals" icon="cow" tint="#2563EB" />
-          <Kpi value={`${utilisation}%`} label="Tag utilisation" icon="chart-donut" tint="#0EA5E9" />
-          <Kpi value={`${uptime}%`} label="Fleet uptime" icon="access-point" tint="#16A34A" />
+          <Kpi value={String(totalDevices)} label={t('action.devices')} icon="tag-outline" tint="#6D874F" />
+          <Kpi value={String(summary.animals)} label={t('home.stat.animals')} icon="cow" tint="#2563EB" />
+          <Kpi value={`${utilisation}%`} label={t('ins.tagUtil')} icon="chart-donut" tint="#0EA5E9" />
+          <Kpi value={`${uptime}%`} label={t('ins.fleetUptime')} icon="access-point" tint="#16A34A" />
         </View>
 
         <AppText variant="title" style={{ marginBottom: spacing.md }}>
-          Device breakdown
+          {t('ins.deviceBreakdown')}
         </AppText>
-        <SectionCard title="Device allocation" subtitle={`${utilisation}% of devices are linked to an animal`}>
-          <DonutChart slices={allocation} centerLabel="devices" />
+        <SectionCard title={t('ins.deviceAllocation')} subtitle={t('ins.allocSub', { pct: utilisation })}>
+          <DonutChart slices={allocation} centerLabel={t('ins.devicesCenter')} />
         </SectionCard>
-        <SectionCard title="Fleet connectivity" subtitle={`${uptime}% of the fleet is currently online`}>
-          <DonutChart slices={connectivity} centerLabel="devices" />
+        <SectionCard title={t('ins.fleetConn')} subtitle={t('ins.connSub', { pct: uptime })}>
+          <DonutChart slices={connectivity} centerLabel={t('ins.devicesCenter')} />
         </SectionCard>
 
         <AppText variant="title" style={{ marginTop: spacing.sm, marginBottom: spacing.md }}>
-          Herd behaviour trends
+          {t('ins.behaviourTrends')}
         </AppText>
         {behaviour.length > 0 ? (
           <>
             <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.md }}>
-              Live Ceres telemetry · drag any chart to inspect a reading.
+              {t('ins.liveTelemetry')}
             </AppText>
             {behaviour.slice(0, 3).map((series) => (
               <ChartCard key={series.label} series={series} />
@@ -117,7 +119,7 @@ export default function Insights() {
           <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.lg, alignItems: 'center', gap: spacing.sm }, shadow[1]]}>
             <Icon name="chart-line" size={28} color={colors.onSurfaceVariant} />
             <AppText variant="body" color={colors.onSurfaceVariant} style={{ textAlign: 'center' }}>
-              {behaviourLoading ? 'Loading telemetry…' : 'No live Ceres telemetry in the last 14 days.'}
+              {behaviourLoading ? t('ins.loadingTelemetry') : t('ins.noTelemetry')}
             </AppText>
           </View>
         )}

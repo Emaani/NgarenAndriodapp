@@ -19,6 +19,7 @@ import {
   healthCsv,
   vetAuditCsv,
 } from '@/data/reports';
+import { useT } from '@/i18n';
 import { AppText, GradientHeader, Icon, IconChip, Screen } from '@/ui';
 
 /**
@@ -27,6 +28,7 @@ import { AppText, GradientHeader, Icon, IconChip, Screen } from '@/ui';
  * ReportsPage export surface; the CSVs are built from live/mock data.
  */
 export default function Reports() {
+  const t = useT();
   const { loading, isAuthenticated, isAdmin, canVet } = useAuth();
   const { data: animals } = useResource(getHerd, animalsFallback);
   const { data: devices } = useResource(() => getDevices(), devicesFallback);
@@ -60,7 +62,7 @@ export default function Reports() {
       const { file, csv } = map[id];
       const ok = await exportCsv(file, csv);
       if (!ok) {
-        Alert.alert('Export unavailable', 'Sharing is not available on this device.');
+        Alert.alert(t('rep.exportFailTitle'), t('rep.exportFailBody'));
       }
     } finally {
       setBusy(null);
@@ -69,10 +71,10 @@ export default function Reports() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Reports" subtitle="Export herd data as CSV" showBack />
+      <GradientHeader title={t('action.reports')} subtitle={t('rep.subtitle')} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         <AppText variant="body" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.md }}>
-          Generate a report and choose where to send it — save to Files, email, or share to Drive.
+          {t('rep.intro')}
         </AppText>
 
         {REPORT_CATALOG.map((r) => {
@@ -107,7 +109,7 @@ export default function Reports() {
                   {r.description}
                 </AppText>
                 <AppText variant="caption" color={colors.primary} style={{ fontWeight: '600', marginTop: 2 }}>
-                  {count} {count === 1 ? 'row' : 'rows'}
+                  {count === 1 ? t('rep.rowOne', { count }) : t('rep.rows', { count })}
                 </AppText>
               </View>
               <Icon
@@ -120,8 +122,7 @@ export default function Reports() {
         })}
 
         <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginTop: spacing.md }}>
-          Reports reflect the data currently visible to your role. PDF export is coming with the
-          reporting backend.
+          {t('rep.footer')}
         </AppText>
       </Screen>
     </View>

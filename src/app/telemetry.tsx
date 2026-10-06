@@ -4,6 +4,7 @@ import { colors, radius, shadow, spacing } from '@/theme';
 import { MOCK as telemetryFallback, getTelemetryAnalytics } from '@/data/telemetry';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
+import { useT } from '@/i18n';
 import { AppText, DonutChart, GradientHeader, Icon, IconName, LineChart, Screen } from '@/ui';
 
 const PALETTE = ['#6D874F', '#0EA5E9', '#F59E0B', '#EC4899', '#EF4444', '#16A34A'];
@@ -46,6 +47,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
  * with a mock fallback; mirrors the web TelemetryAnalyticsPage.
  */
 export default function Telemetry() {
+  const tr = useT();
   const { loading, isAuthenticated, isAdmin } = useAuth();
   const { data: t } = useResource(getTelemetryAnalytics, telemetryFallback);
 
@@ -57,48 +59,48 @@ export default function Telemetry() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Telemetry Analytics" subtitle="Last 7 days · Ceres Tag" showBack />
+      <GradientHeader title={tr('action.telemetry')} subtitle={tr('tel.subtitle')} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
-          <Kpi value={t.pings.toLocaleString()} label="Telemetry pings" icon="access-point" tint="#6D874F" />
-          <Kpi value={String(t.activeTags)} label="Reporting tags" icon="tag-outline" tint="#0EA5E9" />
-          <Kpi value={`${t.avgActivity}%`} label="Avg activity" icon="run-fast" tint="#F59E0B" />
-          <Kpi value={String(t.lowBattery)} label="Low battery" icon="battery-alert" tint="#EF4444" />
+          <Kpi value={t.pings.toLocaleString()} label={tr('tel.pings')} icon="access-point" tint="#6D874F" />
+          <Kpi value={String(t.activeTags)} label={tr('tel.reportingTags')} icon="tag-outline" tint="#0EA5E9" />
+          <Kpi value={`${t.avgActivity}%`} label={tr('tel.avgActivity')} icon="run-fast" tint="#F59E0B" />
+          <Kpi value={String(t.lowBattery)} label={tr('tel.lowBattery')} icon="battery-alert" tint="#EF4444" />
         </View>
 
-        <Card title="Activity trend">
+        <Card title={tr('tel.activityTrend')}>
           {t.activityByDay.some((v) => v > 0) ? (
             <>
               <LineChart actual={t.activityByDay} pfi={[]} />
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.xs }}>
                 {DAYS.map((d) => (
                   <AppText key={d} variant="caption" color={colors.onSurfaceVariant}>
-                    {d}
+                    {d === 'Now' ? tr('tel.now') : d}
                   </AppText>
                 ))}
               </View>
             </>
           ) : (
             <AppText variant="body" color={colors.onSurfaceVariant}>
-              No activity telemetry in the last 7 days.
+              {tr('tel.noActivity')}
             </AppText>
           )}
         </Card>
 
-        <Card title="Behaviour split">
+        <Card title={tr('tel.behaviourSplit')}>
           {slices.length > 0 ? (
             <DonutChart slices={slices} />
           ) : (
             <AppText variant="body" color={colors.onSurfaceVariant}>
-              No behaviour data reported yet.
+              {tr('tel.noBehaviour')}
             </AppText>
           )}
         </Card>
 
-        <Card title="Device battery health">
+        <Card title={tr('tel.batteryHealth')}>
           {t.batteries.length === 0 ? (
             <AppText variant="body" color={colors.onSurfaceVariant}>
-              No devices reporting battery.
+              {tr('tel.noBattery')}
             </AppText>
           ) : (
             t.batteries.map((b, i) => {
