@@ -13,19 +13,14 @@ import { sendLocalNotification } from '@/services/push';
 import { useAuth } from '@/services/auth';
 import { useResource } from '@/data/hooks';
 import { AppointmentMode, Animal, CalloutUrgency } from '@/data/types';
+import { useT } from '@/i18n';
 import { AppText, Button, GradientHeader, Icon, PhotoField, PickerField, Screen, TextField } from '@/ui';
 
 const URGENCY = ['Routine', 'Emergency'] as const;
-// SLA per priority tier (Sep 3 2026 standup): routine sits up to 48h before
-// escalation; emergency has a 4h response window.
-const SLA: Record<(typeof URGENCY)[number], { responseHrs: number; note: string }> = {
-  Routine: { responseHrs: 48, note: 'Response within 48 hours' },
-  Emergency: { responseHrs: 4, note: 'Response within 4 hours' },
-};
-const MODES: { key: AppointmentMode; label: string; icon: 'map-marker-check-outline' | 'video-outline' | 'account-switch-outline' }[] = [
-  { key: 'onsite', label: 'On-site', icon: 'map-marker-check-outline' },
-  { key: 'video', label: 'Video', icon: 'video-outline' },
-  { key: 'hybrid', label: 'Hybrid', icon: 'account-switch-outline' },
+const MODES: { key: AppointmentMode; icon: 'map-marker-check-outline' | 'video-outline' | 'account-switch-outline' }[] = [
+  { key: 'onsite', icon: 'map-marker-check-outline' },
+  { key: 'video', icon: 'video-outline' },
+  { key: 'hybrid', icon: 'account-switch-outline' },
 ];
 
 // Specific booking time slots (Sep 12 2026): the appointment takes a slot, not
@@ -34,6 +29,7 @@ const TIME_SLOTS = BOOKING_SLOTS;
 
 export default function RequestCallout() {
   const router = useRouter();
+  const t = useT();
   const { vetId, date, emergency } = useLocalSearchParams<{ vetId?: string; date?: string; emergency?: string }>();
   const vet = vetId ? vets.find((v) => v.id === Number(vetId)) : undefined;
   const isEmergency = emergency === '1';
@@ -140,11 +136,11 @@ export default function RequestCallout() {
         accessScope: noAnimalYet ? undefined : allAnimals ? 'all-animals' : 'selected',
         accessAnimals: !noAnimalYet && !allAnimals ? permittedLabels : undefined,
       });
-      notify(`Vet request sent for ${animalLabel}`);
+      notify(t('fv.sentToast', { label: animalLabel }));
       // A real on-device notification so the farmer has a durable record + proof
       // notifications work (local — no backend push server needed).
       void sendLocalNotification(
-        'Vet request sent',
+        t('fv.notifTitle'),
         `${urgency} request for ${animalLabel}${vet ? ` to ${vet.name}` : ''}. We'll notify you when a vet responds.`,
         { type: 'VET_REQUEST' },
       );
@@ -157,13 +153,13 @@ export default function RequestCallout() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title={isEmergency ? 'Emergency call-out' : 'Request a Vet'} subtitle={vet ? vet.name : isEmergency ? 'Available vets will be alerted now' : 'A nearby vet will be matched'} showBack />
+      <GradientHeader title={isEmergency ? t('findVet.emergency') : t('health.requestVet')} subtitle={vet ? vet.name : isEmergency ? t('fv.subEmergency') : t('fv.subMatched')} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         {isEmergency ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.errorTint, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.error }}>
             <Icon name="alarm-light-outline" size={20} color={colors.error} />
             <AppText variant="caption" color={colors.error} style={{ flex: 1, fontWeight: '600' }}>
-              Emergency request — we’ll alert available vets near you immediately. No time slot needed.
+              {t('fv.emergencyBanner')}
             </AppText>
           </View>
         ) : null}
@@ -205,7 +201,7 @@ export default function RequestCallout() {
                 {formatDate(scheduledFor)}
               </AppText>
               <AppText variant="caption" color={colors.primaryDark}>
-                Selected from {vet ? `${vet.name}’s` : 'the vet’s'} availability
+                {vet ? t('fv.selectedFromVet', { name: vet.name }) : t('fv.selectedFromGeneric')}
               </AppText>
             </View>
           </View>
@@ -215,7 +211,7 @@ export default function RequestCallout() {
         {scheduledFor ? (
           <>
             <AppText variant="body" style={{ fontWeight: '600', marginBottom: spacing.xs }}>
-              Time slot *
+              {t('fv.timeSlot')}
             </AppText>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.md }}>
               {TIME_SLOTS.map((s) => {
@@ -238,9 +234,9 @@ export default function RequestCallout() {
         {/* Admin-only: book on behalf of a farmer. */}
         {isAdmin ? (
           <PickerField
-            label="Booking on behalf of"
+            label={t('fv.onBehalf')}
             value={onBehalfFarmerId}
-            placeholder="Select a farmer (optional)"
+            placeholder={t('fv.onBehalfPlaceholder')}
             options={farmerOptions}
             onSelect={pickFarmer}
           />
@@ -251,10 +247,10 @@ export default function RequestCallout() {
         {!noAnimalYet ? (
           <>
             <PickerField
-              label="Animal"
+              label={t('ad.animalTitle')}
               required
               value={animal ? String(animal.id) : ''}
-              placeholder={isAdmin && !onBehalfFarmerId ? 'Select a farmer first, or any animal' : 'Select an animal'}
+              placeholder={isAdmin && !onBehalfFarmerId ? t('fv.animalPlaceholderFarmer') : t('fv.animalPlaceholder')}
               options={animalOptions}
               onSelect={selectAnimal}
             />
@@ -262,7 +258,7 @@ export default function RequestCallout() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: -spacing.sm, marginBottom: spacing.sm }}>
                 <Icon name="map-marker-outline" size={15} color={colors.onSurfaceVariant} />
                 <AppText variant="caption" color={colors.onSurfaceVariant}>
-                  Location: {locationName || 'Not set on this animal'} · auto-selected
+                  {t('fv.locationAuto', { loc: locationName || t('fv.locationUnset') })}
                 </AppText>
               </View>
             ) : null}
@@ -273,13 +269,13 @@ export default function RequestCallout() {
           style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.md }}>
           <Icon name={noAnimalYet ? 'checkbox-marked' : 'checkbox-blank-outline'} size={22} color={noAnimalYet ? colors.primary : colors.onSurfaceVariant} />
           <AppText variant="body" color={colors.onSurface} style={{ flex: 1 }}>
-            I haven’t registered this animal yet — the vet will register it during the visit.
+            {t('fv.noAnimalYet')}
           </AppText>
         </Pressable>
 
         {/* Appointment mode */}
         <AppText variant="body" style={{ fontWeight: '600', marginBottom: spacing.sm }}>
-          Appointment type *
+          {t('fv.apptType')}
         </AppText>
         <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
           {MODES.map((m) => {
@@ -291,7 +287,7 @@ export default function RequestCallout() {
                 style={{ flex: 1, alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.sm, borderRadius: radius.md, backgroundColor: active ? colors.primary : colors.surface, borderWidth: 1, borderColor: active ? colors.primary : colors.divider }}>
                 <Icon name={m.icon} size={20} color={active ? '#fff' : colors.onSurfaceVariant} />
                 <AppText variant="caption" color={active ? '#fff' : colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
-                  {m.label}
+                  {t(`fv.${m.key}`)}
                 </AppText>
               </Pressable>
             );
@@ -300,13 +296,13 @@ export default function RequestCallout() {
 
         {/* Priority — routine / emergency only */}
         <AppText variant="body" style={{ fontWeight: '600', marginBottom: spacing.sm }}>
-          Priority *
+          {t('fv.priority')}
         </AppText>
         <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xs }}>
           {URGENCY.map((u) => (
             <Button
               key={u}
-              label={u}
+              label={t(`urgency.${u.toLowerCase()}`)}
               variant={urgency === u ? 'primary' : 'outline'}
               onPress={() => pickUrgency(u)}
               style={{ flex: 1, paddingHorizontal: spacing.sm }}
@@ -317,37 +313,37 @@ export default function RequestCallout() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.md }}>
           <Icon name={urgency === 'Emergency' ? 'alarm-light-outline' : 'clock-outline'} size={15} color={urgency === 'Emergency' ? colors.error : colors.onSurfaceVariant} />
           <AppText variant="caption" color={urgency === 'Emergency' ? colors.error : colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
-            SLA: {SLA[urgency].note}
+            {t('fv.slaPrefix', { note: urgency === 'Emergency' ? t('fv.slaEmergency') : t('fv.slaRoutine') })}
           </AppText>
         </View>
 
         <TextField
-          label="Notes"
+          label={t('ad.notes')}
           value={notes}
           onChangeText={setNotes}
-          placeholder="Describe the symptoms or reason for the visit..."
+          placeholder={t('fv.notesPlaceholder')}
           multiline
         />
 
         {/* Symptom photo — live capture only (authenticity). */}
-        <PhotoField label="Live photo (optional)" value={photo} onChange={setPhoto} liveOnly />
+        <PhotoField label={t('fv.livePhoto')} value={photo} onChange={setPhoto} liveOnly />
 
         {/* Multi-animal permission (Sep 12 2026): grant the vet access to all
             animals, or pick specific ones. Clinical work stays per-animal. */}
         {!noAnimalYet ? (
         <>
         <AppText variant="body" style={{ fontWeight: '600', marginBottom: spacing.xs }}>
-          Animals the vet may access
+          {t('fv.animalsAccess')}
         </AppText>
         <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>
-          Grant access for this visit’s window only. Pick specific animals, or all your animals. The vet records each intervention per animal on-site.
+          {t('fv.accessIntro')}
         </AppText>
         <Pressable
           onPress={() => setAllAnimals((v) => !v)}
           style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm, borderRadius: radius.md, backgroundColor: allAnimals ? colors.primary : colors.surface, borderWidth: 1, borderColor: allAnimals ? colors.primary : colors.divider, paddingHorizontal: spacing.md, marginBottom: spacing.sm }}>
           <Icon name="select-group" size={20} color={allAnimals ? '#fff' : colors.onSurfaceVariant} />
           <AppText variant="body" color={allAnimals ? '#fff' : colors.onSurface} style={{ fontWeight: '600', flex: 1 }}>
-            All my animals ({bookableAnimals.length})
+            {t('fv.allMyAnimals', { count: bookableAnimals.length })}
           </AppText>
           {allAnimals ? <Icon name="check" size={18} color="#fff" /> : null}
         </Pressable>
@@ -369,14 +365,14 @@ export default function RequestCallout() {
               );
             })}
             {bookableAnimals.length === 0 ? (
-              <AppText variant="caption" color={colors.onSurfaceVariant}>No registered animals to select.</AppText>
+              <AppText variant="caption" color={colors.onSurfaceVariant}>{t('fv.noAnimalsSelect')}</AppText>
             ) : null}
           </View>
         ) : null}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.md }}>
           <Icon name="calendar-clock" size={15} color={colors.onSurfaceVariant} />
           <AppText variant="caption" color={colors.onSurfaceVariant}>
-            Access lapses automatically at the end of the booked time slot.
+            {t('fv.accessLapses')}
           </AppText>
         </View>
         </>
@@ -384,7 +380,7 @@ export default function RequestCallout() {
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, backgroundColor: colors.primaryTint, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md }}>
             <Icon name="clipboard-account-outline" size={18} color={colors.primary} />
             <AppText variant="caption" color={colors.primaryDark} style={{ flex: 1 }}>
-              The vet will register the animal and capture its first scorecard during the visit. You can review and approve the record afterwards.
+              {t('fv.vetWillRegister')}
             </AppText>
           </View>
         )}
@@ -400,7 +396,7 @@ export default function RequestCallout() {
         </Pressable>
 
         <Button
-          label={submitting ? 'Submitting…' : 'Submit Request'}
+          label={submitting ? t('fv.submitting') : t('fv.submit')}
           onPress={onSubmit}
           disabled={!canSubmit || submitting}
         />
