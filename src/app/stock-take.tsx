@@ -13,16 +13,15 @@ import { AppText, Button, GradientHeader, Icon, IconChip, IconName, Screen } fro
 
 type Mark = 'pending' | 'present' | 'missing';
 type Phase = 'method' | 'count' | 'summary';
-type StockMethod = 'photo' | 'bluetooth' | 'qr' | 'manual';
+// Oct 2026 standup: "photo confirmation" and "manual/visual" are combined into a
+// single manual & visual identification method (photos + descriptors). Photo is
+// strict evidence — an animal not confirmed with a photo is recorded as missing.
+type StockMethod = 'manual_visual' | 'bluetooth' | 'qr';
 
-// Stock take is a non-satellite verification: you confirm each animal in front
-// of you by whatever tag it carries (tester feedback Q9). title/blurb hold i18n
-// keys, translated at render.
 const METHODS: { value: StockMethod; icon: IconName; title: string; blurb: string }[] = [
-  { value: 'photo', icon: 'camera-outline', title: 'stock.photoTitle', blurb: 'stock.photoBlurb' },
+  { value: 'manual_visual', icon: 'camera-outline', title: 'stock.mvTitle', blurb: 'stock.mvBlurb' },
   { value: 'bluetooth', icon: 'bluetooth', title: 'stock.bleTitle', blurb: 'stock.bleBlurb' },
   { value: 'qr', icon: 'qrcode-scan', title: 'stock.qrTitle', blurb: 'stock.qrBlurb' },
-  { value: 'manual', icon: 'gesture-tap', title: 'stock.manualTitle', blurb: 'stock.manualBlurb' },
 ];
 
 function ProgressBar({ value }: { value: number }) {
@@ -176,7 +175,7 @@ export default function StockTake() {
     Object.fromEntries(animalsFallback.map((a) => [a.id, 'pending' as Mark])),
   );
   const [phase, setPhase] = useState<Phase>('method');
-  const [method, setMethod] = useState<StockMethod>('photo');
+  const [method, setMethod] = useState<StockMethod>('manual_visual');
   // Confirmation photos captured in photo mode, keyed by animal id.
   const [photos, setPhotos] = useState<Record<number, string>>({});
 
@@ -220,13 +219,6 @@ export default function StockTake() {
       // camera unavailable — leave unmarked
     }
   };
-  const markRemaining = (m: Mark) =>
-    setMarks((prev) => {
-      const next = { ...prev };
-      for (const a of allAnimals) if (next[a.id] === 'pending') next[a.id] = m;
-      return next;
-    });
-
   // BLE: associate every animal whose tag is broadcasting (has a linked, active
   // device) as present in one pass — the "acceptance" step of a BLE round.
   const associateBleTags = () =>
@@ -308,15 +300,22 @@ export default function StockTake() {
   }
 
   if (phase === 'summary') {
-    const missingAnimals = allAnimals.filter((a) => marks[a.id] === 'missing');
+    // Strict photo-evidence (Oct 2026 standup): in manual & visual mode, any
+    // animal not confirmed with a photo (still pending) counts as missing.
+    const strict = method === 'manual_visual';
+    const missingAnimals = allAnimals.filter(
+      (a) => marks[a.id] === 'missing' || (strict && (marks[a.id] ?? 'pending') === 'pending'),
+    );
+    const missingCount = missingAnimals.length;
+    const notCountedCount = strict ? 0 : notCounted;
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <GradientHeader title={t('stock.reportTitle')} subtitle={t('stock.reportSubtitle')} showBack />
         <Screen contentStyle={{ paddingTop: spacing.md }}>
           <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
             <SummaryStat value={present} label={t('stock.present')} color={colors.success} />
-            <SummaryStat value={missing} label={t('stock.missing')} color={colors.error} />
-            <SummaryStat value={notCounted} label={t('stock.notCounted')} color={colors.onSurfaceVariant} />
+            <SummaryStat value={missingCount} label={t('stock.missing')} color={colors.error} />
+            <SummaryStat value={notCountedCount} label={t('stock.notCounted')} color={colors.onSurfaceVariant} />
           </View>
 
           {missingAnimals.length > 0 && (
@@ -409,20 +408,13 @@ export default function StockTake() {
         {method === 'qr' && (
           <Button label={t('stock.scanQr')} icon="qrcode-scan" variant="outline" onPress={scanNextTag} />
         )}
-        {method === 'manual' && (
-          <Pressable
-            onPress={() => markRemaining('present')}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-            <Icon name="check-all" size={16} color={colors.success} />
-            <AppText variant="body" color={colors.success} style={{ fontWeight: '600' }}>
-              {t('stock.markRemaining')}
+        {method === 'manual_visual' && (
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, backgroundColor: colors.warningTint, borderRadius: radius.md, padding: spacing.sm }}>
+            <Icon name="shield-alert-outline" size={15} color={colors.warning} />
+            <AppText variant="caption" color={colors.onSurface} style={{ flex: 1 }}>
+              {t('stock.strictEvidence')}
             </AppText>
-          </Pressable>
-        )}
-        {method === 'photo' && (
-          <AppText variant="caption" color={colors.onSurfaceVariant}>
-            {t('stock.photoHint')}
-          </AppText>
+          </View>
         )}
       </View>
 
@@ -433,7 +425,7 @@ export default function StockTake() {
             animal={a}
             mark={marks[a.id] ?? 'pending'}
             onMark={(m) => setMark(a.id, m)}
-            photoMode={method === 'photo'}
+            photoMode={method === 'manual_visual'}
             photoUri={photos[a.id]}
             onCapture={() => captureFor(a.id)}
           />
