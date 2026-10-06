@@ -14,10 +14,13 @@ import { useResource } from '@/data/hooks';
 import { ageFromDate, formatDate } from '@/lib/date';
 import { taggingMeta } from '@/lib/tagging';
 import { useAuth } from '@/services/auth';
+import { useT, useTStatus } from '@/i18n';
 import { ActionChip, AppText, Button, ChartCard, DetailRow, EmptyState, GradientHeader, Icon, Screen } from '@/ui';
 
 export default function AnimalDetail() {
   const router = useRouter();
+  const t = useT();
+  const tStatus = useTStatus();
   // Health-record input is reserved for certified professionals (Sep 5 2026
   // standup): farmers get a view-only Health Score Card + history.
   const { canVet } = useAuth();
@@ -47,8 +50,8 @@ export default function AnimalDetail() {
   if (!animal) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <GradientHeader title="Animal" showBack />
-        <EmptyState icon="cow" title="Animal not found" subtitle="This animal may have been removed." />
+        <GradientHeader title={t('ad.animalTitle')} showBack />
+        <EmptyState icon="cow" title={t('ad.notFoundTitle')} subtitle={t('ad.notFoundSub')} />
       </View>
     );
   }
@@ -96,13 +99,13 @@ export default function AnimalDetail() {
           )}
           <View style={{ flexDirection: 'row', gap: spacing.xs }}>
             <ActionChip
-              label={animal.status === 'active' ? 'Active' : 'Inactive'}
+              label={tStatus(animal.status)}
               variant={animal.status === 'active' ? 'success' : 'neutral'}
             />
             {animal.approvalStatus === 'pending' ? (
-              <ActionChip label="Pending activation" variant="warning" />
+              <ActionChip label={t('ad.pendingActivation')} variant="warning" />
             ) : animal.approvalStatus === 'rejected' ? (
-              <ActionChip label="Rejected" variant="error" />
+              <ActionChip label={tStatus('rejected')} variant="error" />
             ) : null}
           </View>
         </View>
@@ -110,13 +113,13 @@ export default function AnimalDetail() {
         {/* Photo ID gallery (front / side / back) — the primary identifier.
             Always offer add/update so existing animals can be photographed. */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }}>
-          <AppText variant="title">Photo ID</AppText>
+          <AppText variant="title">{t('ad.photoId')}</AppText>
           <Pressable
             onPress={() => router.push(`/edit-animal-photos?id=${animal.id}` as never)}
             style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
             <Icon name={animal.photos && animal.photos.length > 0 ? 'image-edit-outline' : 'camera-plus-outline'} size={18} color={colors.primary} />
             <AppText variant="body" color={colors.primary} style={{ fontWeight: '600' }}>
-              {animal.photos && animal.photos.length > 0 ? 'Update' : 'Add photos'}
+              {animal.photos && animal.photos.length > 0 ? t('common.update') : t('ad.addPhotos')}
             </AppText>
           </Pressable>
         </View>
@@ -150,56 +153,56 @@ export default function AnimalDetail() {
             }}>
             <Icon name="camera-plus-outline" size={28} color={colors.primary} />
             <AppText variant="body" color={colors.onSurfaceVariant}>
-              No photos yet — tap to capture front, side & back
+              {t('ad.noPhotos')}
             </AppText>
           </Pressable>
         )}
 
         {/* Static record — the animal's own identity that doesn't change. */}
         <AppText variant="title" style={{ marginBottom: spacing.sm }}>
-          Static record
+          {t('ad.staticRecord')}
         </AppText>
         <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.md }, shadow[1]]}>
           {/* Dual ID: the AAN (system) + the owner's farmer reference. */}
-          {animal.accountNumber ? <DetailRow label="Account number" value={animal.accountNumber} /> : null}
-          {animal.ngarenCode ? <DetailRow label="Internal ID" value={animal.ngarenCode} /> : null}
-          <DetailRow label="Farmer reference" value={animal.tag} />
-          <DetailRow label="Breed" value={animal.breed.name} />
-          {animal.color ? <DetailRow label="Colour" value={animal.color} /> : null}
-          <DetailRow label="Location" value={animal.locationName ?? '—'} />
-          {animal.physicalAddress ? <DetailRow label="Address" value={animal.physicalAddress} /> : null}
+          {animal.accountNumber ? <DetailRow label={t('ad.accountNumber')} value={animal.accountNumber} /> : null}
+          {animal.ngarenCode ? <DetailRow label={t('ad.internalId')} value={animal.ngarenCode} /> : null}
+          <DetailRow label={t('ad.farmerRef')} value={animal.tag} />
+          <DetailRow label={t('ad.breed')} value={animal.breed.name} />
+          {animal.color ? <DetailRow label={t('ad.colour')} value={animal.color} /> : null}
+          <DetailRow label={t('ad.location')} value={animal.locationName ?? '—'} />
+          {animal.physicalAddress ? <DetailRow label={t('ad.address')} value={animal.physicalAddress} /> : null}
           {/* Privacy: display age, not the date of birth. */}
-          <DetailRow label="Age" value={ageFromDate(animal.dateOfBirth)} />
-          <DetailRow label="Tagging method" value={taggingMeta(animal.taggingMethod).short} />
-          <DetailRow label="Dam (mother)" value={animal.damTag ?? 'Unknown'} />
-          <DetailRow label="Sire (father)" value={animal.sireTag ?? 'Unknown'} last={!animal.description} />
-          {animal.description ? <DetailRow label="Notes" value={animal.description} last /> : null}
+          <DetailRow label={t('ad.age')} value={ageFromDate(animal.dateOfBirth)} />
+          <DetailRow label={t('ad.taggingMethod')} value={taggingMeta(animal.taggingMethod).short} />
+          <DetailRow label={t('ad.dam')} value={animal.damTag ?? t('reg.unknown')} />
+          <DetailRow label={t('ad.sire')} value={animal.sireTag ?? t('reg.unknown')} last={!animal.description} />
+          {animal.description ? <DetailRow label={t('ad.notes')} value={animal.description} last /> : null}
         </View>
 
         {/* Services consumed — the connected services running on this animal. */}
         <AppText variant="title" style={{ marginTop: spacing.lg, marginBottom: spacing.sm }}>
-          Services consumed
+          {t('ad.services')}
         </AppText>
         <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.md }, shadow[1]]}>
-          <DetailRow label="Tag associated" value={animal.deviceSerial ?? 'None'} />
-          <DetailRow label="Tag status" value={hasTag ? (tagActive ? 'Active' : 'Inactive') : 'Not connected'} />
-          <DetailRow label="Telemetry" value={hasBehaviourData ? 'Syncing' : hasTag ? 'Awaiting sync' : 'No device'} />
-          <DetailRow label="Vet visits" value={vetVisits === 0 ? 'None booked' : String(vetVisits)} />
-          <DetailRow label="Alerts monitoring" value={tagActive ? 'On' : 'Off'} last />
+          <DetailRow label={t('ad.tagAssociated')} value={animal.deviceSerial ?? t('ad.none')} />
+          <DetailRow label={t('ad.tagStatus')} value={hasTag ? (tagActive ? tStatus('active') : tStatus('inactive')) : t('ad.notConnected')} />
+          <DetailRow label={t('ad.telemetry')} value={hasBehaviourData ? t('ad.syncing') : hasTag ? t('ad.awaitingSync') : t('ad.noDevice')} />
+          <DetailRow label={t('ad.vetVisits')} value={vetVisits === 0 ? t('ad.noneBooked') : String(vetVisits)} />
+          <DetailRow label={t('ad.alertsMonitoring')} value={tagActive ? t('ad.on') : t('ad.off')} last />
         </View>
 
         {/* Associated devices (AAN can carry more than one). */}
         {animal.devices && animal.devices.length > 0 ? (
           <>
             <AppText variant="title" style={{ marginTop: spacing.lg, marginBottom: spacing.sm }}>
-              Devices ({animal.devices.length})
+              {t('ad.devices', { count: animal.devices.length })}
             </AppText>
             <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.md }, shadow[1]]}>
               {animal.devices.map((d, i) => (
                 <DetailRow
                   key={d.serial + i}
                   label={d.type}
-                  value={`${d.serial}${d.linkage ? ` · ${d.linkage === 'support' ? 'Ngaren linkage' : 'Self-linkage'}` : ''}`}
+                  value={`${d.serial}${d.linkage ? ` · ${d.linkage === 'support' ? t('reg.ngarenLinkage') : t('reg.selfLinkage')}` : ''}`}
                   last={i === animal.devices!.length - 1}
                 />
               ))}
@@ -209,7 +212,7 @@ export default function AnimalDetail() {
 
         {/* Digital Health Card — chronological history for this animal's code. */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.lg, marginBottom: spacing.sm }}>
-          <AppText variant="title">Health history</AppText>
+          <AppText variant="title">{t('ad.healthHistory')}</AppText>
           {/* Only certified professionals may input health records (Sep 5 2026). */}
           {canVet ? (
             <Pressable
@@ -217,23 +220,21 @@ export default function AnimalDetail() {
               style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
               <Icon name="plus-circle-outline" size={18} color={colors.primary} />
               <AppText variant="body" color={colors.primary} style={{ fontWeight: '600' }}>
-                Add
+                {t('common.add')}
               </AppText>
             </Pressable>
           ) : (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
               <Icon name="lock-outline" size={16} color={colors.onSurfaceVariant} />
               <AppText variant="caption" color={colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
-                View only
+                {t('ad.viewOnly')}
               </AppText>
             </View>
           )}
         </View>
         {animalHealth.length === 0 ? (
           <AppText variant="body" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.lg }}>
-            {canVet
-              ? 'No health records yet. Tap Add to log a vaccination, treatment or ailment.'
-              : 'No health records yet. Records are entered by your certified vet during a visit.'}
+            {canVet ? t('ad.noHealthVet') : t('ad.noHealthFarmer')}
           </AppText>
         ) : (
           <View style={{ marginBottom: spacing.lg, gap: spacing.sm }}>
@@ -263,7 +264,7 @@ export default function AnimalDetail() {
                     {r.notes}
                   </AppText>
                   <AppText variant="caption" color={colors.onSurfaceVariant}>
-                    Logged by {r.recordedBy}
+                    {t('ad.loggedBy', { name: r.recordedBy })}
                   </AppText>
                 </View>
               </View>
@@ -272,20 +273,20 @@ export default function AnimalDetail() {
         )}
 
         <View style={{ gap: spacing.sm, marginBottom: spacing.lg }}>
-          <Button label="Health Score Card" icon="file-document-outline" onPress={() => router.push(`/health-scorecard?id=${animal.id}` as never)} />
-          <Button label="Track on Map" icon="map-marker-radius" variant="outline" onPress={() => router.push('/(tabs)/track')} />
-          <Button label="Request a Vet" icon="stethoscope" variant="outline" onPress={() => router.push('/find-vet')} />
+          <Button label={t('ad.scorecard')} icon="file-document-outline" onPress={() => router.push(`/health-scorecard?id=${animal.id}` as never)} />
+          <Button label={t('ad.trackMap')} icon="map-marker-radius" variant="outline" onPress={() => router.push('/(tabs)/track')} />
+          <Button label={t('health.requestVet')} icon="stethoscope" variant="outline" onPress={() => router.push('/find-vet')} />
         </View>
 
         <AppText variant="title" style={{ marginBottom: spacing.md }}>
-          Ceres Tag activity
+          {t('ad.ceresActivity')}
         </AppText>
         {!behaviourLoading && !hasBehaviourData ? (
           <EmptyState
             icon="chart-line"
-            title="No Ceres Tag data yet"
-            subtitle="This animal's device may not be linked or hasn't synced yet."
-            actionLabel="Go to Devices"
+            title={t('ad.noCeresTitle')}
+            subtitle={t('ad.noCeresSub')}
+            actionLabel={t('ad.goDevices')}
             onAction={() => router.push('/devices')}
           />
         ) : (
