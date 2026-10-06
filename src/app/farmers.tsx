@@ -5,6 +5,7 @@ import { colors, radius, shadow, spacing } from '@/theme';
 import { FarmerPortfolioItem, getFarmerPortfolio, portfolioTotals } from '@/data/portfolio';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
+import { useT, useTStatus } from '@/i18n';
 import { ActionChip, AppText, EmptyState, GradientHeader, Icon, IconChip, Screen, SearchBar } from '@/ui';
 
 const STATUS_VARIANT = {
@@ -28,6 +29,8 @@ function TotalTile({ value, label, tint }: { value: number; label: string; tint:
 
 export default function Farmers() {
   const router = useRouter();
+  const t = useT();
+  const tStatus = useTStatus();
   const { isAdmin, loading, isAuthenticated } = useAuth();
   const { data: portfolio } = useResource(getFarmerPortfolio, []);
   const [query, setQuery] = useState('');
@@ -49,22 +52,22 @@ export default function Farmers() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Farmers Portfolio" subtitle="Book of business across the network" showBack>
+      <GradientHeader title={t('action.farmersPortfolio')} subtitle={t('farmers.subtitle')} showBack>
         <View style={{ flexDirection: 'row', marginTop: spacing.md }}>
-          <TotalTile value={totals.farmers} label="Farmers" tint="#fff" />
-          <TotalTile value={totals.animals} label="Animals" tint="#fff" />
-          <TotalTile value={totals.activeTags} label="Active tags" tint="#fff" />
-          <TotalTile value={totals.needAttention} label="Need attention" tint="#fff" />
+          <TotalTile value={totals.farmers} label={t('home.stat.farmers')} tint="#fff" />
+          <TotalTile value={totals.animals} label={t('home.stat.animals')} tint="#fff" />
+          <TotalTile value={totals.activeTags} label={t('home.kpi.activeTags')} tint="#fff" />
+          <TotalTile value={totals.needAttention} label={t('home.kpi.needAttention')} tint="#fff" />
         </View>
       </GradientHeader>
 
       <View style={{ padding: spacing.md, paddingBottom: 0 }}>
-        <SearchBar value={query} onChangeText={setQuery} placeholder="Search farmer, farm or region..." />
+        <SearchBar value={query} onChangeText={setQuery} placeholder={t('farmers.search')} />
       </View>
 
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         {filtered.length === 0 ? (
-          <EmptyState icon="account-search-outline" title="No farmers found" subtitle="Try a different search." />
+          <EmptyState icon="account-search-outline" title={t('farmers.emptyTitle')} subtitle={t('farmers.emptySub')} />
         ) : (
           filtered.map((f: FarmerPortfolioItem) => {
             const tagPct = f.devices > 0 ? Math.round((f.activeTags / f.devices) * 100) : 0;
@@ -82,17 +85,17 @@ export default function Farmers() {
                       {f.farmerName}
                     </AppText>
                     <AppText variant="caption" color={colors.onSurfaceVariant}>
-                      {[f.farmName, f.location].filter((s) => s && s !== '—').join(' · ') || 'No farm details'}
+                      {[f.farmName, f.location].filter((s) => s && s !== '—').join(' · ') || t('farmers.noFarmDetails')}
                     </AppText>
                   </View>
-                  <ActionChip label={f.status[0].toUpperCase() + f.status.slice(1)} variant={STATUS_VARIANT[f.status]} />
+                  <ActionChip label={tStatus(f.status)} variant={STATUS_VARIANT[f.status]} />
                 </View>
 
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Metric icon="cow" label="Animals" value={String(f.animals)} />
-                  <Metric icon="tag" label="Devices" value={String(f.devices)} />
-                  <Metric icon="access-point" label="Active tags" value={`${f.activeTags} (${tagPct}%)`} />
-                  <Metric icon="heart-pulse" label="Health" value={f.healthScore ? `${f.healthScore}%` : '—'} />
+                  <Metric icon="cow" label={t('farmers.animals')} value={String(f.animals)} />
+                  <Metric icon="tag" label={t('farmers.devices')} value={String(f.devices)} />
+                  <Metric icon="access-point" label={t('home.kpi.activeTags')} value={`${f.activeTags} (${tagPct}%)`} />
+                  <Metric icon="heart-pulse" label={t('farmers.health')} value={f.healthScore ? `${f.healthScore}%` : '—'} />
                 </View>
 
                 <Pressable
@@ -100,7 +103,7 @@ export default function Farmers() {
                   style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingVertical: spacing.xs, borderTopWidth: 1, borderTopColor: colors.divider, marginTop: spacing.xs }}>
                   <Icon name="eye-outline" size={14} color={colors.primary} />
                   <AppText variant="caption" color={colors.primary} style={{ fontWeight: '600' }}>
-                    View as farmer
+                    {t('farmers.viewAsFarmer')}
                   </AppText>
                 </Pressable>
               </View>

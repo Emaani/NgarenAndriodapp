@@ -6,6 +6,7 @@ import { teamMembers as teamFallback, userRoles as rolesFallback } from '@/data/
 import { createTeamMember, deleteTeamMember, getTeamMembers, getUserRoles } from '@/data/api';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
+import { useT } from '@/i18n';
 import {
   ActionChip,
   AppText,
@@ -28,6 +29,7 @@ function roleVariant(role: string) {
 }
 
 export default function Users() {
+  const t = useT();
   const { isAdmin, loading, isAuthenticated } = useAuth();
   const { data: members, reload } = useResource(() => getTeamMembers(), teamFallback);
   const { data: roles } = useResource(() => getUserRoles(), rolesFallback);
@@ -70,17 +72,17 @@ export default function Users() {
       resetForm();
       reload();
     } catch {
-      Alert.alert('Could not add member', 'Please try again.');
+      Alert.alert(t('usr.addFailTitle'), t('usr.addFailBody'));
     } finally {
       setSaving(false);
     }
   };
 
   const onRemove = (userId: number, name: string) => {
-    Alert.alert('Remove team member', `Remove ${name} from this account?`, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('usr.removeTitle'), t('usr.removeBody', { name }), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Remove',
+        text: t('usr.removeBtn'),
         style: 'destructive',
         onPress: async () => {
           await deleteTeamMember(userId).catch(() => {});
@@ -92,27 +94,27 @@ export default function Users() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Team Management" subtitle={`${members.length} members`} showBack />
+      <GradientHeader title={t('profile.row.teamManagement')} subtitle={t('usr.subtitle', { count: members.length })} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         {sheetOpen ? (
           <Card style={{ marginBottom: spacing.md, gap: 0 }}>
             <AppText variant="title" style={{ marginBottom: spacing.md }}>
-              Invite team member
+              {t('usr.inviteTitle')}
             </AppText>
-            <TextField label="First name" required value={firstName} onChangeText={setFirstName} placeholder="Jane" />
-            <TextField label="Last name" value={lastName} onChangeText={setLastName} placeholder="Doe" />
-            <TextField label="Email" required value={email} onChangeText={setEmail} placeholder="jane@ngaren.com" />
+            <TextField label={t('usr.firstName')} required value={firstName} onChangeText={setFirstName} placeholder="Jane" />
+            <TextField label={t('usr.lastName')} value={lastName} onChangeText={setLastName} placeholder="Doe" />
+            <TextField label={t('usr.email')} required value={email} onChangeText={setEmail} placeholder="jane@ngaren.com" />
             <PickerField
-              label="Role"
+              label={t('settings.row.role')}
               required
               value={roleKey}
-              placeholder="Select a role"
+              placeholder={t('usr.rolePlaceholder')}
               options={roleOptions}
               onSelect={setRoleKey}
             />
             <View style={{ flexDirection: 'row', gap: spacing.md }}>
               <Button
-                label="Cancel"
+                label={t('common.cancel')}
                 variant="outline"
                 onPress={() => {
                   setSheetOpen(false);
@@ -121,7 +123,7 @@ export default function Users() {
                 style={{ flex: 1 }}
               />
               <Button
-                label="Send invite"
+                label={t('usr.sendInvite')}
                 loading={saving}
                 disabled={!firstName.trim() || !email.trim() || !roleKey}
                 onPress={onInvite}
@@ -131,7 +133,7 @@ export default function Users() {
           </Card>
         ) : (
           <Button
-            label="Invite a team member"
+            label={t('usr.inviteBtn')}
             icon="account-plus-outline"
             onPress={() => setSheetOpen(true)}
             style={{ marginBottom: spacing.md }}

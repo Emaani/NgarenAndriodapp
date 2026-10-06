@@ -5,6 +5,7 @@ import { colors, radius, shadow, spacing } from '@/theme';
 import { getIncidents, Incident, IncidentPriority, IncidentStatus } from '@/data/ops';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
+import { useT, useTStatus } from '@/i18n';
 import { ActionChip, AppText, EmptyState, GradientHeader, Icon, Screen } from '@/ui';
 
 const PRIORITY_COLOR: Record<IncidentPriority, string> = {
@@ -21,13 +22,11 @@ function statusVariant(s: IncidentStatus) {
   return 'warning' as const;
 }
 
-function statusLabel(s: IncidentStatus) {
-  return s.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
 type Filter = 'all' | 'open' | 'critical';
 
 export default function Incidents() {
+  const t = useT();
+  const tStatus = useTStatus();
   const { isAdmin, loading, isAuthenticated } = useAuth();
   const { data: incidents } = useResource(getIncidents, []);
   const [filter, setFilter] = useState<Filter>('all');
@@ -46,14 +45,14 @@ export default function Incidents() {
   if (!isAdmin) return <Redirect href="/(tabs)/home" />;
 
   const FILTERS: { key: Filter; label: string }[] = [
-    { key: 'all', label: `All (${incidents.length})` },
-    { key: 'open', label: `Open (${open})` },
-    { key: 'critical', label: `Critical (${critical})` },
+    { key: 'all', label: t('inc.filterAll', { count: incidents.length }) },
+    { key: 'open', label: t('inc.filterOpen', { count: open }) },
+    { key: 'critical', label: t('inc.filterCritical', { count: critical }) },
   ];
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Incidents & SLA" subtitle={`${open} open · ${critical} critical`} showBack />
+      <GradientHeader title={t('profile.row.incidentsSla')} subtitle={t('inc.subtitle', { open, critical })} showBack />
       <View style={{ flexDirection: 'row', gap: spacing.sm, padding: spacing.md, paddingBottom: 0 }}>
         {FILTERS.map((f) => {
           const active = filter === f.key;
@@ -79,7 +78,7 @@ export default function Incidents() {
 
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         {visible.length === 0 ? (
-          <EmptyState icon="check-circle-outline" title="No incidents" subtitle="All systems nominal." />
+          <EmptyState icon="check-circle-outline" title={t('inc.emptyTitle')} subtitle={t('inc.emptySub')} />
         ) : (
           visible.map((inc: Incident) => (
             <View
@@ -97,7 +96,7 @@ export default function Incidents() {
                     {inc.title}
                   </AppText>
                 </View>
-                <ActionChip label={statusLabel(inc.status)} variant={statusVariant(inc.status)} />
+                <ActionChip label={tStatus(inc.status)} variant={statusVariant(inc.status)} />
               </View>
 
               <AppText variant="body" color={colors.onSurface}>
@@ -107,8 +106,8 @@ export default function Incidents() {
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
                   <Icon name="flag-variant" size={14} color={PRIORITY_COLOR[inc.priority]} />
-                  <AppText variant="caption" color={PRIORITY_COLOR[inc.priority]} style={{ fontWeight: '600', textTransform: 'capitalize' }}>
-                    {inc.priority}
+                  <AppText variant="caption" color={PRIORITY_COLOR[inc.priority]} style={{ fontWeight: '600' }}>
+                    {t(`prio.${inc.priority}`)}
                   </AppText>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
@@ -120,7 +119,7 @@ export default function Incidents() {
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
                   <Icon name="timer-sand" size={14} color={colors.onSurfaceVariant} />
                   <AppText variant="caption" color={colors.onSurfaceVariant}>
-                    SLA {inc.slaDeadline}
+                    {t('inc.sla', { deadline: inc.slaDeadline })}
                   </AppText>
                 </View>
               </View>

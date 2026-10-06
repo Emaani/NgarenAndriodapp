@@ -5,6 +5,7 @@ import { notifications as notificationsFallback } from '@/data/mock';
 import { getNotifications } from '@/data/api';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
+import { useT } from '@/i18n';
 import { ActionChip, AppText, EmptyState, GradientHeader, Icon, IconChip, Screen } from '@/ui';
 
 /**
@@ -13,6 +14,7 @@ import { ActionChip, AppText, EmptyState, GradientHeader, Icon, IconChip, Screen
  * page. Farmers/vets are redirected out.
  */
 export default function Alerts() {
+  const t = useT();
   const { isAdmin, loading, isAuthenticated } = useAuth();
   const { data: alerts } = useResource(() => getNotifications(0, 100), notificationsFallback);
 
@@ -25,10 +27,10 @@ export default function Alerts() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Alert History" subtitle={`${alerts.length} alerts · ${boundary} geofence · ${device} device`} showBack />
+      <GradientHeader title={t('action.alertHistory')} subtitle={t('alr.subtitle', { count: alerts.length, boundary, device })} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         {alerts.length === 0 ? (
-          <EmptyState icon="check-circle-outline" title="No alerts" subtitle="All quiet across the herd." />
+          <EmptyState icon="check-circle-outline" title={t('alr.emptyTitle')} subtitle={t('alr.emptySub')} />
         ) : (
           alerts.map((a) => {
             const isBoundary = a.category === 'boundary';
@@ -60,7 +62,7 @@ export default function Alerts() {
                       {a.title}
                     </AppText>
                     <ActionChip
-                      label={isBoundary ? 'Geofence' : 'Device'}
+                      label={isBoundary ? t('alr.geofence') : t('alr.device')}
                       variant={isBoundary ? 'error' : 'warning'}
                     />
                   </View>

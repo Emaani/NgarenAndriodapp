@@ -7,6 +7,7 @@ import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { statusVisual } from '@/lib/scorecardVisual';
 import { formatDate } from '@/lib/date';
+import { useT } from '@/i18n';
 import { AppText, EmptyState, GradientHeader, Icon, Screen } from '@/ui';
 
 function Bar({ label, value, total, tint }: { label: string; value: number; total: number; tint: string }) {
@@ -36,6 +37,7 @@ function Bar({ label, value, total, tint }: { label: string; value: number; tota
  * No farmer identities are shown. Reads local ∪ remote (RLS-scoped) scorecards.
  */
 export default function Surveillance() {
+  const t = useT();
   const { loading, isAuthenticated, isAdmin } = useAuth();
   const { data: cards } = useResource(loadScorecards, []);
 
@@ -76,16 +78,16 @@ export default function Surveillance() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Disease surveillance" subtitle="Anonymized signals across visit scorecards" showBack />
+      <GradientHeader title={t('action.diseaseSurveillance')} subtitle={t('surv.subtitle')} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md, paddingBottom: spacing.xxl }}>
         {agg.total === 0 ? (
-          <EmptyState icon="chart-box-outline" title="No scorecard data yet" subtitle="Aggregated diagnosis signals will appear here once vets record visit scorecards." />
+          <EmptyState icon="chart-box-outline" title={t('surv.emptyTitle')} subtitle={t('surv.emptySub')} />
         ) : (
           <>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.md }}>
               <Icon name="shield-lock-outline" size={14} color={colors.onSurfaceVariant} />
               <AppText variant="caption" color={colors.onSurfaceVariant} style={{ flex: 1 }}>
-                Aggregated & anonymized — no individual farmers or persons are shown.
+                {t('surv.anonNote')}
               </AppText>
             </View>
 
@@ -93,26 +95,26 @@ export default function Surveillance() {
             <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg }}>
               <View style={{ flex: 1, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.divider }}>
                 <AppText variant="headline" style={{ fontWeight: '800' }}>{agg.total}</AppText>
-                <AppText variant="caption" color={colors.onSurfaceVariant}>Scorecards</AppText>
+                <AppText variant="caption" color={colors.onSurfaceVariant}>{t('surv.scorecards')}</AppText>
               </View>
               <View style={{ flex: 1, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.divider }}>
                 <AppText variant="headline" style={{ fontWeight: '800' }} color={colors.error}>{agg.status.urgent}</AppText>
-                <AppText variant="caption" color={colors.onSurfaceVariant}>Urgent</AppText>
+                <AppText variant="caption" color={colors.onSurfaceVariant}>{t('surv.urgent')}</AppText>
               </View>
               <View style={{ flex: 1, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.divider }}>
                 <AppText variant="headline" style={{ fontWeight: '800' }} color={colors.warning}>{agg.status.monitor}</AppText>
-                <AppText variant="caption" color={colors.onSurfaceVariant}>Monitor</AppText>
+                <AppText variant="caption" color={colors.onSurfaceVariant}>{t('surv.monitor')}</AppText>
               </View>
             </View>
 
             {agg.earliest ? (
               <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.lg }}>
-                Reporting period: {formatDate(agg.earliest)} – {formatDate(agg.latest)}
+                {t('surv.period', { from: formatDate(agg.earliest), to: formatDate(agg.latest) })}
               </AppText>
             ) : null}
 
             {/* Status split */}
-            <AppText variant="title" style={{ marginBottom: spacing.sm }}>Health status split</AppText>
+            <AppText variant="title" style={{ marginBottom: spacing.sm }}>{t('surv.statusSplit')}</AppText>
             <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.lg, borderWidth: 1, borderColor: colors.divider }, shadow[1]]}>
               {(['urgent', 'monitor', 'healthy'] as ScorecardStatus[]).map((s) => (
                 <Bar key={s} label={STATUS_LABEL[s]} value={agg.status[s]} total={agg.total} tint={statusVisual(s).color} />
@@ -120,17 +122,17 @@ export default function Surveillance() {
             </View>
 
             {/* Leading conditions */}
-            <AppText variant="title" style={{ marginBottom: spacing.sm }}>Leading conditions</AppText>
+            <AppText variant="title" style={{ marginBottom: spacing.sm }}>{t('surv.leadingConditions')}</AppText>
             <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.lg, borderWidth: 1, borderColor: colors.divider }, shadow[1]]}>
               {agg.conditions.length === 0 ? (
-                <AppText variant="body" color={colors.onSurfaceVariant}>No diagnoses recorded yet.</AppText>
+                <AppText variant="body" color={colors.onSurfaceVariant}>{t('surv.noDiagnoses')}</AppText>
               ) : (
                 agg.conditions.slice(0, 10).map(([tag, n]) => <Bar key={tag} label={tag} value={n} total={maxCondition} tint={colors.primary} />)
               )}
             </View>
 
             {/* Geographic spread */}
-            <AppText variant="title" style={{ marginBottom: spacing.sm }}>By farm / location</AppText>
+            <AppText variant="title" style={{ marginBottom: spacing.sm }}>{t('surv.byLocation')}</AppText>
             <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.divider }, shadow[1]]}>
               {agg.locations.slice(0, 10).map(([loc, n]) => <Bar key={loc} label={loc} value={n} total={maxLocation} tint={colors.info} />)}
             </View>
