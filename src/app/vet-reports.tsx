@@ -15,6 +15,7 @@ import { makeFarmerAnonymizer } from '@/lib/anon';
 import { notify } from '@/lib/toast';
 import { formatDateTime } from '@/lib/date';
 import { CalloutRequest, VetImpact } from '@/data/types';
+import { useT } from '@/i18n';
 import { AppText, GradientHeader, Icon, IconChip, IconName, Screen } from '@/ui';
 
 const EMPTY_IMPACT: VetImpact = {
@@ -39,6 +40,7 @@ interface ReportDef {
 
 export default function VetReports() {
   const router = useRouter();
+  const t = useT();
   const { loading, isAuthenticated, canVet, isAdmin, user } = useAuth();
   const { data: impact } = useResource(getMyVetImpact, EMPTY_IMPACT);
   const { data: callouts } = useResource(() => getCalloutRequests(), calloutFallback);
@@ -57,40 +59,40 @@ export default function VetReports() {
     return [
       {
         id: 'visits',
-        name: 'Visits log',
-        description: 'Every call-out — animal, farmer, priority, status.',
+        name: t('vr.rVisitsName'),
+        description: t('vr.rVisitsDesc'),
         icon: 'clipboard-pulse-outline',
         headers: ['Animal', 'Farmer', 'Location', 'Priority', 'Status', 'Fulfilment', 'Requested'],
         rows: (callouts as CalloutRequest[]).map((c) => [c.animal, alias(c.farmerName), c.locationName, c.urgency, c.status, fulfilment(c.status), c.requestedAt]),
       },
       {
         id: 'audit',
-        name: 'Visits audit (fulfilled vs unfulfilled)',
-        description: 'Service-delivery audit trail across requests.',
+        name: t('vr.rAuditName'),
+        description: t('vr.rAuditDesc'),
         icon: 'clipboard-check-outline',
         headers: ['Animal', 'Farmer', 'Location', 'Priority', 'SLA', 'Status', 'Fulfilment', 'Requested', 'Distance (km)'],
         rows: (callouts as CalloutRequest[]).map((r) => [r.animal, alias(r.farmerName), r.locationName, r.urgency, slaFor(r.urgency), r.status, fulfilment(r.status), r.requestedAt, String(r.distanceKm)]),
       },
       {
         id: 'animals',
-        name: 'Animals managed',
-        description: 'Distinct animals treated with record counts.',
+        name: t('vr.rAnimalsName'),
+        description: t('vr.rAnimalsDesc'),
         icon: 'cow',
         headers: ['Animal', 'Records'],
         rows: (impact.detail?.animals ?? []).map((a) => [a.label, a.sub ?? '']),
       },
       {
         id: 'farmers',
-        name: 'Farmers serviced',
-        description: 'Farmers served with visit counts (anonymized).',
+        name: t('vr.rFarmersName'),
+        description: t('vr.rFarmersDesc'),
         icon: 'account-group-outline',
         headers: ['Farmer', 'Visits'],
         rows: (impact.detail?.farmers ?? []).map((f) => [f.label, f.sub ?? '']),
       },
       {
         id: 'services',
-        name: 'Services summary',
-        description: 'Treatment / vaccination / stock-take / others.',
+        name: t('vr.rServicesName'),
+        description: t('vr.rServicesDesc'),
         icon: 'medical-bag',
         headers: ['Service', 'Count'],
         rows: [
@@ -103,8 +105,8 @@ export default function VetReports() {
       },
       {
         id: 'observations',
-        name: 'Disease & pest observations',
-        description: 'Ticks / flies / disease trend counts.',
+        name: t('vr.rObsName'),
+        description: t('vr.rObsDesc'),
         icon: 'bug-outline',
         headers: ['Observation', 'Count'],
         rows: [
@@ -114,7 +116,7 @@ export default function VetReports() {
         ],
       },
     ];
-  }, [callouts, impact]);
+  }, [callouts, impact, t]);
 
   if (loading) return null;
   if (!isAuthenticated) return <Redirect href="/login" />;
@@ -148,7 +150,7 @@ export default function VetReports() {
         shared: true,
       });
       reloadAudit();
-      notify(`${r.name} generated`);
+      notify(t('vr.generated', { name: r.name }));
       router.push(`/documents/${id}` as never);
     } finally {
       setBusy(null);
@@ -157,7 +159,7 @@ export default function VetReports() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Reports" subtitle="Generate & share — with an audit trail" showBack />
+      <GradientHeader title={t('action.reports')} subtitle={t('vr.subtitle')} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md, paddingBottom: spacing.xxl }}>
         {/* Per-animal source of truth */}
         <Pressable
@@ -171,10 +173,10 @@ export default function VetReports() {
           </View>
           <View style={{ flex: 1 }}>
             <AppText variant="bodyLarge" color="#fff" style={{ fontWeight: '700' }}>
-              Health Score Card
+              {t('ad.scorecard')}
             </AppText>
             <AppText variant="caption" color="rgba(255,255,255,0.9)">
-              Pick an animal to generate its full record — a branded PDF.
+              {t('vr.scorecardSub')}
             </AppText>
           </View>
           <Icon name="chevron-right" size={22} color="#fff" />
@@ -190,20 +192,20 @@ export default function VetReports() {
           <IconChip icon="folder-multiple-outline" />
           <View style={{ flex: 1 }}>
             <AppText variant="bodyLarge" style={{ fontWeight: '700' }}>
-              Documents
+              {t('home.banner.documents')}
             </AppText>
             <AppText variant="caption" color={colors.onSurfaceVariant}>
-              Generated scorecards & reports — auto-deleted after 30 days.
+              {t('vr.docsSub')}
             </AppText>
           </View>
           <Icon name="chevron-right" size={22} color={colors.onSurfaceVariant} />
         </Pressable>
 
         <AppText variant="title" style={{ marginBottom: spacing.xs }}>
-          Practice reports
+          {t('vr.practiceReports')}
         </AppText>
         <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>
-          Tap to share a branded PDF, or tap Excel for a spreadsheet (CSV).
+          {t('vr.practiceHint')}
         </AppText>
         {reports.map((r) => (
           <View
@@ -219,7 +221,7 @@ export default function VetReports() {
                   {r.name}
                 </AppText>
                 <AppText variant="caption" color={colors.onSurfaceVariant}>
-                  {r.description} · {r.rows.length} row{r.rows.length === 1 ? '' : 's'}
+                  {r.description} · {r.rows.length === 1 ? t('rep.rowOne', { count: r.rows.length }) : t('rep.rows', { count: r.rows.length })}
                 </AppText>
               </View>
             </View>
@@ -248,11 +250,11 @@ export default function VetReports() {
 
         {/* Audit trail */}
         <AppText variant="title" style={{ marginTop: spacing.lg, marginBottom: spacing.sm }}>
-          Audit trail
+          {t('vr.auditTrail')}
         </AppText>
         {audit.length === 0 ? (
           <AppText variant="body" color={colors.onSurfaceVariant}>
-            No reports generated yet. Exports are logged here for accountability.
+            {t('vr.noAudit')}
           </AppText>
         ) : (
           audit.map((e: ReportAuditEntry) => (
@@ -264,7 +266,7 @@ export default function VetReports() {
                   {e.subject ? ` · ${e.subject}` : ''}
                 </AppText>
                 <AppText variant="caption" color={colors.onSurfaceVariant}>
-                  {formatDateTime(e.at)} · {e.by} · {e.rows} row{e.rows === 1 ? '' : 's'}
+                  {formatDateTime(e.at)} · {e.by} · {e.rows === 1 ? t('rep.rowOne', { count: e.rows }) : t('rep.rows', { count: e.rows })}
                 </AppText>
               </View>
             </View>

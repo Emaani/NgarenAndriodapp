@@ -6,6 +6,7 @@ import { OUTCOME_LABELS, VisitOutcome, addVetVisit, getVetVisits } from '@/data/
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { formatDateTime } from '@/lib/date';
+import { useT } from '@/i18n';
 import { ActionChip, AppText, Button, GradientHeader, IconChip, PhotoField, PickerField, Screen, TextField } from '@/ui';
 
 const OUTCOME_OPTIONS = (['healthy', 'treated', 'follow_up'] as VisitOutcome[]).map((v) => ({
@@ -21,6 +22,7 @@ const outcomeVariant = (o: VisitOutcome) => (o === 'healthy' ? 'success' : o ===
  */
 export default function LogVisit() {
   const router = useRouter();
+  const t = useT();
   const { loading, isAuthenticated, canVet, user } = useAuth();
   const { data: visits, reload } = useResource(getVetVisits, []);
 
@@ -55,21 +57,21 @@ export default function LogVisit() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Log a Visit" subtitle="Validate a field visit with a photo" showBack />
+      <GradientHeader title={t('action.logVisit')} subtitle={t('lv.subtitle')} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md, paddingBottom: spacing.xxl }}>
-        <TextField label="Animal (tag or name)" required value={animal} onChangeText={setAnimal} placeholder="e.g. A-042 or Bull" />
-        <PickerField label="Outcome" required value={outcome} options={OUTCOME_OPTIONS} onSelect={(v) => setOutcome(v as VisitOutcome)} />
-        <TextField label="Findings" required value={findings} onChangeText={setFindings} placeholder="Observations, treatment given…" multiline />
-        <PhotoField label="Confirmation photo (required)" value={photo} onChange={setPhoto} />
+        <TextField label={t('lv.animal')} required value={animal} onChangeText={setAnimal} placeholder={t('lv.animalPlaceholder')} />
+        <PickerField label={t('lv.outcome')} required value={outcome} options={OUTCOME_OPTIONS} onSelect={(v) => setOutcome(v as VisitOutcome)} />
+        <TextField label={t('lv.findings')} required value={findings} onChangeText={setFindings} placeholder={t('lv.findingsPlaceholder')} multiline />
+        <PhotoField label={t('lv.photo')} value={photo} onChange={setPhoto} />
         <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.md }}>
-          The photo confirms your presence and the animal’s status at the visit.
+          {t('lv.photoNote')}
         </AppText>
-        <Button label="Log visit" icon="clipboard-check-outline" loading={saving} disabled={!canSubmit} onPress={onSubmit} />
+        <Button label={t('lv.logBtn')} icon="clipboard-check-outline" loading={saving} disabled={!canSubmit} onPress={onSubmit} />
 
         {visits.length > 0 && (
           <>
             <AppText variant="title" style={{ marginTop: spacing.xl, marginBottom: spacing.sm }}>
-              Recent visits ({visits.length})
+              {t('lv.recent', { count: visits.length })}
             </AppText>
             {visits.map((v) => (
               <View
