@@ -114,6 +114,7 @@ const en: Dict = {
   'status.offline': 'Offline',
   'status.connected': 'Connected',
   'status.disconnected': 'Disconnected',
+  'status.paid': 'Paid',
   'common.loading': 'Loading…',
   'prio.critical': 'Critical',
   'prio.high': 'High',
@@ -208,6 +209,39 @@ const en: Dict = {
   'tel.noBehaviour': 'No behaviour data reported yet.',
   'tel.noBattery': 'No devices reporting battery.',
   'tel.now': 'Now',
+
+  // Payments
+  'pay.subtitle': '{plan} plan',
+  'pay.currentPlan': 'Current plan',
+  'pay.nextRenewal': 'Next renewal',
+  'pay.switchTo': 'Switch to {plan}',
+  'pay.paymentMethod': 'Payment method',
+  'pay.default': 'Default',
+  'pay.plans': 'Plans',
+  'pay.billingHistory': 'Billing history',
+  'pay.manageNote': 'Manage your subscription securely through the Ngaren billing portal.',
+
+  // Add event
+  'ae.title': 'Schedule Activity',
+  'ae.subtitle': 'Add to the farm calendar',
+  'ae.titlePlaceholder': 'e.g. Routine herd stock take',
+  'ae.activityType': 'Activity type',
+  'ae.date': 'Date',
+  'ae.datePlaceholder': 'Select a date',
+  'ae.addBtn': 'Add to calendar',
+  'ae.vetVisit': 'Vet Visit',
+  'ae.stockTake': 'Stock Take',
+  'ae.vaccination': 'Vaccination',
+  'ae.followUp': 'Follow-up',
+
+  // Edit animal photos
+  'ep.intro': 'Capture or upload the animal from four angles (360°). The front photo is its primary ID.',
+  'ep.lockedTitle': 'Onboarding photos (locked)',
+  'ep.lockedNote': 'The original identity photos are kept permanently and can’t be replaced. Updating below keeps these on record.',
+  'ep.front': 'Front',
+  'ep.previousPhotos': 'Previous photos ({count})',
+  'ep.saveUpdated': 'Save updated photos',
+  'ep.savePhotoId': 'Save Photo ID',
 
   // Admin mirror
   'am.title': 'Farmer mirror',
@@ -1045,6 +1079,7 @@ const sw: Dict = {
   'status.offline': 'Nje ya mtandao',
   'status.connected': 'Imeunganishwa',
   'status.disconnected': 'Haijaunganishwa',
+  'status.paid': 'Imelipwa',
   'common.loading': 'Inapakia…',
   'prio.critical': 'Hatari sana',
   'prio.high': 'Juu',
@@ -1139,6 +1174,39 @@ const sw: Dict = {
   'tel.noBehaviour': 'Bado hakuna data ya tabia iliyoripotiwa.',
   'tel.noBattery': 'Hakuna vifaa vinavyoripoti betri.',
   'tel.now': 'Sasa',
+
+  // Payments
+  'pay.subtitle': 'mpango wa {plan}',
+  'pay.currentPlan': 'Mpango wa sasa',
+  'pay.nextRenewal': 'Uhuishaji ujao',
+  'pay.switchTo': 'Badilisha kwenda {plan}',
+  'pay.paymentMethod': 'Njia ya malipo',
+  'pay.default': 'Chaguo-msingi',
+  'pay.plans': 'Mipango',
+  'pay.billingHistory': 'Historia ya malipo',
+  'pay.manageNote': 'Dhibiti usajili wako kwa usalama kupitia lango la malipo la Ngaren.',
+
+  // Add event
+  'ae.title': 'Panga Shughuli',
+  'ae.subtitle': 'Ongeza kwenye kalenda ya shamba',
+  'ae.titlePlaceholder': 'mf. Kuhesabu mifugo kwa kawaida',
+  'ae.activityType': 'Aina ya shughuli',
+  'ae.date': 'Tarehe',
+  'ae.datePlaceholder': 'Chagua tarehe',
+  'ae.addBtn': 'Ongeza kwenye kalenda',
+  'ae.vetVisit': 'Ziara ya Daktari',
+  'ae.stockTake': 'Kuhesabu Mifugo',
+  'ae.vaccination': 'Chanjo',
+  'ae.followUp': 'Ufuatiliaji',
+
+  // Edit animal photos
+  'ep.intro': 'Nasa au pakia mnyama kutoka pembe nne (360°). Picha ya mbele ndiyo kitambulisho chake kikuu.',
+  'ep.lockedTitle': 'Picha za usajili (zimefungwa)',
+  'ep.lockedNote': 'Picha za asili za kitambulisho huhifadhiwa kudumu na haziwezi kubadilishwa. Kusasisha hapa chini huzihifadhi hizi kwenye rekodi.',
+  'ep.front': 'Mbele',
+  'ep.previousPhotos': 'Picha za awali ({count})',
+  'ep.saveUpdated': 'Hifadhi picha zilizosasishwa',
+  'ep.savePhotoId': 'Hifadhi Kitambulisho cha Picha',
 
   // Admin mirror
   'am.title': 'Kioo cha mkulima',

@@ -10,6 +10,7 @@ import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { formatDate } from '@/lib/date';
 import { generateNgarenCode } from '@/lib/ngaren';
+import { useT } from '@/i18n';
 import { AppText, Button, EmptyState, GradientHeader, Icon, PhotoField, Screen } from '@/ui';
 
 /**
@@ -25,6 +26,7 @@ import { AppText, Button, EmptyState, GradientHeader, Icon, PhotoField, Screen }
  */
 export default function EditAnimalPhotos() {
   const router = useRouter();
+  const t = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { loading, isAuthenticated, user } = useAuth();
   // Resolve from the same live herd the detail screen uses (local-first, then
@@ -58,8 +60,8 @@ export default function EditAnimalPhotos() {
   if (!animal) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <GradientHeader title="Photo ID" showBack />
-        <EmptyState icon="cow" title="Animal not found" subtitle="This animal may have been removed." />
+        <GradientHeader title={t('ad.photoId')} showBack />
+        <EmptyState icon="cow" title={t('ad.notFoundTitle')} subtitle={t('ad.notFoundSub')} />
       </View>
     );
   }
@@ -106,10 +108,10 @@ export default function EditAnimalPhotos() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Photo ID" subtitle={animal.name ?? animal.tag} showBack />
+      <GradientHeader title={t('ad.photoId')} subtitle={animal.name ?? animal.tag} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>
-          Capture or upload the animal from four angles (360°). The front photo is its primary ID.
+          {t('ep.intro')}
         </AppText>
 
         {/* Locked onboarding record — permanent, read-only (Sep 5 2026). */}
@@ -118,11 +120,11 @@ export default function EditAnimalPhotos() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm }}>
               <Icon name="lock-check-outline" size={16} color={colors.primary} />
               <AppText variant="body" style={{ fontWeight: '700' }}>
-                Onboarding photos (locked)
+                {t('ep.lockedTitle')}
               </AppText>
             </View>
             <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>
-              The original identity photos are kept permanently and can’t be replaced. Updating below keeps these on record.
+              {t('ep.lockedNote')}
             </AppText>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
               {onboarding.map((uri, i) => (
@@ -132,16 +134,16 @@ export default function EditAnimalPhotos() {
           </View>
         ) : null}
 
-        <PhotoField label="Front" value={front} onChange={setFront} />
-        <PhotoField label="Left side" value={left} onChange={setLeft} />
-        <PhotoField label="Right side" value={right} onChange={setRight} />
-        <PhotoField label="Back" value={back} onChange={setBack} />
+        <PhotoField label={t('ep.front')} value={front} onChange={setFront} />
+        <PhotoField label={t('reg.photoLeft')} value={left} onChange={setLeft} />
+        <PhotoField label={t('reg.photoRight')} value={right} onChange={setRight} />
+        <PhotoField label={t('reg.photoBack')} value={back} onChange={setBack} />
 
         {/* Photo history — every superseded set, for audit. */}
         {history.length > 0 ? (
           <View style={{ marginTop: spacing.md }}>
             <AppText variant="body" style={{ fontWeight: '700', marginBottom: spacing.sm }}>
-              Previous photos ({history.length})
+              {t('ep.previousPhotos', { count: history.length })}
             </AppText>
             {history.map((h, i) => (
               <View key={h.at + i} style={{ marginBottom: spacing.sm }}>
@@ -160,7 +162,7 @@ export default function EditAnimalPhotos() {
         ) : null}
 
         <Button
-          label={isLocked ? 'Save updated photos' : 'Save Photo ID'}
+          label={isLocked ? t('ep.saveUpdated') : t('ep.savePhotoId')}
           icon="content-save-outline"
           loading={saving}
           disabled={photos.length === 0}

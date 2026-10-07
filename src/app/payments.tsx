@@ -3,9 +3,11 @@ import { View } from 'react-native';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { currentPlanId, invoices, plans } from '@/data/mock';
 import { Plan } from '@/data/types';
+import { useT, useTStatus } from '@/i18n';
 import { ActionChip, AppText, Button, GradientHeader, Icon, IconChip, Screen } from '@/ui';
 
 function PlanCard({ plan, active, onSelect }: { plan: Plan; active: boolean; onSelect: () => void }) {
+  const t = useT();
   return (
     <View
       style={[
@@ -22,7 +24,7 @@ function PlanCard({ plan, active, onSelect }: { plan: Plan; active: boolean; onS
       ]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <AppText variant="title">{plan.name}</AppText>
-        {active && <ActionChip label="Current plan" variant="success" />}
+        {active && <ActionChip label={t('pay.currentPlan')} variant="success" />}
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 4 }}>
         <AppText variant="headline" color={colors.primary}>
@@ -46,7 +48,7 @@ function PlanCard({ plan, active, onSelect }: { plan: Plan; active: boolean; onS
       </View>
       {!active && (
         <Button
-          label={`Switch to ${plan.name}`}
+          label={t('pay.switchTo', { plan: plan.name })}
           variant="outline"
           onPress={onSelect}
           style={{ marginTop: spacing.sm }}
@@ -57,15 +59,17 @@ function PlanCard({ plan, active, onSelect }: { plan: Plan; active: boolean; onS
 }
 
 export default function Payments() {
+  const t = useT();
+  const tStatus = useTStatus();
   const [selected, setSelected] = useState(currentPlanId);
   const current = plans.find((p) => p.id === selected) ?? plans[0];
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Payments & Subscription" subtitle={`${current.name} plan`} showBack>
+      <GradientHeader title={t('profile.row.paymentsSubscription')} subtitle={t('pay.subtitle', { plan: current.name })} showBack>
         <View style={{ marginTop: spacing.md, alignItems: 'center' }}>
           <AppText variant="caption" color="rgba(255,255,255,0.85)">
-            Next renewal
+            {t('pay.nextRenewal')}
           </AppText>
           <AppText variant="bodyLarge" color="#fff" style={{ fontWeight: '600' }}>
             01 Jul 2026 · {current.priceLabel}
@@ -76,7 +80,7 @@ export default function Payments() {
 
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         <AppText variant="overline" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>
-          Payment method
+          {t('pay.paymentMethod')}
         </AppText>
         <View
           style={[
@@ -102,18 +106,18 @@ export default function Payments() {
               **** **** 4242
             </AppText>
           </View>
-          <ActionChip label="Default" variant="info" dot={false} />
+          <ActionChip label={t('pay.default')} variant="info" dot={false} />
         </View>
 
         <AppText variant="overline" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>
-          Plans
+          {t('pay.plans')}
         </AppText>
         {plans.map((p) => (
           <PlanCard key={p.id} plan={p} active={p.id === selected} onSelect={() => setSelected(p.id)} />
         ))}
 
         <AppText variant="overline" color={colors.onSurfaceVariant} style={{ marginTop: spacing.sm, marginBottom: spacing.sm }}>
-          Billing history
+          {t('pay.billingHistory')}
         </AppText>
         <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.md }, shadow[1]]}>
           {invoices.map((inv, i) => (
@@ -132,13 +136,13 @@ export default function Payments() {
                   {inv.date}
                 </AppText>
               </View>
-              <ActionChip label={inv.status} variant={inv.status === 'Paid' ? 'success' : 'warning'} />
+              <ActionChip label={tStatus(inv.status)} variant={inv.status === 'Paid' ? 'success' : 'warning'} />
             </View>
           ))}
         </View>
 
         <AppText variant="caption" color={colors.onSurfaceVariant} style={{ textAlign: 'center', marginTop: spacing.lg }}>
-          Manage your subscription securely through the Ngaren billing portal.
+          {t('pay.manageNote')}
         </AppText>
       </Screen>
     </View>

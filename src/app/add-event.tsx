@@ -5,14 +5,16 @@ import { colors, spacing } from '@/theme';
 import { CalendarType } from '@/data/clinical';
 import { addLocalEvent } from '@/data/localEvents';
 import { useAuth } from '@/services/auth';
+import { useT } from '@/i18n';
 import { Button, DatePickerField, GradientHeader, PickerField, Screen, TextField } from '@/ui';
 
-// Farmer-schedulable activity types (subset of CalendarType).
+// Farmer-schedulable activity types (subset of CalendarType). label holds an
+// i18n key, translated at render.
 const TYPE_OPTIONS: { label: string; value: CalendarType }[] = [
-  { label: 'Vet Visit', value: 'vet_visit' },
-  { label: 'Stock Take', value: 'stock_take' },
-  { label: 'Vaccination', value: 'vaccination' },
-  { label: 'Follow-up', value: 'follow_up' },
+  { label: 'ae.vetVisit', value: 'vet_visit' },
+  { label: 'ae.stockTake', value: 'stock_take' },
+  { label: 'ae.vaccination', value: 'vaccination' },
+  { label: 'ae.followUp', value: 'follow_up' },
 ];
 
 /**
@@ -22,7 +24,9 @@ const TYPE_OPTIONS: { label: string; value: CalendarType }[] = [
  */
 export default function AddEvent() {
   const router = useRouter();
+  const t = useT();
   const { loading, isAuthenticated } = useAuth();
+  const typeOptions = TYPE_OPTIONS.map((o) => ({ label: t(o.label), value: o.value }));
   const { date: presetDate } = useLocalSearchParams<{ date?: string }>();
 
   const [title, setTitle] = useState('');
@@ -44,12 +48,12 @@ export default function AddEvent() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Schedule Activity" subtitle="Add to the farm calendar" showBack />
+      <GradientHeader title={t('ae.title')} subtitle={t('ae.subtitle')} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
-        <TextField label="Title" required value={title} onChangeText={setTitle} placeholder="e.g. Routine herd stock take" />
-        <PickerField label="Activity type" required value={type} options={TYPE_OPTIONS} onSelect={(v) => setType(v as CalendarType)} />
-        <DatePickerField label="Date" value={date} placeholder="Select a date" onSelect={setDate} />
-        <Button label="Add to calendar" icon="calendar-plus" loading={saving} disabled={!canSubmit} onPress={onSubmit} style={{ marginTop: spacing.sm }} />
+        <TextField label={t('mkt.fTitle')} required value={title} onChangeText={setTitle} placeholder={t('ae.titlePlaceholder')} />
+        <PickerField label={t('ae.activityType')} required value={type} options={typeOptions} onSelect={(v) => setType(v as CalendarType)} />
+        <DatePickerField label={t('ae.date')} value={date} placeholder={t('ae.datePlaceholder')} onSelect={setDate} />
+        <Button label={t('ae.addBtn')} icon="calendar-plus" loading={saving} disabled={!canSubmit} onPress={onSubmit} style={{ marginTop: spacing.sm }} />
       </Screen>
     </View>
   );
