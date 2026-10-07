@@ -6,6 +6,7 @@ import { buildIngestionSummary, getWebhookLogs, WebhookLog } from '@/data/ceresW
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { formatDateTime } from '@/lib/date';
+import { useT, useTStatus } from '@/i18n';
 import { ActionChip, AppText, GradientHeader, Icon, IconName, SearchBar, Screen } from '@/ui';
 
 const TYPES = ['all', 'alerts', 'historical', 'standard', 'pfi', 'activity', 'repro'];
@@ -33,6 +34,8 @@ function StatTile({ value, label, icon, tint }: { value: number; label: string; 
  */
 export default function WebhookMonitor() {
   const router = useRouter();
+  const tr = useT();
+  const tStatus = useTStatus();
   const { loading, isAuthenticated, isAdmin } = useAuth();
   const [type, setType] = useState('all');
   const [search, setSearch] = useState('');
@@ -53,13 +56,13 @@ export default function WebhookMonitor() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Webhook Monitor" subtitle="Inspect, debug and replay CERES deliveries" showBack />
+      <GradientHeader title={tr('action.webhookMonitor')} subtitle={tr('wh.subtitle')} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
-          <StatTile value={summary.total} label="Total" icon="webhook" tint={colors.primary} />
-          <StatTile value={summary.processed} label="Processed" icon="check-circle-outline" tint={colors.success} />
-          <StatTile value={summary.failed} label="Failed" icon="close-circle-outline" tint={summary.failed > 0 ? colors.error : colors.onSurfaceVariant} />
-          <StatTile value={summary.uniqueTags} label="Tags" icon="tag-outline" tint="#0EA5E9" />
+          <StatTile value={summary.total} label={tr('wh.total')} icon="webhook" tint={colors.primary} />
+          <StatTile value={summary.processed} label={tr('wh.processed2')} icon="check-circle-outline" tint={colors.success} />
+          <StatTile value={summary.failed} label={tr('wh.failed')} icon="close-circle-outline" tint={summary.failed > 0 ? colors.error : colors.onSurfaceVariant} />
+          <StatTile value={summary.uniqueTags} label={tr('wh.tags')} icon="tag-outline" tint="#0EA5E9" />
         </View>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.sm }} contentContainerStyle={{ gap: spacing.xs }}>
@@ -82,15 +85,15 @@ export default function WebhookMonitor() {
           ))}
         </ScrollView>
 
-        <SearchBar value={search} onChangeText={setSearch} placeholder="Search payload or type..." />
+        <SearchBar value={search} onChangeText={setSearch} placeholder={tr('wh.search')} />
 
         <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginVertical: spacing.sm }}>
-          {loadingRows ? 'Loading…' : `${filtered.length} deliveries · last received ${summary.lastReceived ? formatDateTime(summary.lastReceived) : '—'}`}
+          {loadingRows ? tr('common.loading') : tr('wh.deliveries', { count: filtered.length, time: summary.lastReceived ? formatDateTime(summary.lastReceived) : '—' })}
         </AppText>
 
         {!loadingRows && filtered.length === 0 && (
           <AppText variant="body" color={colors.onSurfaceVariant} style={{ textAlign: 'center', paddingVertical: spacing.xl }}>
-            No deliveries.
+            {tr('wh.noDeliveries')}
           </AppText>
         )}
 
@@ -106,7 +109,7 @@ export default function WebhookMonitor() {
               <AppText variant="bodyLarge" style={{ fontWeight: '600' }}>
                 {r.webhookType}
               </AppText>
-              <ActionChip label={r.status} variant={statusVariant(r.status)} />
+              <ActionChip label={tStatus(r.status)} variant={statusVariant(r.status)} />
             </View>
             <AppText variant="caption" color={colors.onSurfaceVariant}>
               {formatDateTime(r.receivedAt)}
@@ -118,7 +121,7 @@ export default function WebhookMonitor() {
         <Pressable onPress={() => reload()} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingVertical: spacing.md }}>
           <Icon name="reload" size={16} color={colors.primary} />
           <AppText variant="body" color={colors.primary} style={{ fontWeight: '600' }}>
-            Refresh
+            {tr('common.refresh')}
           </AppText>
         </Pressable>
       </Screen>

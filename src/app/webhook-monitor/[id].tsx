@@ -6,6 +6,7 @@ import { CERES_DATA_DOWNLOAD_DISCLAIMER, getWebhookLogs, replayWebhook } from '@
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { formatDateTime } from '@/lib/date';
+import { useT, useTStatus } from '@/i18n';
 import { ActionChip, AppText, Button, DetailRow, EmptyState, GradientHeader, Icon, Screen } from '@/ui';
 
 const statusVariant = (s: string) =>
@@ -13,6 +14,8 @@ const statusVariant = (s: string) =>
 
 /** One webhook delivery — payload, diagnostics and a replay action. */
 export default function WebhookDetail() {
+  const t = useT();
+  const tStatus = useTStatus();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { loading, isAuthenticated, isAdmin } = useAuth();
   const { data: rows } = useResource(() => getWebhookLogs(), []);
@@ -27,8 +30,8 @@ export default function WebhookDetail() {
   if (!log) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <GradientHeader title="Webhook" showBack />
-        <EmptyState icon="webhook" title="Delivery not found" subtitle="It may have rolled off the last 100 deliveries." />
+        <GradientHeader title={t('wh.title')} showBack />
+        <EmptyState icon="webhook" title={t('wh.notFoundTitle')} subtitle={t('wh.notFoundSub')} />
       </View>
     );
   }
@@ -37,7 +40,7 @@ export default function WebhookDetail() {
     setReplaying(true);
     const res = await replayWebhook(log);
     setReplaying(false);
-    Alert.alert(res.ok ? 'Replayed' : 'Replay failed', res.ok ? 'The delivery was resubmitted.' : res.message ?? 'Unknown error');
+    Alert.alert(res.ok ? t('wh.replayed') : t('wh.replayFailed'), res.ok ? t('wh.replayOk') : res.message ?? t('wh.unknownError'));
   };
 
   return (
@@ -45,24 +48,24 @@ export default function WebhookDetail() {
       <GradientHeader title={log.webhookType} subtitle={formatDateTime(log.receivedAt)} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
-          <ActionChip label={log.status} variant={statusVariant(log.status)} />
-          <ActionChip label={log.senderVerified ? 'verified' : log.verificationMethod ?? 'unverified'} variant={log.senderVerified ? 'success' : 'warning'} />
+          <ActionChip label={tStatus(log.status)} variant={statusVariant(log.status)} />
+          <ActionChip label={log.senderVerified ? t('wh.verified') : log.verificationMethod ?? t('wh.unverified')} variant={log.senderVerified ? 'success' : 'warning'} />
         </View>
 
         <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.md }, shadow[1]]}>
-          <DetailRow label="Received" value={formatDateTime(log.receivedAt)} />
-          <DetailRow label="Processed" value={log.processedAt ? formatDateTime(log.processedAt) : '—'} />
-          <DetailRow label="Source" value={log.sourceClass ?? 'unknown'} />
-          <DetailRow label="Persisted" value={String(log.persistedCount)} />
-          <DetailRow label="Duplicates" value={String(log.duplicateCount)} />
-          <DetailRow label="Retries" value={String(log.retryCount)} />
-          <DetailRow label="Delayed" value={String(log.delayedCount)} last={!log.errorMessage && !log.authError} />
-          {log.errorMessage ? <DetailRow label="Error" value={log.errorMessage} last={!log.authError} /> : null}
-          {log.authError ? <DetailRow label="Auth error" value={log.authError} last /> : null}
+          <DetailRow label={t('wh.received')} value={formatDateTime(log.receivedAt)} />
+          <DetailRow label={t('wh.processed')} value={log.processedAt ? formatDateTime(log.processedAt) : '—'} />
+          <DetailRow label={t('wh.source')} value={log.sourceClass ?? t('wh.unknown')} />
+          <DetailRow label={t('wh.persisted')} value={String(log.persistedCount)} />
+          <DetailRow label={t('wh.duplicates')} value={String(log.duplicateCount)} />
+          <DetailRow label={t('wh.retries')} value={String(log.retryCount)} />
+          <DetailRow label={t('wh.delayed')} value={String(log.delayedCount)} last={!log.errorMessage && !log.authError} />
+          {log.errorMessage ? <DetailRow label={t('wh.error')} value={log.errorMessage} last={!log.authError} /> : null}
+          {log.authError ? <DetailRow label={t('wh.authError')} value={log.authError} last /> : null}
         </View>
 
         <AppText variant="title" style={{ marginTop: spacing.lg, marginBottom: spacing.sm }}>
-          Payload
+          {t('wh.payload')}
         </AppText>
         <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md }, shadow[1]]}>
           <AppText variant="caption" style={{ fontFamily: 'monospace' }} color={colors.onSurface}>
@@ -92,7 +95,7 @@ export default function WebhookDetail() {
           </AppText>
         </View>
 
-        <Button label="Replay delivery" icon="replay" variant="outline" loading={replaying} onPress={onReplay} style={{ marginTop: spacing.lg, marginBottom: spacing.lg }} />
+        <Button label={t('wh.replayBtn')} icon="replay" variant="outline" loading={replaying} onPress={onReplay} style={{ marginTop: spacing.lg, marginBottom: spacing.lg }} />
       </Screen>
     </View>
   );

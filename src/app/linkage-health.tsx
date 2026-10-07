@@ -5,6 +5,7 @@ import { colors, radius, shadow, spacing } from '@/theme';
 import { CeresLinkageRecord, LinkageState, getLinkageState, syncGrant } from '@/data/ceresLinkage';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
+import { useT, useTStatus } from '@/i18n';
 import { ActionChip, AppText, GradientHeader, Icon, IconName, Screen } from '@/ui';
 
 const FALLBACK: LinkageState = {
@@ -48,6 +49,8 @@ const linkageVariant = (s: CeresLinkageRecord['linkageStatus']) =>
  * Mirrors the web CeresLinkageHealthPage / useCeresIntegration.
  */
 export default function LinkageHealth() {
+  const t = useT();
+  const tStatus = useTStatus();
   const { loading, isAuthenticated, isAdmin } = useAuth();
   const { data: state, loading: loadingState, reload } = useResource(getLinkageState, FALLBACK);
   const [syncing, setSyncing] = useState<string | null>(null);
@@ -66,14 +69,14 @@ export default function LinkageHealth() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <GradientHeader
-        title="Linkage Health"
-        subtitle={`${state.environment} · ${state.connected} connected · ${state.pending} pending · ${state.disconnected} disconnected`}
+        title={t('action.linkageHealth')}
+        subtitle={t('lh.subtitle', { env: state.environment, connected: state.connected, pending: state.pending, disconnected: state.disconnected })}
         showBack
       />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.lg }, shadow[1]]}>
           <AppText variant="bodyLarge" style={{ fontWeight: '600', marginBottom: spacing.sm }}>
-            Integration endpoints
+            {t('lh.endpoints')}
           </AppText>
           <StatusRow ok={!state.error} label="ceres-linkage edge function" detail={state.error ?? 'Linkage state retrieved successfully'} />
           <StatusRow ok={state.connected > 0} label="Software partner auth (OAuth)" detail={state.connected > 0 ? `${state.connected} active linkage(s)` : 'No connected linkages yet'} />
@@ -82,15 +85,15 @@ export default function LinkageHealth() {
         </View>
 
         <AppText variant="title" style={{ marginBottom: spacing.sm }}>
-          Linkages ({state.linkages.length})
+          {t('lh.linkages', { count: state.linkages.length })}
         </AppText>
         {loadingState ? (
           <AppText variant="body" color={colors.onSurfaceVariant}>
-            Loading…
+            {t('common.loading')}
           </AppText>
         ) : state.linkages.length === 0 ? (
           <AppText variant="body" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.lg }}>
-            No linkages yet. Connect a CERES customer from Settings → Integrations.
+            {t('lh.noLinkages')}
           </AppText>
         ) : (
           state.linkages.map((l) => (
@@ -99,10 +102,10 @@ export default function LinkageHealth() {
                 <AppText variant="bodyLarge" style={{ fontWeight: '600', flex: 1 }}>
                   {l.farmDisplayName ?? l.propertyName}
                 </AppText>
-                <ActionChip label={l.linkageStatus} variant={linkageVariant(l.linkageStatus)} />
+                <ActionChip label={tStatus(l.linkageStatus)} variant={linkageVariant(l.linkageStatus)} />
               </View>
               <AppText variant="caption" color={colors.onSurfaceVariant}>
-                Sync: {l.syncState} · Tags: {l.activeTags} · Alerts: {l.alertsCount}
+                {t('lh.linkMeta', { state: l.syncState, tags: l.activeTags, alerts: l.alertsCount })}
               </AppText>
               {l.lastError ? (
                 <AppText variant="caption" color={colors.error}>
@@ -115,7 +118,7 @@ export default function LinkageHealth() {
                 style={{ alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs }}>
                 <Icon name="sync" size={14} color={colors.primary} />
                 <AppText variant="caption" color={colors.primary} style={{ fontWeight: '600' }}>
-                  {syncing === l.grantId ? 'Syncing…' : 'Sync'}
+                  {syncing === l.grantId ? t('sync.syncing') : t('lh.sync')}
                 </AppText>
               </Pressable>
             </View>
@@ -125,7 +128,7 @@ export default function LinkageHealth() {
         {state.farms.length > 0 && (
           <>
             <AppText variant="title" style={{ marginTop: spacing.md, marginBottom: spacing.sm }}>
-              CERES farms ({state.farms.length})
+              {t('lh.ceresFarms', { count: state.farms.length })}
             </AppText>
             {state.farms.map((f) => (
               <View key={f.id} style={[{ backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, gap: 2, borderWidth: 1, borderColor: colors.divider }, shadow[1]]}>
@@ -133,7 +136,7 @@ export default function LinkageHealth() {
                   {f.name}
                 </AppText>
                 <AppText variant="caption" color={colors.onSurfaceVariant}>
-                  {f.region}, {f.country} · {f.animalCount} animals · {f.activeTags} active tags · health {f.healthScore}
+                  {t('lh.farmMeta', { region: f.region, country: f.country, animals: f.animalCount, tags: f.activeTags, health: f.healthScore })}
                 </AppText>
               </View>
             ))}

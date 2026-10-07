@@ -6,6 +6,7 @@ import { FarmerMirror, getFarmerMirror, logMirrorAccess } from '@/data/farmerMir
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { maskEmail } from '@/lib/privacy';
+import { useT, useTStatus } from '@/i18n';
 import { ActionChip, AppText, EmptyState, GradientHeader, Icon, IconChip, Screen } from '@/ui';
 
 const FALLBACK: FarmerMirror = { farmer: null, animals: [], devices: [] };
@@ -29,6 +30,8 @@ function Stat({ value, label }: { value: number; label: string }) {
  * livestock_audit_log, exactly like the web AdminFarmerMirrorPage.
  */
 export default function AdminMirror() {
+  const t = useT();
+  const tStatus = useTStatus();
   const { farmerId } = useLocalSearchParams<{ farmerId: string }>();
   const { loading, isAuthenticated, isAdmin, user } = useAuth();
   const { data: mirror, loading: loadingMirror } = useResource(() => getFarmerMirror(farmerId), FALLBACK);
@@ -54,21 +57,21 @@ export default function AdminMirror() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title={mirror.farmer?.fullName ?? 'Farmer mirror'} subtitle="Support mirror mode · read-only" showBack />
+      <GradientHeader title={mirror.farmer?.fullName ?? t('am.title')} subtitle={t('am.subtitle')} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.warningTint, marginBottom: spacing.md }}>
           <Icon name="eye-outline" size={16} color={colors.warning} />
           <AppText variant="caption" color={colors.warning} style={{ flex: 1, fontWeight: '600' }}>
-            You are viewing {mirror.farmer?.fullName ?? mirror.farmer?.email ?? farmerId} — every access is logged.
+            {t('am.viewingNote', { name: mirror.farmer?.fullName ?? mirror.farmer?.email ?? farmerId })}
           </AppText>
         </View>
 
         {loadingMirror ? (
           <AppText variant="body" color={colors.onSurfaceVariant}>
-            Loading…
+            {t('common.loading')}
           </AppText>
         ) : !mirror.farmer ? (
-          <EmptyState icon="account-off-outline" title="Farmer not found" subtitle="This account may have been removed." />
+          <EmptyState icon="account-off-outline" title={t('am.notFoundTitle')} subtitle={t('am.notFoundSub')} />
         ) : (
           <>
             <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.lg, gap: spacing.md }, shadow[1]]}>
@@ -76,7 +79,7 @@ export default function AdminMirror() {
                 <IconChip icon="account-outline" />
                 <View style={{ flex: 1 }}>
                   <AppText variant="bodyLarge" style={{ fontWeight: '700' }}>
-                    {mirror.farmer.fullName ?? '(unnamed farmer)'}
+                    {mirror.farmer.fullName ?? t('am.unnamed')}
                   </AppText>
                   <AppText variant="caption" color={colors.onSurfaceVariant}>
                     {maskEmail(mirror.farmer.email)}
@@ -84,20 +87,20 @@ export default function AdminMirror() {
                 </View>
               </View>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-                <Stat value={stats.animals} label="Animals" />
-                <Stat value={stats.complete} label="Complete" />
-                <Stat value={stats.devices} label="Devices" />
-                <Stat value={stats.online} label="Online" />
-                <Stat value={stats.paired} label="Paired" />
+                <Stat value={stats.animals} label={t('farmers.animals')} />
+                <Stat value={stats.complete} label={t('am.complete')} />
+                <Stat value={stats.devices} label={t('farmers.devices')} />
+                <Stat value={stats.online} label={t('am.online')} />
+                <Stat value={stats.paired} label={t('am.paired')} />
               </View>
             </View>
 
             <AppText variant="title" style={{ marginBottom: spacing.sm }}>
-              Livestock ({mirror.animals.length})
+              {t('am.livestock', { count: mirror.animals.length })}
             </AppText>
             {mirror.animals.length === 0 ? (
               <AppText variant="body" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.lg }}>
-                No animals onboarded.
+                {t('am.noAnimals')}
               </AppText>
             ) : (
               mirror.animals.map((a) => (
@@ -112,20 +115,20 @@ export default function AdminMirror() {
                       {a.animalName}
                     </AppText>
                     <AppText variant="caption" color={colors.onSurfaceVariant}>
-                      {a.animalTagId ?? a.visualTagNumber ?? 'no tag'} · {a.breed ?? '—'}
+                      {a.animalTagId ?? a.visualTagNumber ?? t('am.noTag')} · {a.breed ?? '—'}
                     </AppText>
                   </View>
-                  <ActionChip label={a.lifecycleStatus} variant={a.lifecycleStatus === 'complete' ? 'success' : 'warning'} />
+                  <ActionChip label={tStatus(a.lifecycleStatus)} variant={a.lifecycleStatus === 'complete' ? 'success' : 'warning'} />
                 </View>
               ))
             )}
 
             <AppText variant="title" style={{ marginTop: spacing.md, marginBottom: spacing.sm }}>
-              Devices ({mirror.devices.length})
+              {t('am.devices', { count: mirror.devices.length })}
             </AppText>
             {mirror.devices.length === 0 ? (
               <AppText variant="body" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.lg }}>
-                No devices assigned.
+                {t('am.noDevices')}
               </AppText>
             ) : (
               mirror.devices.map((d) => (
@@ -136,10 +139,10 @@ export default function AdminMirror() {
                       {d.serialNumber}
                     </AppText>
                     <AppText variant="caption" color={colors.onSurfaceVariant}>
-                      {d.tagId} {d.linkedAnimalId ? '· linked' : '· unlinked'} · {d.batteryLevel ?? '—'}%
+                      {d.tagId} · {d.linkedAnimalId ? t('am.linked') : t('am.unlinked')} · {d.batteryLevel ?? '—'}%
                     </AppText>
                   </View>
-                  <ActionChip label={d.status} variant={d.status === 'online' ? 'success' : 'neutral'} />
+                  <ActionChip label={tStatus(d.status)} variant={d.status === 'online' ? 'success' : 'neutral'} />
                 </View>
               ))
             )}
