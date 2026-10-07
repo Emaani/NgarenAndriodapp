@@ -6,6 +6,7 @@ import { getCalloutRequests } from '@/data/api';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { CalloutRequest, CalloutStatus, CalloutUrgency } from '@/data/types';
+import { useT, useTStatus } from '@/i18n';
 import { ActionChip, AppText, Button, DetailRow, EmptyState, GradientHeader, Icon, IconName, Screen } from '@/ui';
 
 const urgencyVariant = (u: CalloutUrgency) => (u === 'Emergency' ? 'error' : 'neutral');
@@ -45,6 +46,8 @@ function Step({ icon, title, subtitle, state, last }: { icon: IconName; title: s
  */
 export default function VetRequestDetail() {
   const router = useRouter();
+  const t = useT();
+  const tStatus = useTStatus();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { loading, isAuthenticated } = useAuth();
   const { data: requests } = useResource(() => getCalloutRequests(), calloutFallback);
@@ -57,8 +60,8 @@ export default function VetRequestDetail() {
   if (!req) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <GradientHeader title="Vet request" showBack />
-        <EmptyState icon="clipboard-pulse-outline" title="Request not found" subtitle="This request may have been removed." />
+        <GradientHeader title={t('vrq.title')} showBack />
+        <EmptyState icon="clipboard-pulse-outline" title={t('vrq.notFoundTitle')} subtitle={t('vrq.notFoundSub')} />
       </View>
     );
   }
@@ -69,7 +72,7 @@ export default function VetRequestDetail() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Vet request" subtitle={req.animal} showBack />
+      <GradientHeader title={t('vrq.title')} subtitle={req.animal} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         {/* Status summary */}
         <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderColor: colors.divider }, shadow[1]]}>
@@ -81,25 +84,25 @@ export default function VetRequestDetail() {
               {req.animal}
             </AppText>
             <AppText variant="caption" color={colors.onSurfaceVariant}>
-              {req.locationName} · requested {req.requestedAt}
+              {t('vrq.reqMeta', { location: req.locationName, time: req.requestedAt })}
             </AppText>
           </View>
-          <ActionChip label={req.status[0].toUpperCase() + req.status.slice(1)} variant={statusVariant(req.status)} />
+          <ActionChip label={tStatus(req.status)} variant={statusVariant(req.status)} />
         </View>
 
         {/* Details */}
         <AppText variant="title" style={{ marginBottom: spacing.sm }}>
-          Details
+          {t('vrq.details')}
         </AppText>
         <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.md, marginBottom: spacing.lg }, shadow[1]]}>
-          <DetailRow label="Animal" value={req.animal} />
-          <DetailRow label="Priority" value={req.urgency} />
-          <DetailRow label="SLA" value={req.urgency === 'Emergency' ? 'Response within 4 hours' : 'Response within 48 hours'} />
-          <DetailRow label="Location" value={req.locationName} />
-          <DetailRow label="Distance" value={`${req.distanceKm} km`} />
-          <DetailRow label="Requested" value={req.requestedAt} />
-          <DetailRow label="Requested by" value={req.farmerName} last={!req.notes} />
-          {req.notes ? <DetailRow label="Notes" value={req.notes} last /> : null}
+          <DetailRow label={t('ad.animalTitle')} value={req.animal} />
+          <DetailRow label={t('vrq.priority')} value={t(`urgency.${req.urgency.toLowerCase()}`)} />
+          <DetailRow label="SLA" value={req.urgency === 'Emergency' ? t('fv.slaEmergency') : t('fv.slaRoutine')} />
+          <DetailRow label={t('ad.location')} value={req.locationName} />
+          <DetailRow label={t('vrq.distance')} value={`${req.distanceKm} km`} />
+          <DetailRow label={t('vrq.requested')} value={req.requestedAt} />
+          <DetailRow label={t('vrq.requestedBy')} value={req.farmerName} last={!req.notes} />
+          {req.notes ? <DetailRow label={t('ad.notes')} value={req.notes} last /> : null}
         </View>
 
         {/* Priority hint */}
@@ -107,31 +110,31 @@ export default function VetRequestDetail() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.errorTint, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.lg }}>
             <Icon name="alert-decagram-outline" size={18} color={colors.error} />
             <AppText variant="caption" color={colors.error} style={{ flex: 1, fontWeight: '600' }}>
-              Marked as an emergency — prioritised for the fastest available vet.
+              {t('vrq.emergencyHint')}
             </AppText>
           </View>
         ) : null}
 
         {/* Lifecycle timeline */}
         <AppText variant="title" style={{ marginBottom: spacing.sm }}>
-          Progress
+          {t('vrq.progress')}
         </AppText>
         <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.lg, borderWidth: 1, borderColor: colors.divider }, shadow[1]]}>
-          <Step icon="clipboard-check-outline" title="Requested" subtitle={req.requestedAt} state="done" />
+          <Step icon="clipboard-check-outline" title={t('vrq.sRequested')} subtitle={req.requestedAt} state="done" />
           {declined ? (
-            <Step icon="close-circle-outline" title="Declined" subtitle="No vet was able to take this request" state="failed" last />
+            <Step icon="close-circle-outline" title={t('vrq.sDeclined')} subtitle={t('vrq.sDeclinedSub')} state="failed" last />
           ) : (
             <>
               <Step
                 icon="account-check-outline"
-                title="Accepted by a vet"
-                subtitle={accepted ? 'A vet has accepted and is scheduled' : 'Waiting for a nearby vet to accept'}
+                title={t('vrq.sAccepted')}
+                subtitle={accepted ? t('vrq.sAcceptedDone') : t('vrq.sAcceptedWait')}
                 state={accepted ? 'done' : 'current'}
               />
               <Step
                 icon="check-decagram-outline"
-                title="Visit completed"
-                subtitle={completed ? 'The vet completed the visit' : 'Pending the visit'}
+                title={t('vrq.sCompleted')}
+                subtitle={completed ? t('vrq.sCompletedDone') : t('vrq.sCompletedPending')}
                 state={completed ? 'done' : 'todo'}
                 last
               />
@@ -140,16 +143,16 @@ export default function VetRequestDetail() {
         </View>
 
         {/* Relevant actions */}
-        <Button label="View on map" icon="map-marker-radius" variant="outline" onPress={() => router.push('/(tabs)/track')} style={{ marginBottom: spacing.sm }} />
+        <Button label={t('vet.viewOnMap')} icon="map-marker-radius" variant="outline" onPress={() => router.push('/(tabs)/track')} style={{ marginBottom: spacing.sm }} />
         {completed ? (
           <Button
-            label="Rate this visit"
+            label={t('vrq.rateVisit')}
             icon="star-outline"
             onPress={() => router.push(`/rate-vet?animal=${encodeURIComponent(req.animal)}&service=${encodeURIComponent(req.urgency + ' visit')}` as never)}
             style={{ marginBottom: spacing.sm }}
           />
         ) : (
-          <Button label="Book another vet" icon="stethoscope" onPress={() => router.push('/find-vet')} style={{ marginBottom: spacing.sm }} />
+          <Button label={t('vrq.bookAnother')} icon="stethoscope" onPress={() => router.push('/find-vet')} style={{ marginBottom: spacing.sm }} />
         )}
       </Screen>
     </View>

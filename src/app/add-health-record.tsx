@@ -12,6 +12,7 @@ import {
 import { notify } from '@/lib/toast';
 import { scheduleLocalReminder } from '@/services/push';
 import { useAuth } from '@/services/auth';
+import { useT } from '@/i18n';
 import { AppText, Button, DatePickerField, GradientHeader, Icon, PhotoField, PickerField, Screen, TextField } from '@/ui';
 
 const TYPE_OPTIONS = (['vaccination', 'treatment', 'consultation', 'ailment'] as HealthEventType[]).map((t) => ({
@@ -38,6 +39,7 @@ const TEMPLATES: Record<
  */
 export default function AddHealthRecord() {
   const router = useRouter();
+  const t = useT();
   const { animal, label, type: presetType } = useLocalSearchParams<{ animal?: string; label?: string; type?: string }>();
   const { loading, isAuthenticated, canVet, user } = useAuth();
 
@@ -69,25 +71,25 @@ export default function AddHealthRecord() {
   if (!canVet) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <GradientHeader title="Health record" subtitle={label ?? animal ?? 'Animal'} showBack />
+        <GradientHeader title={t('ahr.viewTitle')} subtitle={label ?? animal ?? t('ad.animalTitle')} showBack />
         <Screen contentStyle={{ paddingTop: spacing.xl, alignItems: 'center' }}>
           <View style={{ width: 72, height: 72, borderRadius: radius.full, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md }}>
             <Icon name="shield-account-outline" size={34} color={colors.primary} />
           </View>
           <AppText variant="title" style={{ textAlign: 'center', marginBottom: spacing.sm }}>
-            Entered by certified vets
+            {t('ahr.certifiedTitle')}
           </AppText>
           <AppText variant="body" color={colors.onSurfaceVariant} style={{ textAlign: 'center', marginBottom: spacing.lg }}>
-            Health records and prescriptions are added by a certified veterinary professional during a visit. You can view the full history and the Health Score Card at any time.
+            {t('ahr.certifiedBody')}
           </AppText>
-          <Button label="View Health Score Card" icon="file-document-outline" onPress={() => router.replace(`/health-scorecard${animal ? `?key=${encodeURIComponent(animal)}` : ''}` as never)} />
+          <Button label={t('ahr.viewScorecard')} icon="file-document-outline" onPress={() => router.replace(`/health-scorecard${animal ? `?key=${encodeURIComponent(animal)}` : ''}` as never)} />
         </Screen>
       </View>
     );
   }
 
   const animalKey = animal ?? '';
-  const animalLabel = label ?? animal ?? 'Animal';
+  const animalLabel = label ?? animal ?? t('ad.animalTitle');
   const canSubmit = !!animalKey && notes.trim().length > 0;
 
   const onSubmit = async () => {
@@ -115,24 +117,24 @@ export default function AddHealthRecord() {
           data: { type: 'HEALTH_DUE', animal: animalKey },
         });
       }
-      notify('Health record saved');
+      notify(t('ahr.saved'));
       router.back();
     } catch {
       setSaving(false);
-      notify('Could not save the record — please try again');
+      notify(t('ahr.saveFail'));
     }
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="New Health Record" subtitle={animalLabel} showBack />
+      <GradientHeader title={t('ahr.newTitle')} subtitle={animalLabel} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         {!animalKey ? (
           <AppText variant="body" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.md }}>
-            Open this from an animal’s Health History to attach the record to that animal.
+            {t('ahr.attachHint')}
           </AppText>
         ) : null}
-        <PickerField label="Event type" required value={type} options={TYPE_OPTIONS} onSelect={(v) => setType(v as HealthEventType)} />
+        <PickerField label={t('ahr.eventType')} required value={type} options={TYPE_OPTIONS} onSelect={(v) => setType(v as HealthEventType)} />
 
         {/* Type-specific diagnostic template fields. */}
         {tpl.showDiagnosis ? (
@@ -147,7 +149,7 @@ export default function AddHealthRecord() {
 
         {/* Structured observations for disease/pest trend collection. */}
         <AppText variant="body" style={{ fontWeight: '600', marginBottom: spacing.xs }}>
-          Observations
+          {t('ahr.observations')}
         </AppText>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.md }}>
           {HEALTH_OBSERVATIONS.map((o) => {
@@ -166,10 +168,10 @@ export default function AddHealthRecord() {
         </View>
 
         <TextField label={tpl.notesLabel} required value={notes} onChangeText={setNotes} placeholder={tpl.notesPlaceholder} multiline />
-        <DatePickerField label="Event date" value={date} placeholder="Defaults to today" maximumIso={today} onSelect={setDate} />
+        <DatePickerField label={t('ahr.eventDate')} value={date} placeholder={t('ahr.eventDatePlaceholder')} maximumIso={today} onSelect={setDate} />
         {/* Visit photos must be live captures (authenticity) — no gallery. */}
-        <PhotoField label="Live photo (optional)" value={photo} onChange={setPhoto} liveOnly />
-        <Button label="Save record" icon="content-save-outline" loading={saving} disabled={!canSubmit} onPress={onSubmit} style={{ marginTop: spacing.sm }} />
+        <PhotoField label={t('ahr.livePhoto')} value={photo} onChange={setPhoto} liveOnly />
+        <Button label={t('ahr.save')} icon="content-save-outline" loading={saving} disabled={!canSubmit} onPress={onSubmit} style={{ marginTop: spacing.sm }} />
       </Screen>
     </View>
   );
