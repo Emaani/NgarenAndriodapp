@@ -7,6 +7,7 @@ import { isPrimaryVet, togglePrimaryVet } from '@/data/primaryVets';
 import { notify } from '@/lib/toast';
 import { VetDayAvailability } from '@/data/types';
 import { useResource } from '@/data/hooks';
+import { useT } from '@/i18n';
 import { AppText, Button, EmptyState, GradientHeader, Icon, Screen, VetImpactDashboard } from '@/ui';
 
 // Real-time availability colours (Sep 3 2026 standup): green = open slots,
@@ -22,6 +23,7 @@ function initials(name: string): string {
 /** A single day tile: green when slots are open (tappable to book), red when
  *  fully booked/committed. Real-time availability at a glance. */
 function DayCard({ day, onBook }: { day: VetDayAvailability; onBook: () => void }) {
+  const t = useT();
   const { weekday, day: date } = formatDayLabel(day.dateIso);
   const available = day.appts > 0;
   const tint = available ? AVAIL_GREEN : AVAIL_RED;
@@ -50,7 +52,7 @@ function DayCard({ day, onBook }: { day: VetDayAvailability; onBook: () => void 
         {date}
       </AppText>
       <AppText variant="caption" color={tint} style={{ fontWeight: '700' }}>
-        {available ? `${day.appts} open` : 'Booked'}
+        {available ? t('vp.nOpen', { count: day.appts }) : t('vp.booked')}
       </AppText>
     </Pressable>
   );
@@ -58,6 +60,7 @@ function DayCard({ day, onBook }: { day: VetDayAvailability; onBook: () => void 
 
 export default function VetProfileScreen() {
   const router = useRouter();
+  const t = useT();
   const { vetId } = useLocalSearchParams<{ vetId: string }>();
   const { data: vet } = useResource(() => getVetProfile(Number(vetId)), undefined);
 
@@ -73,14 +76,14 @@ export default function VetProfileScreen() {
   const onTogglePrimary = async () => {
     const saved = await togglePrimaryVet(Number(vetId));
     setPrimary(saved);
-    notify(saved ? 'Saved as a trusted vet' : 'Removed from trusted vets');
+    notify(saved ? t('vp.savedTrusted') : t('vp.removedTrusted'));
   };
 
   if (!vet) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <GradientHeader title="Vet profile" showBack />
-        <EmptyState icon="stethoscope" title="Vet not found" subtitle="This profile may no longer be listed." />
+        <GradientHeader title={t('vp.title')} showBack />
+        <EmptyState icon="stethoscope" title={t('vp.notFoundTitle')} subtitle={t('vp.notFoundSub')} />
       </View>
     );
   }
@@ -88,8 +91,8 @@ export default function VetProfileScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <GradientHeader
-        title="Vet profile"
-        subtitle={`${vet.distanceKm} km away`}
+        title={t('vp.title')}
+        subtitle={t('vp.distanceAway', { km: vet.distanceKm })}
         showBack
         right={
           <Pressable onPress={onTogglePrimary} hitSlop={8} accessibilityLabel={primary ? 'Remove trusted vet' : 'Save trusted vet'}>
@@ -125,7 +128,7 @@ export default function VetProfileScreen() {
                 {vet.sponsored ? (
                   <View style={{ backgroundColor: colors.background, borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 2, borderWidth: 1, borderColor: colors.divider }}>
                     <AppText variant="caption" color={colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
-                      Sponsored
+                      {t('vp.sponsored')}
                     </AppText>
                   </View>
                 ) : null}
@@ -139,17 +142,17 @@ export default function VetProfileScreen() {
                   {vet.rating.toFixed(2)}
                 </AppText>
                 <AppText variant="body" color={colors.onSurfaceVariant}>
-                  · {vet.reviews} reviews
+                  · {vet.reviews} {t('common.reviews')}
                 </AppText>
               </View>
             </View>
           </View>
 
           <View style={{ height: 1, backgroundColor: colors.divider, marginVertical: 2 }} />
-          {vet.videoVisits ? <PersonaLine icon="video" text="Video visits" /> : null}
-          {vet.selfPay ? <PersonaLine icon="cash-multiple" text="Self-pay" /> : null}
+          {vet.videoVisits ? <PersonaLine icon="video" text={t('vp.videoVisits')} /> : null}
+          {vet.selfPay ? <PersonaLine icon="cash-multiple" text={t('vp.selfPay')} /> : null}
           {vet.institution ? <PersonaLine icon="school-outline" text={vet.institution} /> : null}
-          <PersonaLine icon="stethoscope" text={`${vet.specialty}${vet.yearsExperience ? ` · ${vet.yearsExperience} yrs experience` : ''}`} />
+          <PersonaLine icon="stethoscope" text={`${vet.specialty}${vet.yearsExperience ? ` · ${t('vp.yrsExp', { yrs: vet.yearsExperience })}` : ''}`} />
           {vet.tagline ? (
             <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginTop: 2 }}>
               {vet.tagline}
@@ -159,14 +162,14 @@ export default function VetProfileScreen() {
 
         {/* Services offered (managed-health MVP categories) */}
         <AppText variant="title" style={{ marginTop: spacing.lg, marginBottom: spacing.sm }}>
-          Services offered
+          {t('vp.servicesOffered')}
         </AppText>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
           {[
-            { label: 'Stock-take', icon: 'clipboard-list-outline' as const },
-            { label: 'Vaccination', icon: 'needle' as const },
-            { label: 'Treatment', icon: 'medical-bag' as const },
-            { label: 'Consultation', icon: 'comment-question-outline' as const },
+            { label: t('vp.svStockTake'), icon: 'clipboard-list-outline' as const },
+            { label: t('vp.svVaccination'), icon: 'needle' as const },
+            { label: t('vp.svTreatment'), icon: 'medical-bag' as const },
+            { label: t('vp.svConsultation'), icon: 'comment-question-outline' as const },
           ].map((sv) => (
             <View key={sv.label} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.mdMinus, paddingVertical: spacing.xs, borderRadius: radius.full, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.divider }}>
               <Icon name={sv.icon} size={15} color={colors.primary} />
@@ -179,16 +182,16 @@ export default function VetProfileScreen() {
 
         {/* Booking calendar */}
         <AppText variant="title" style={{ marginTop: spacing.lg, marginBottom: spacing.xs }}>
-          Availability
+          {t('vp.availability')}
         </AppText>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.sm }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: AVAIL_GREEN }} />
-            <AppText variant="caption" color={colors.onSurfaceVariant}>Open · tap to book</AppText>
+            <AppText variant="caption" color={colors.onSurfaceVariant}>{t('vp.open')}</AppText>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: AVAIL_RED }} />
-            <AppText variant="caption" color={colors.onSurfaceVariant}>Booked</AppText>
+            <AppText variant="caption" color={colors.onSurfaceVariant}>{t('vp.booked')}</AppText>
           </View>
         </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
@@ -199,18 +202,18 @@ export default function VetProfileScreen() {
 
         {/* Impact dashboard */}
         <AppText variant="title" style={{ marginTop: spacing.lg, marginBottom: spacing.sm }}>
-          Impact
+          {t('vp.impact')}
         </AppText>
         <VetImpactDashboard impact={vet.impact} />
 
         <Button
-          label="Request appointment"
+          label={t('vp.requestAppt')}
           icon="calendar-check"
           onPress={() => router.push(`/find-vet/request?vetId=${vet.id}` as never)}
           style={{ marginTop: spacing.lg }}
         />
         <Button
-          label="Rate this vet"
+          label={t('vp.rateThis')}
           variant="outline"
           icon="star-outline"
           onPress={() => router.push(`/rate-vet?vetId=${vet.id}` as never)}

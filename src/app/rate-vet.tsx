@@ -5,13 +5,16 @@ import { colors, radius, shadow, spacing } from '@/theme';
 import { vets } from '@/data/mock';
 import { rateService } from '@/data/vetRatings';
 import { notify } from '@/lib/toast';
+import { useT } from '@/i18n';
 import { AppText, Button, GradientHeader, Icon, Screen, TextField } from '@/ui';
 
-const TAGS = ['Punctual', 'Knowledgeable', 'Friendly', 'Great with animals', 'Fair price'];
-const RATING_LABELS = ['', 'Poor', 'Fair', 'Good', 'Very good', 'Excellent'];
+// Chip + rating labels hold i18n keys, translated at render.
+const TAG_KEYS = ['rv.tag1', 'rv.tag2', 'rv.tag3', 'rv.tag4', 'rv.tag5'];
+const RATING_KEYS = ['', 'rv.r1', 'rv.r2', 'rv.r3', 'rv.r4', 'rv.r5'];
 
 export default function RateVet() {
   const router = useRouter();
+  const t = useT();
   const { vetId, animal, service, callout } = useLocalSearchParams<{ vetId?: string; animal?: string; service?: string; callout?: string }>();
   const vet = vetId ? vets.find((v) => v.id === Number(vetId)) : vets[0];
 
@@ -38,13 +41,13 @@ export default function RateVet() {
         review: review.trim() || undefined,
       });
     }
-    notify('Thanks — your rating was recorded');
+    notify(t('rv.thanks'));
     router.replace('/find-vet');
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Rate your vet" subtitle={vet ? vet.name : 'Share your experience'} showBack />
+      <GradientHeader title={t('rv.title')} subtitle={vet ? vet.name : t('rv.subtitle')} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         {/* Service-linked rating (Sep 3 2026 standup): tied to a specific
             completed visit, not a general public rating. */}
@@ -52,7 +55,9 @@ export default function RateVet() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.primaryTint, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md }}>
             <Icon name="check-decagram-outline" size={18} color={colors.primary} />
             <AppText variant="caption" color={colors.primary} style={{ flex: 1, fontWeight: '600' }}>
-              Linked to your {service ?? 'visit'}{animal ? ` for ${animal}` : ''} — verified feedback for that service.
+              {animal
+                ? t('rv.linkedNoteAnimal', { service: service ?? t('rv.visit'), animal })
+                : t('rv.linkedNote', { service: service ?? t('rv.visit') })}
             </AppText>
           </View>
         ) : null}
@@ -95,7 +100,7 @@ export default function RateVet() {
         )}
 
         <AppText variant="title" style={{ textAlign: 'center', marginBottom: spacing.md }}>
-          How was your call-out?
+          {t('rv.howWas')}
         </AppText>
         <View style={{ flexDirection: 'row', justifyContent: 'center', gap: spacing.sm }}>
           {[1, 2, 3, 4, 5].map((n) => (
@@ -108,19 +113,19 @@ export default function RateVet() {
           variant="bodyLarge"
           color={rating ? colors.onSurface : colors.onSurfaceVariant}
           style={{ textAlign: 'center', marginTop: spacing.sm, marginBottom: spacing.lg, fontWeight: '600' }}>
-          {rating ? RATING_LABELS[rating] : 'Tap a star to rate'}
+          {rating ? t(RATING_KEYS[rating]) : t('rv.tapStar')}
         </AppText>
 
         <AppText variant="body" style={{ fontWeight: '600', marginBottom: spacing.sm }}>
-          What went well?
+          {t('rv.whatWent')}
         </AppText>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg }}>
-          {TAGS.map((t) => {
-            const active = tags.includes(t);
+          {TAG_KEYS.map((tagKey) => {
+            const active = tags.includes(tagKey);
             return (
               <Pressable
-                key={t}
-                onPress={() => toggleTag(t)}
+                key={tagKey}
+                onPress={() => toggleTag(tagKey)}
                 style={{
                   paddingHorizontal: spacing.md,
                   paddingVertical: spacing.sm,
@@ -130,7 +135,7 @@ export default function RateVet() {
                   borderColor: active ? colors.primary : colors.divider,
                 }}>
                 <AppText variant="body" color={active ? '#fff' : colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
-                  {t}
+                  {t(tagKey)}
                 </AppText>
               </Pressable>
             );
@@ -138,15 +143,15 @@ export default function RateVet() {
         </View>
 
         <TextField
-          label="Add a review"
+          label={t('rv.addReview')}
           value={review}
           onChangeText={setReview}
-          placeholder="Tell other farmers about your experience..."
+          placeholder={t('rv.reviewPlaceholder')}
           multiline
         />
 
         <Button
-          label={saving ? 'Submitting…' : 'Submit Rating'}
+          label={saving ? t('fv.submitting') : t('rv.submit')}
           icon="send"
           disabled={rating === 0 || saving}
           onPress={onSubmit}
