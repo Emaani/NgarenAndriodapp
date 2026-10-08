@@ -10,6 +10,7 @@ import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { formatDistance } from '@/lib/geo';
 import { AnimalMarker } from '@/data/types';
+import { useT, useTStatus } from '@/i18n';
 import { ActionChip, AppText, BottomSheet, Button, GradientHeader, Icon, IconName } from '@/ui';
 import { LiveMap, LiveMapHandle } from '@/components/LiveMap';
 
@@ -38,6 +39,8 @@ function MapButton({ icon, onPress, label }: { icon: IconName; onPress: () => vo
 
 export default function TrackScreen() {
   const router = useRouter();
+  const t = useT();
+  const tStatus = useTStatus();
   const mapRef = useRef<LiveMapHandle>(null);
   const { appRole } = useAuth();
   const [selected, setSelected] = useState<AnimalMarker | null>(null);
@@ -78,16 +81,13 @@ export default function TrackScreen() {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(
-          'Location permission needed',
-          'Allow location access to centre the map on where you are.',
-        );
+        Alert.alert(t('reg.locPermTitle'), t('trk.locPermBody'));
         return;
       }
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       mapRef.current?.showUser(pos.coords.latitude, pos.coords.longitude);
     } catch {
-      Alert.alert('Location unavailable', 'Could not get your current position. Try again outdoors.');
+      Alert.alert(t('trk.locUnavailTitle'), t('trk.locUnavailBody'));
     } finally {
       setLocating(false);
     }
@@ -110,7 +110,7 @@ export default function TrackScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <GradientHeader
-        title="Track animals"
+        title={t('trk.title')}
         compact
         right={
           <Pressable onPress={() => setFilterOpen(true)} hitSlop={8}>
@@ -152,10 +152,10 @@ export default function TrackScreen() {
             <Icon name="alert-decagram-outline" size={20} color="#fff" />
             <View style={{ flex: 1 }}>
               <AppText variant="body" color="#fff" style={{ fontWeight: '700' }}>
-                {report.breaches.length} {report.breaches.length === 1 ? 'animal' : 'animals'} outside boundary
+                {report.breaches.length === 1 ? t('trk.outsideOne', { count: 1 }) : t('trk.outside', { count: report.breaches.length })}
               </AppText>
               <AppText variant="caption" color="rgba(255,255,255,0.9)">
-                Furthest {formatDistance(report.breaches[0].metersOutside)} out · tap to review
+                {t('trk.furthest', { dist: formatDistance(report.breaches[0].metersOutside) })}
               </AppText>
             </View>
             <Icon name="chevron-right" size={20} color="#fff" />
@@ -170,13 +170,13 @@ export default function TrackScreen() {
             top: spacing.md,
             gap: spacing.sm,
           }}>
-          <MapButton icon="plus" label="Zoom in" onPress={() => mapRef.current?.zoomIn()} />
-          <MapButton icon="minus" label="Zoom out" onPress={() => mapRef.current?.zoomOut()} />
-          <MapButton icon="fit-to-screen-outline" label="Fit herd" onPress={() => mapRef.current?.fitAll()} />
-          <MapButton icon="vector-polygon" label="Geofences" onPress={() => setFenceOpen(true)} />
+          <MapButton icon="plus" label={t('trk.zoomIn')} onPress={() => mapRef.current?.zoomIn()} />
+          <MapButton icon="minus" label={t('trk.zoomOut')} onPress={() => mapRef.current?.zoomOut()} />
+          <MapButton icon="fit-to-screen-outline" label={t('trk.fitHerd')} onPress={() => mapRef.current?.fitAll()} />
+          <MapButton icon="vector-polygon" label={t('trk.geofences')} onPress={() => setFenceOpen(true)} />
           <MapButton
             icon={locating ? 'crosshairs' : 'crosshairs-gps'}
-            label="My location"
+            label={t('trk.myLocation')}
             onPress={goToMyLocation}
           />
         </View>
@@ -203,14 +203,14 @@ export default function TrackScreen() {
               </Pressable>
             </View>
             <View style={{ flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' }}>
-              <ActionChip label={selected.status === 'active' ? 'Active' : 'Inactive'} variant={selected.status === 'active' ? 'success' : 'neutral'} />
-              <ActionChip label={`Satellite · ${selected.provider ?? 'Unknown'}`} variant="info" />
+              <ActionChip label={tStatus(selected.status)} variant={selected.status === 'active' ? 'success' : 'neutral'} />
+              <ActionChip label={t('trk.satellite', { provider: selected.provider ?? t('reg.unknown') })} variant="info" />
             </View>
             <AppText variant="body" color={colors.onSurfaceVariant}>
-              GPS Accuracy: {selected.accuracy}
+              {t('trk.gpsAccuracy', { acc: selected.accuracy })}
             </AppText>
             <AppText variant="body" color={colors.onSurfaceVariant}>
-              Last seen: {selected.lastSeenMins} minutes ago
+              {t('trk.lastSeen', { mins: selected.lastSeenMins })}
             </AppText>
             {(() => {
               const s = report.statuses.find((x) => x.animalId === selected.animalId);
@@ -224,23 +224,23 @@ export default function TrackScreen() {
                   />
                   <AppText variant="caption" color={inside ? colors.onSurfaceVariant : colors.error}>
                     {report.noFences
-                      ? 'No boundary drawn for this area'
+                      ? t('trk.noBoundaryArea')
                       : inside
-                        ? `Inside ${s?.fenceName ?? 'boundary'}`
-                        : `${formatDistance(s?.metersOutside ?? 0)} outside ${s?.fenceName ?? 'boundary'}`}
+                        ? t('trk.inside', { fence: s?.fenceName ?? t('trk.boundary') })
+                        : t('trk.outsideFence', { dist: formatDistance(s?.metersOutside ?? 0), fence: s?.fenceName ?? t('trk.boundary') })}
                   </AppText>
                 </View>
               );
             })()}
             <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
               <Button
-                label="Detail"
+                label={t('trk.detail')}
                 variant="outline"
                 onPress={() => router.push(`/animals/${selected.animalId}`)}
                 style={{ flex: 1 }}
               />
               <Button
-                label={`${selected.provider ?? 'Provider'} view`}
+                label={t('trk.providerView', { provider: selected.provider ?? t('trk.provider') })}
                 icon="satellite-variant"
                 onPress={() => router.push(`/animals/${selected.animalId}`)}
                 style={{ flex: 1 }}
@@ -251,23 +251,23 @@ export default function TrackScreen() {
       </View>
 
       {/* Geofence status — occupancy per paddock and the breach worklist. */}
-      <BottomSheet visible={fenceOpen} onClose={() => setFenceOpen(false)} title="Geofencing">
+      <BottomSheet visible={fenceOpen} onClose={() => setFenceOpen(false)} title={t('trk.geofencing')}>
         <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.md }}>
-          {isAdmin ? 'Boundary status across the portfolio' : 'Boundary status for your herd'} ·{' '}
-          {report.insideCount} inside · {report.breaches.length} outside
+          {isAdmin ? t('trk.boundaryPortfolio') : t('trk.boundaryHerd')} ·{' '}
+          {t('trk.insideOutside', { inside: report.insideCount, outside: report.breaches.length })}
         </AppText>
 
         <View>
           {report.noFences ? (
             <AppText variant="body" color={colors.onSurfaceVariant} style={{ paddingVertical: spacing.md }}>
-              No boundaries are visible. Enable a location in the filter to see its geofence.
+              {t('trk.noBoundaries')}
             </AppText>
           ) : (
             <>
               {report.breaches.length > 0 && (
                 <>
                   <AppText variant="overline" color={colors.error} style={{ marginBottom: spacing.sm }}>
-                    Outside boundary ({report.breaches.length})
+                    {t('trk.outsideBoundary', { count: report.breaches.length })}
                   </AppText>
                   {report.breaches.map((b) => (
                     <Pressable
@@ -289,8 +289,8 @@ export default function TrackScreen() {
                           {b.tag}
                         </AppText>
                         <AppText variant="caption" color={colors.onSurfaceVariant}>
-                          {formatDistance(b.metersOutside)} beyond {b.fenceName ?? 'the boundary'}
-                          {b.accuracy === 'Poor' ? ' · low GPS confidence' : ''}
+                          {t('trk.beyond', { dist: formatDistance(b.metersOutside), fence: b.fenceName ?? t('trk.theBoundary') })}
+                          {b.accuracy === 'Poor' ? t('trk.lowGps') : ''}
                         </AppText>
                       </View>
                       <Icon name="crosshairs-gps" size={18} color={colors.primary} />
@@ -301,7 +301,7 @@ export default function TrackScreen() {
               )}
 
               <AppText variant="overline" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>
-                Paddocks ({report.occupancy.length})
+                {t('trk.paddocks', { count: report.occupancy.length })}
               </AppText>
               {report.occupancy.map(({ fence, animals }) => (
                 <View
@@ -324,7 +324,7 @@ export default function TrackScreen() {
                     </AppText>
                     <AppText variant="caption" color={colors.onSurfaceVariant}>
                       {animals.length === 0
-                        ? 'No animals inside'
+                        ? t('trk.noAnimalsInside')
                         : animals.map((a) => a.tag).join(', ')}
                     </AppText>
                   </View>
@@ -339,7 +339,7 @@ export default function TrackScreen() {
         </View>
       </BottomSheet>
 
-      <BottomSheet visible={filterOpen} onClose={() => setFilterOpen(false)} title="Filter by Location">
+      <BottomSheet visible={filterOpen} onClose={() => setFilterOpen(false)} title={t('trk.filterTitle')}>
         {locations.map((l) => (
           <Pressable
             key={l.id}
@@ -354,8 +354,8 @@ export default function TrackScreen() {
           </Pressable>
         ))}
         <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.md }}>
-          <Button label="Clear All" variant="outline" onPress={() => setChecked([])} style={{ flex: 1 }} />
-          <Button label="Apply" onPress={() => setFilterOpen(false)} style={{ flex: 1 }} />
+          <Button label={t('trk.clearAll')} variant="outline" onPress={() => setChecked([])} style={{ flex: 1 }} />
+          <Button label={t('trk.apply')} onPress={() => setFilterOpen(false)} style={{ flex: 1 }} />
         </View>
       </BottomSheet>
     </View>
