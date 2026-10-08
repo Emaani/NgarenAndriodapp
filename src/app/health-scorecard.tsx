@@ -19,6 +19,7 @@ import { notify } from '@/lib/toast';
 import { ageFromDate, formatDate } from '@/lib/date';
 import { statusVisual, bcsColor } from '@/lib/scorecardVisual';
 import { Animal } from '@/data/types';
+import { useT } from '@/i18n';
 import { AppText, Button, DetailRow, EmptyState, GradientHeader, Icon, IconChip, IconName, LineChart, Screen, SearchBar } from '@/ui';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -69,6 +70,7 @@ function Stat({ value, label, tint }: { value: number; label: string; tint: stri
  */
 export default function HealthScoreCard() {
   const router = useRouter();
+  const tr = useT();
   const { id, key } = useLocalSearchParams<{ id?: string; key?: string; label?: string }>();
   const { loading, isAuthenticated, canVet, isAdmin, user } = useAuth();
   const [busy, setBusy] = useState(false);
@@ -155,13 +157,13 @@ export default function HealthScoreCard() {
   if (!animal) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <GradientHeader title="Health Score Card" subtitle="Choose an animal" showBack />
+        <GradientHeader title={tr('ad.scorecard')} subtitle={tr('hsc.chooseAnimal')} showBack />
         <View style={{ padding: spacing.md, paddingBottom: 0 }}>
-          <SearchBar value={query} onChangeText={setQuery} placeholder="Search by account #, tag, name or breed..." />
+          <SearchBar value={query} onChangeText={setQuery} placeholder={tr('animals.search')} />
         </View>
         <Screen contentStyle={{ paddingTop: spacing.md, paddingBottom: spacing.xxl }}>
           {pickerList.length === 0 ? (
-            <EmptyState icon="cow" title="No animals" subtitle="Register an animal first to generate its Health Score Card." />
+            <EmptyState icon="cow" title={tr('hsc.noAnimalsTitle')} subtitle={tr('hsc.noAnimalsSub')} />
           ) : (
             pickerList.map((a) => (
               <Pressable
@@ -226,7 +228,7 @@ export default function HealthScoreCard() {
         content: healthScoreCardHtml(cardInput()),
       });
       await logExport('Download');
-      notify('Score card saved to Documents');
+      notify(tr('hsc.savedToast'));
       router.push(`/documents/${id}` as never);
     } finally {
       setBusy(false);
@@ -242,7 +244,7 @@ export default function HealthScoreCard() {
       const html = healthScoreCardHtml(cardInput());
       const uri = await renderPdfToFile(name, html);
       if (!uri) {
-        notify('Could not prepare the PDF — please try again');
+        notify(tr('hsc.pdfFailToast'));
         return;
       }
       if (!(await MailComposer.isAvailableAsync())) {
@@ -252,8 +254,8 @@ export default function HealthScoreCard() {
         return;
       }
       await MailComposer.composeAsync({
-        subject: `Health Score Card — ${animal.name ?? animal.tag} (${animal.accountNumber ?? animal.tag})`,
-        body: `Please find attached the Ngaren Health Score Card for ${animal.name ?? animal.tag}.\n\nGenerated with the Ngaren app · Ngaren Digital.`,
+        subject: tr('hsc.emailSubject', { name: animal.name ?? animal.tag, account: animal.accountNumber ?? animal.tag }),
+        body: tr('hsc.emailBody', { name: animal.name ?? animal.tag }),
         attachments: [uri],
       });
       await logExport('Email');
@@ -266,10 +268,10 @@ export default function HealthScoreCard() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Health Score Card" subtitle={animal.accountNumber ?? animal.name ?? animal.tag} showBack />
+      <GradientHeader title={tr('ad.scorecard')} subtitle={animal.accountNumber ?? animal.name ?? animal.tag} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md, paddingBottom: spacing.xxl }}>
         <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.md }}>
-          This animal’s complete record — identity, devices, full health history, visits and telemetry.
+          {tr('hsc.intro')}
         </AppText>
 
         {/* Current status (from the latest Visit Scorecard). */}
@@ -283,7 +285,7 @@ export default function HealthScoreCard() {
                   {STATUS_LABEL[latestCard.status]}
                 </AppText>
                 <AppText variant="caption" color={sv.color}>
-                  as of {formatDate(latestCard.date)}
+                  {tr('hsc.asOf', { date: formatDate(latestCard.date) })}
                 </AppText>
               </View>
             );
@@ -293,7 +295,7 @@ export default function HealthScoreCard() {
         {/* Vets capture a new visit scorecard here (Sep 7 2026). */}
         {canVet ? (
           <Button
-            label="New visit scorecard"
+            label={tr('hsc.newVisitScorecard')}
             icon="clipboard-plus-outline"
             onPress={() => router.push(`/vet-scorecard/new?key=${encodeURIComponent(animal.ngarenCode ?? animal.tag)}&label=${encodeURIComponent(animal.name ?? animal.tag)}` as never)}
             style={{ marginBottom: spacing.md }}
@@ -301,12 +303,12 @@ export default function HealthScoreCard() {
         ) : null}
 
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.xs }}>
-          <Stat value={summary.total} label="Health records" tint="#2563EB" />
-          <Stat value={summary.vaccinations} label="Vaccinations" tint="#16A34A" />
-          <Stat value={summary.treatments} label="Treatments" tint="#EF4444" />
-          <Stat value={visits.length} label="Vet visits" tint="#9333EA" />
-          <Stat value={summary.openFollowUps} label="Open follow-ups" tint="#F59E0B" />
-          <Stat value={summary.observations.length} label="Obs. flagged" tint="#0EA5E9" />
+          <Stat value={summary.total} label={tr('hsc.statHealthRecords')} tint="#2563EB" />
+          <Stat value={summary.vaccinations} label={tr('hsc.statVaccinations')} tint="#16A34A" />
+          <Stat value={summary.treatments} label={tr('hsc.statTreatments')} tint="#EF4444" />
+          <Stat value={visits.length} label={tr('hsc.statVetVisits')} tint="#9333EA" />
+          <Stat value={summary.openFollowUps} label={tr('hsc.statOpenFollowUps')} tint="#F59E0B" />
+          <Stat value={summary.observations.length} label={tr('hsc.statObs')} tint="#0EA5E9" />
         </View>
 
         {/* Body Condition trend + KPIs + scorecard history (Sep 7 2026 design). */}
@@ -315,7 +317,7 @@ export default function HealthScoreCard() {
             {bcsSeries.length >= 2 ? (
               <>
                 <AppText variant="title" style={{ marginTop: spacing.lg, marginBottom: spacing.sm }}>
-                  Body condition trend
+                  {tr('hsc.bcsTrend')}
                 </AppText>
                 <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.divider }, shadow[1]]}>
                   <LineChart actual={bcsSeries} pfi={[]} unit="BCS" xLabels={['Earliest', 'Latest']} />
@@ -329,7 +331,7 @@ export default function HealthScoreCard() {
                   {relativeDayLabel(latestCard!.date)}
                 </AppText>
                 <AppText variant="caption" color={colors.onSurfaceVariant}>
-                  Last visit
+                  {tr('hsc.lastVisit')}
                 </AppText>
               </View>
               <View style={{ flex: 1, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.divider }}>
@@ -337,13 +339,13 @@ export default function HealthScoreCard() {
                   {openFollowUps}
                 </AppText>
                 <AppText variant="caption" color={colors.onSurfaceVariant}>
-                  Open follow-ups
+                  {tr('hsc.statOpenFollowUps')}
                 </AppText>
               </View>
             </View>
 
             <AppText variant="title" style={{ marginTop: spacing.lg, marginBottom: spacing.sm }}>
-              Scorecard history ({scorecards.length})
+              {tr('hsc.scorecardHistory', { count: scorecards.length })}
             </AppText>
             {scorecards.map((s) => {
               const sv = statusVisual(s.status);
@@ -379,27 +381,27 @@ export default function HealthScoreCard() {
           </>
         ) : null}
 
-        <Section title="Identity">
-          {animal.accountNumber ? <DetailRow label="Account number" value={animal.accountNumber} /> : null}
-          {animal.ngarenCode ? <DetailRow label="Internal ID (AAN)" value={animal.ngarenCode} /> : null}
-          <DetailRow label="Farmer reference" value={animal.tag} />
-          {animal.name ? <DetailRow label="Name" value={animal.name} /> : null}
-          <DetailRow label="Breed" value={animal.breed.name} />
-          {animal.color ? <DetailRow label="Colour" value={animal.color} /> : null}
-          <DetailRow label="Age" value={ageFromDate(animal.dateOfBirth)} />
-          <DetailRow label="Location" value={animal.locationName ?? '—'} />
-          {animal.physicalAddress ? <DetailRow label="Address" value={animal.physicalAddress} /> : null}
-          <DetailRow label="Dam" value={animal.damTag ?? 'Unknown'} />
-          <DetailRow label="Sire" value={animal.sireTag ?? 'Unknown'} />
-          <DetailRow label="Telemetry" value={hasTelemetry ? 'Ceres synced' : 'No synced telemetry'} last />
+        <Section title={tr('hsc.identity')}>
+          {animal.accountNumber ? <DetailRow label={tr('ad.accountNumber')} value={animal.accountNumber} /> : null}
+          {animal.ngarenCode ? <DetailRow label={tr('hsc.internalIdAan')} value={animal.ngarenCode} /> : null}
+          <DetailRow label={tr('ad.farmerRef')} value={animal.tag} />
+          {animal.name ? <DetailRow label={tr('hsc.name')} value={animal.name} /> : null}
+          <DetailRow label={tr('ad.breed')} value={animal.breed.name} />
+          {animal.color ? <DetailRow label={tr('ad.colour')} value={animal.color} /> : null}
+          <DetailRow label={tr('ad.age')} value={ageFromDate(animal.dateOfBirth)} />
+          <DetailRow label={tr('ad.location')} value={animal.locationName ?? '—'} />
+          {animal.physicalAddress ? <DetailRow label={tr('ad.address')} value={animal.physicalAddress} /> : null}
+          <DetailRow label={tr('hsc.dam')} value={animal.damTag ?? tr('reg.unknown')} />
+          <DetailRow label={tr('hsc.sire')} value={animal.sireTag ?? tr('reg.unknown')} />
+          <DetailRow label={tr('ad.telemetry')} value={hasTelemetry ? tr('hsc.ceresSynced') : tr('hsc.noTelemetry')} last />
         </Section>
 
         <AppText variant="title" style={{ marginTop: spacing.lg, marginBottom: spacing.sm }}>
-          Health history ({health.length})
+          {tr('hsc.healthHistory', { count: health.length })}
         </AppText>
         {health.length === 0 ? (
           <AppText variant="body" color={colors.onSurfaceVariant}>
-            No health records yet for this animal.
+            {tr('hsc.noHealth')}
           </AppText>
         ) : (
           health.map((r) => (
@@ -418,18 +420,18 @@ export default function HealthScoreCard() {
                 {r.diagnosis ? <AppText variant="caption" color={colors.onSurfaceVariant}>Dx: {r.diagnosis}</AppText> : null}
                 <AppText variant="body" color={colors.onSurface}>{r.notes}</AppText>
                 {r.observations?.length ? <AppText variant="caption" color={colors.info}>Obs: {r.observations.join(', ')}</AppText> : null}
-                <AppText variant="caption" color={colors.onSurfaceVariant}>by {r.recordedBy}</AppText>
+                <AppText variant="caption" color={colors.onSurfaceVariant}>{tr('hsc.by', { name: r.recordedBy })}</AppText>
               </View>
             </View>
           ))
         )}
 
-        <Button label={busy ? 'Working…' : 'Download Score Card'} icon="download-outline" loading={busy} onPress={onDownload} style={{ marginTop: spacing.lg }} />
-        <Button label="Share on Email" variant="outline" icon="email-outline" disabled={busy} onPress={onEmail} style={{ marginTop: spacing.sm }} />
+        <Button label={busy ? tr('hsc.working') : tr('hsc.download')} icon="download-outline" loading={busy} onPress={onDownload} style={{ marginTop: spacing.lg }} />
+        <Button label={tr('hsc.shareEmail')} variant="outline" icon="email-outline" disabled={busy} onPress={onEmail} style={{ marginTop: spacing.sm }} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm }}>
           <Icon name={'shield-check-outline' as IconName} size={14} color={colors.onSurfaceVariant} />
           <AppText variant="caption" color={colors.onSurfaceVariant}>
-            Downloads are saved to Documents; every generation is recorded in the audit trail.
+            {tr('hsc.footer')}
           </AppText>
         </View>
       </Screen>

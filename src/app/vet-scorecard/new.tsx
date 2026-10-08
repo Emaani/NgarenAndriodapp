@@ -23,6 +23,7 @@ import { scheduleLocalReminder } from '@/services/push';
 import { notify } from '@/lib/toast';
 import { statusVisual, bcsColor } from '@/lib/scorecardVisual';
 import { Animal } from '@/data/types';
+import { useT } from '@/i18n';
 import { AppText, Button, DatePickerField, GradientHeader, Icon, IconName, PhotoField, Screen, SearchBar, TextField } from '@/ui';
 
 const VISIT_TYPES = ['Routine check', 'Treatment', 'Vaccination', 'Emergency'];
@@ -70,6 +71,7 @@ function TogglePill({ label, active, onPress }: { label: string; active: boolean
  */
 export default function NewScorecard() {
   const router = useRouter();
+  const tr = useT();
   const { key, label, callout } = useLocalSearchParams<{ key?: string; label?: string; callout?: string }>();
   const { loading, isAuthenticated, canVet, user } = useAuth();
   const { data: herd } = useResource(getHerd, animalsFallback);
@@ -201,18 +203,18 @@ export default function NewScorecard() {
         void addLocalEvent({ title: `Expected calving: ${animalLabel}`, date: calvingDue, type: 'vet_visit' });
       }
 
-      notify('Scorecard saved & locked');
+      notify(tr('vsn.savedToast'));
       if (callout) router.back();
       else router.replace(`/health-scorecard?key=${encodeURIComponent(animalKey)}&label=${encodeURIComponent(animalLabel)}` as never);
     } catch {
       setSaving(false);
-      Alert.alert('Could not save', 'The scorecard could not be saved. Please try again.');
+      Alert.alert(tr('vsn.saveFailTitle'), tr('vsn.saveFailBody'));
     }
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Visit Scorecard" subtitle={animalLabel} showBack />
+      <GradientHeader title={tr('vc.visitScorecard')} subtitle={animalLabel} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md, paddingBottom: spacing.xxl }}>
         {/* Animal header */}
         <View style={[{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.divider }, shadow[1]]}>
@@ -224,7 +226,7 @@ export default function NewScorecard() {
               {animalLabel}
             </AppText>
             <AppText variant="caption" color={colors.onSurfaceVariant}>
-              {[animal?.breed?.name, animal?.accountNumber ?? animal?.tag, animal?.locationName].filter(Boolean).join(' · ') || 'New visit'}
+              {[animal?.breed?.name, animal?.accountNumber ?? animal?.tag, animal?.locationName].filter(Boolean).join(' · ') || tr('vsn.newVisit')}
             </AppText>
           </View>
         </View>
@@ -421,7 +423,7 @@ export default function NewScorecard() {
             Saving locks this scorecard permanently. Corrections are added as a new dated visit.
           </AppText>
         </View>
-        <Button label={saving ? 'Saving…' : 'Save Scorecard'} icon="content-save-check-outline" loading={saving} onPress={onSave} />
+        <Button label={saving ? tr('common.saving') : tr('vsn.save')} icon="content-save-check-outline" loading={saving} onPress={onSave} />
       </Screen>
     </View>
   );
