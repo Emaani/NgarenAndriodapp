@@ -10,6 +10,7 @@ import { useAuth } from '@/services/auth';
 import { notify } from '@/lib/toast';
 import { sendLocalNotification } from '@/services/push';
 import { CalloutRequest, CalloutStatus } from '@/data/types';
+import { useT, useTStatus } from '@/i18n';
 import { ActionChip, AppText, Button, DetailRow, EmptyState, GradientHeader, Icon, IconName, PhotoField, Screen } from '@/ui';
 
 /** An on-site task activation: live photo + best-effort GPS + timestamp. */
@@ -30,11 +31,11 @@ const statusVariant = (s: CalloutStatus) =>
   s === 'accepted' ? 'success' : s === 'completed' ? 'info' : s === 'declined' ? 'error' : 'warning';
 
 // The on-site service actions a vet performs (Sep 3 2026 MVP scope).
-const SERVICES: { key: string; label: string; icon: IconName; route: (animal: string) => string }[] = [
-  { key: 'stock', label: 'Stock-take', icon: 'clipboard-list-outline', route: () => '/stock-take' },
-  { key: 'vaccination', label: 'Vaccination', icon: 'needle', route: (a) => `/add-health-record?animal=${encodeURIComponent(a)}&label=${encodeURIComponent(a)}&type=vaccination` },
-  { key: 'treatment', label: 'Treatment', icon: 'medical-bag', route: (a) => `/add-health-record?animal=${encodeURIComponent(a)}&label=${encodeURIComponent(a)}&type=treatment` },
-  { key: 'consultation', label: 'Consultation', icon: 'comment-question-outline', route: (a) => `/add-health-record?animal=${encodeURIComponent(a)}&label=${encodeURIComponent(a)}&type=consultation` },
+const SERVICES: { key: string; labelKey: string; icon: IconName; route: (animal: string) => string }[] = [
+  { key: 'stock', labelKey: 'vp.svStockTake', icon: 'clipboard-list-outline', route: () => '/stock-take' },
+  { key: 'vaccination', labelKey: 'vp.svVaccination', icon: 'needle', route: (a) => `/add-health-record?animal=${encodeURIComponent(a)}&label=${encodeURIComponent(a)}&type=vaccination` },
+  { key: 'treatment', labelKey: 'vp.svTreatment', icon: 'medical-bag', route: (a) => `/add-health-record?animal=${encodeURIComponent(a)}&label=${encodeURIComponent(a)}&type=treatment` },
+  { key: 'consultation', labelKey: 'vp.svConsultation', icon: 'comment-question-outline', route: (a) => `/add-health-record?animal=${encodeURIComponent(a)}&label=${encodeURIComponent(a)}&type=consultation` },
 ];
 
 /**
@@ -45,6 +46,8 @@ const SERVICES: { key: string; label: string; icon: IconName; route: (animal: st
  */
 export default function VetCallout() {
   const router = useRouter();
+  const tr = useT();
+  const tStatus = useTStatus();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { loading, isAuthenticated, canVet } = useAuth();
   const { data: requests } = useResource(() => getCalloutRequests(), calloutFallback);
@@ -62,7 +65,7 @@ export default function VetCallout() {
     const at = new Date().toISOString();
     setActivated((prev) => ({ ...prev, [key]: { photo, at } }));
     setActiveCapture(null);
-    notify(`${label} activated`);
+    notify(tr('vc.activatedToast', { label }));
     try {
       const perm = await Location.requestForegroundPermissionsAsync();
       if (!perm.granted) return;
@@ -80,8 +83,8 @@ export default function VetCallout() {
   if (!req) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <GradientHeader title="Call-out" showBack />
-        <EmptyState icon="clipboard-pulse-outline" title="Request not found" subtitle="This call-out may have been removed." />
+        <GradientHeader title={tr('vc.title')} showBack />
+        <EmptyState icon="clipboard-pulse-outline" title={tr('vc.notFoundTitle')} subtitle={tr('vc.notFoundSub')} />
       </View>
     );
   }
@@ -95,8 +98,8 @@ export default function VetCallout() {
   // Scorecard is the comprehensive record; the others jump to focused screens.
   const TASKS: { key: string; label: string; icon: IconName; route: string }[] = req
     ? [
-        { key: 'scorecard', label: 'Visit Scorecard', icon: 'clipboard-plus-outline', route: `/vet-scorecard/new?key=${encodeURIComponent(req.animal)}&label=${encodeURIComponent(req.animal)}&callout=${req.id}` },
-        ...SERVICES.map((s) => ({ key: s.key, label: s.label, icon: s.icon, route: s.route(req.animal) })),
+        { key: 'scorecard', label: tr('vc.visitScorecard'), icon: 'clipboard-plus-outline', route: `/vet-scorecard/new?key=${encodeURIComponent(req.animal)}&label=${encodeURIComponent(req.animal)}&callout=${req.id}` },
+        ...SERVICES.map((s) => ({ key: s.key, label: tr(s.labelKey), icon: s.icon, route: s.route(req.animal) })),
       ]
     : [];
 
@@ -105,13 +108,13 @@ export default function VetCallout() {
     updateCalloutStatus(req.id, next).catch(() => undefined);
     notify(toast);
     if (next === 'accepted') {
-      void sendLocalNotification('Call-out accepted', `You accepted ${req.farmerName}'s request for ${req.animal}.`, { type: 'VET_CALLOUT' });
+      void sendLocalNotification(tr('vc.notifTitle'), tr('vc.notifBody', { farmer: req.farmerName, animal: req.animal }), { type: 'VET_CALLOUT' });
     }
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Call-out" subtitle={req.animal} showBack />
+      <GradientHeader title={tr('vc.title')} subtitle={req.animal} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md, paddingBottom: spacing.xxl }}>
         {/* Summary */}
         <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderColor: colors.divider }, shadow[1]]}>
@@ -120,26 +123,26 @@ export default function VetCallout() {
           </View>
           <View style={{ flex: 1 }}>
             <AppText variant="bodyLarge" style={{ fontWeight: '700' }}>
-              {revealed ? req.farmerName : 'Farmer hidden'}
+              {revealed ? req.farmerName : tr('vc.farmerHidden')}
             </AppText>
             <AppText variant="caption" color={colors.onSurfaceVariant}>
-              {revealed ? `${req.locationName} · ${req.distanceKm} km · ${req.requestedAt}` : `~${req.distanceKm} km · ${req.requestedAt} · revealed on accept`}
+              {revealed ? tr('vc.revealedMeta', { loc: req.locationName, km: req.distanceKm, time: req.requestedAt }) : tr('vc.hiddenMeta', { km: req.distanceKm, time: req.requestedAt })}
             </AppText>
           </View>
-          <ActionChip label={current[0].toUpperCase() + current.slice(1)} variant={statusVariant(current)} />
+          <ActionChip label={tStatus(current)} variant={statusVariant(current)} />
         </View>
 
         {/* Request details */}
         <AppText variant="title" style={{ marginBottom: spacing.sm }}>
-          Request
+          {tr('vc.request')}
         </AppText>
         <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.md, marginBottom: spacing.lg }, shadow[1]]}>
-          <DetailRow label="Animal" value={req.animal} />
-          <DetailRow label="Priority" value={req.urgency} />
-          <DetailRow label="SLA" value={req.urgency === 'Emergency' ? 'Respond within 4 hours' : 'Respond within 48 hours'} />
-          <DetailRow label="Farmer" value={revealed ? req.farmerName : 'Hidden until accepted'} />
-          <DetailRow label="Location" value={revealed ? `${req.locationName} · ${req.distanceKm} km` : `~${req.distanceKm} km · shown on accept`} last={!req.notes} />
-          {req.notes ? <DetailRow label="Notes" value={req.notes} last /> : null}
+          <DetailRow label={tr('ad.animalTitle')} value={req.animal} />
+          <DetailRow label={tr('vrq.priority')} value={tr(`urgency.${req.urgency.toLowerCase()}`)} />
+          <DetailRow label="SLA" value={req.urgency === 'Emergency' ? tr('vc.sla4') : tr('vc.sla48')} />
+          <DetailRow label={tr('vc.farmer')} value={revealed ? req.farmerName : tr('vc.hiddenUntil')} />
+          <DetailRow label={tr('ad.location')} value={revealed ? `${req.locationName} · ${req.distanceKm} km` : tr('vc.locHidden', { km: req.distanceKm })} last={!req.notes} />
+          {req.notes ? <DetailRow label={tr('ad.notes')} value={req.notes} last /> : null}
         </View>
 
         {/* Accountability through the deliverable, not a hard clock (Oct 2026
@@ -147,15 +150,15 @@ export default function VetCallout() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.primaryTint, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.lg }}>
           <Icon name="shield-check-outline" size={18} color={colors.primary} />
           <AppText variant="caption" color={colors.primary} style={{ flex: 1, fontWeight: '600' }}>
-            Take the time you need on-site — field conditions vary. Accountability comes from the scorecard you submit and your stamped on-site check, not a countdown.
+            {tr('vc.accountability')}
           </AppText>
         </View>
 
         {/* Status-driven actions */}
         {current === 'pending' ? (
           <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-            <Button label="Decline" variant="outline" onPress={() => setAndSync('declined', 'Call-out declined')} style={{ flex: 1 }} />
-            <Button label="Accept" icon="check" onPress={() => setAndSync('accepted', 'Call-out accepted')} style={{ flex: 1 }} />
+            <Button label={tr('vet.decline')} variant="outline" onPress={() => setAndSync('declined', tr('vc.declinedToast'))} style={{ flex: 1 }} />
+            <Button label={tr('vet.accept')} icon="check" onPress={() => setAndSync('accepted', tr('vc.acceptedToast'))} style={{ flex: 1 }} />
           </View>
         ) : null}
 
@@ -163,7 +166,7 @@ export default function VetCallout() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.errorTint, borderRadius: radius.md, padding: spacing.md }}>
             <Icon name="close-circle-outline" size={18} color={colors.error} />
             <AppText variant="caption" color={colors.error} style={{ flex: 1, fontWeight: '600' }}>
-              You declined this call-out. It returns to the pool for another vet.
+              {tr('vc.declinedNote')}
             </AppText>
           </View>
         ) : null}
@@ -171,13 +174,13 @@ export default function VetCallout() {
         {current === 'accepted' ? (
           <>
             <AppText variant="title" style={{ marginBottom: spacing.xs }}>
-              On-site service activation
+              {tr('vc.onSiteActivation')}
             </AppText>
             {/* 45-minute activation window from the scheduled time (Sep 12 2026). */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.primaryTint, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md }}>
               <Icon name="clock-alert-outline" size={18} color={colors.primary} />
               <AppText variant="caption" color={colors.primary} style={{ flex: 1, fontWeight: '600' }}>
-                Activate each task when you arrive on the farm. Each activation takes a live Face ID photo, stamped with your GPS location & time for accountability — no strict time limit.
+                {tr('vc.activateHint')}
               </AppText>
             </View>
 
@@ -202,31 +205,30 @@ export default function VetCallout() {
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
                           <Icon name="map-marker-check-outline" size={13} color={colors.success} />
                           <AppText variant="caption" color={colors.success} style={{ fontWeight: '600' }}>
-                            Verified {hhmm(activated[t.key].at)}
                             {activated[t.key].lat != null
-                              ? ` · GPS ${activated[t.key].lat!.toFixed(4)}, ${activated[t.key].lng!.toFixed(4)}`
-                              : ' · location unavailable'}
+                              ? tr('vc.verifiedGps', { time: hhmm(activated[t.key].at), lat: activated[t.key].lat!.toFixed(4), lng: activated[t.key].lng!.toFixed(4) })
+                              : tr('vc.verifiedNoGps', { time: hhmm(activated[t.key].at) })}
                           </AppText>
                         </View>
-                        <Button label={`Open ${t.label}`} icon={t.icon} onPress={() => router.push(t.route as never)} />
+                        <Button label={tr('vc.open', { label: t.label })} icon={t.icon} onPress={() => router.push(t.route as never)} />
                       </>
                     ) : capturing ? (
                       <>
                         <AppText variant="caption" color={colors.onSurfaceVariant}>
-                          Take a live Face ID photo on the farm — it’s stamped with your GPS location & time.
+                          {tr('vc.faceHint')}
                         </AppText>
                         <PhotoField
-                          label="Face ID"
+                          label={tr('vc.faceId')}
                           value={null}
                           onChange={(uri) => {
                             if (uri) void activateTask(t.key, t.label, uri);
                           }}
                           liveOnly
                         />
-                        <Button label="Cancel" variant="outline" onPress={() => setActiveCapture(null)} />
+                        <Button label={tr('common.cancel')} variant="outline" onPress={() => setActiveCapture(null)} />
                       </>
                     ) : (
-                      <Button label="Activate with Face ID" icon="face-recognition" variant="outline" onPress={() => setActiveCapture(t.key)} />
+                      <Button label={tr('vc.activateFace')} icon="face-recognition" variant="outline" onPress={() => setActiveCapture(t.key)} />
                     )}
                   </View>
                 );
@@ -237,7 +239,7 @@ export default function VetCallout() {
                 register an animal found on-site; it goes for admin + farmer
                 approval before its records are finalized. */}
             <Button
-              label="Register a new animal"
+              label={tr('common.regNewAnimal')}
               icon="plus-circle-outline"
               variant="outline"
               onPress={() => router.push('/register-animal' as never)}
@@ -245,14 +247,14 @@ export default function VetCallout() {
             />
 
             <Button
-              label="Complete visit"
+              label={tr('vc.completeVisit')}
               icon="check-decagram-outline"
               disabled={Object.keys(activated).length === 0}
-              onPress={() => setAndSync('completed', 'Visit completed')}
+              onPress={() => setAndSync('completed', tr('vc.completedToast'))}
             />
             {Object.keys(activated).length === 0 ? (
               <AppText variant="caption" color={colors.onSurfaceVariant} style={{ textAlign: 'center', marginTop: spacing.xs }}>
-                Activate at least one task on-site before completing.
+                {tr('vc.activateFirst')}
               </AppText>
             ) : null}
           </>
@@ -263,10 +265,10 @@ export default function VetCallout() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: '#0EA5E91A', borderRadius: radius.md, padding: spacing.md }}>
               <Icon name="check-decagram" size={18} color="#0EA5E9" />
               <AppText variant="caption" color="#0369A1" style={{ flex: 1, fontWeight: '600' }}>
-                Visit completed. It now shows as fulfilled in the visits audit.
+                {tr('vc.completedNote')}
               </AppText>
             </View>
-            <Button label="Log another service" icon="plus" variant="outline" onPress={() => router.push(`/add-health-record?animal=${encodeURIComponent(req.animal)}&label=${encodeURIComponent(req.animal)}` as never)} />
+            <Button label={tr('vc.logAnother')} icon="plus" variant="outline" onPress={() => router.push(`/add-health-record?animal=${encodeURIComponent(req.animal)}&label=${encodeURIComponent(req.animal)}` as never)} />
           </View>
         ) : null}
       </Screen>
