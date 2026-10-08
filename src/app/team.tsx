@@ -17,6 +17,7 @@ import {
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { SEAT_ROLE_LABELS, SEAT_ROLE_TEMPLATES, SeatRole } from '@/lib/permissions';
+import { useT, useTStatus } from '@/i18n';
 import {
   ActionChip,
   AppText,
@@ -48,6 +49,8 @@ const statusVariant = (s: MemberStatus) =>
  */
 export default function Team() {
   const router = useRouter();
+  const t = useT();
+  const tStatus = useTStatus();
   const { user, loading, isAuthenticated, canManageTeam } = useAuth();
   const { data } = useResource(async () => {
     const org = await getMyOrganization(user?.id);
@@ -109,13 +112,13 @@ export default function Team() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Team & Seats" subtitle={data.org?.name ?? 'Your farm'} showBack />
+      <GradientHeader title={t('action.teamSeats')} subtitle={data.org?.name ?? t('tm.yourFarm')} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md, paddingBottom: spacing.xxl }}>
         {/* Seat usage meter */}
         <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md, gap: spacing.sm }, shadow[1]]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <AppText variant="bodyLarge" style={{ fontWeight: '700' }}>
-              {activeSeats} of {seatLimit} seats used
+              {t('tm.seatsUsed', { active: activeSeats, limit: seatLimit })}
             </AppText>
             {data.subscription ? (
               <ActionChip label={data.subscription.plan} variant="info" />
@@ -126,32 +129,32 @@ export default function Team() {
           </View>
           {data.subscription ? (
             <AppText variant="caption" color={colors.onSurfaceVariant}>
-              {formatSeatPrice(data.subscription)} per seat · billed monthly
+              {t('tm.pricePerSeat', { price: formatSeatPrice(data.subscription) })}
             </AppText>
           ) : null}
           <View style={{ flexDirection: 'row', gap: spacing.sm }}>
             <Button
-              label="Invite member"
+              label={t('tm.inviteMember')}
               icon="account-plus-outline"
               onPress={() => setInviteOpen(true)}
               disabled={seatsFull || !data.org}
               style={{ flex: 1 }}
             />
-            <Button label="Add seats" variant="outline" icon="plus" onPress={() => router.push('/payments')} style={{ flex: 1 }} />
+            <Button label={t('tm.addSeats')} variant="outline" icon="plus" onPress={() => router.push('/payments')} style={{ flex: 1 }} />
           </View>
           {!data.org ? (
             <AppText variant="caption" color={colors.onSurfaceVariant}>
-              Team management activates once your farm account is set up.
+              {t('tm.notSetup')}
             </AppText>
           ) : seatsFull ? (
             <AppText variant="caption" color={colors.warning}>
-              All seats are in use — add seats to invite more people.
+              {t('tm.seatsFull')}
             </AppText>
           ) : null}
         </View>
 
         <AppText variant="overline" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>
-          Members ({members.length})
+          {t('tm.members', { count: members.length })}
         </AppText>
         {members.map((m) => (
           <Pressable
@@ -170,24 +173,24 @@ export default function Team() {
                 {SEAT_ROLE_LABELS[m.seatRole]}
               </AppText>
             </View>
-            <ActionChip label={m.status} variant={statusVariant(m.status)} />
+            <ActionChip label={tStatus(m.status)} variant={statusVariant(m.status)} />
           </Pressable>
         ))}
       </Screen>
 
       {/* Invite sheet */}
-      <BottomSheet visible={inviteOpen} onClose={() => setInviteOpen(false)} title="Invite a team member">
-        <TextField label="Email" required value={email} onChangeText={setEmail} placeholder="name@farm.ug" keyboardType="email-address" />
-        <PickerField label="Seat role" required value={seatRole} options={ROLE_OPTIONS} onSelect={(v) => setSeatRole(v as SeatRole)} />
+      <BottomSheet visible={inviteOpen} onClose={() => setInviteOpen(false)} title={t('usr.inviteBtn')}>
+        <TextField label={t('usr.email')} required value={email} onChangeText={setEmail} placeholder="name@farm.ug" keyboardType="email-address" />
+        <PickerField label={t('tm.seatRole')} required value={seatRole} options={ROLE_OPTIONS} onSelect={(v) => setSeatRole(v as SeatRole)} />
         <View style={{ backgroundColor: colors.background, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.divider }}>
           <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.xs }}>
-            {SEAT_ROLE_LABELS[seatRole]} can:
+            {t('tm.roleCan', { role: SEAT_ROLE_LABELS[seatRole] })}
           </AppText>
           <AppText variant="caption" color={colors.onSurface}>
             {SEAT_ROLE_TEMPLATES[seatRole].map((p) => p.replace(/_/g, ' ')).join(' · ')}
           </AppText>
         </View>
-        <Button label="Send invite" loading={saving} disabled={!email.trim()} onPress={onInvite} />
+        <Button label={t('usr.sendInvite')} loading={saving} disabled={!email.trim()} onPress={onInvite} />
       </BottomSheet>
 
       {/* Manage member sheet */}
@@ -195,17 +198,17 @@ export default function Team() {
         {manage ? (
           <>
             <PickerField
-              label="Seat role"
+              label={t('tm.seatRole')}
               value={manage.seatRole}
               options={ROLE_OPTIONS}
               onSelect={(v) => applyMember(manage, { seatRole: v as SeatRole })}
             />
             {manage.status === 'suspended' ? (
-              <Button label="Reactivate" icon="account-check-outline" onPress={() => applyMember(manage, { status: 'active' })} disabled={seatsFull} />
+              <Button label={t('tm.reactivate')} icon="account-check-outline" onPress={() => applyMember(manage, { status: 'active' })} disabled={seatsFull} />
             ) : (
-              <Button label="Suspend" variant="outline" icon="account-off-outline" onPress={() => applyMember(manage, { status: 'suspended' })} />
+              <Button label={t('tm.suspend')} variant="outline" icon="account-off-outline" onPress={() => applyMember(manage, { status: 'suspended' })} />
             )}
-            <Button label="Remove from team" variant="outline" icon="trash-can-outline" onPress={() => removeMember(manage)} style={{ marginTop: spacing.sm }} />
+            <Button label={t('tm.removeFromTeam')} variant="outline" icon="trash-can-outline" onPress={() => removeMember(manage)} style={{ marginTop: spacing.sm }} />
           </>
         ) : null}
       </BottomSheet>

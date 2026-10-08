@@ -9,16 +9,18 @@ import { getHerd } from '@/data/herd';
 import { distanceMeters, LatLng } from '@/lib/geo';
 import { useAuth } from '@/services/auth';
 import { notify } from '@/lib/toast';
+import { useT } from '@/i18n';
 import { AppText, Button, GradientHeader, Icon, PickerField, Screen, TextField } from '@/ui';
 
+// Specialty option value stays English (stored data); labels translate.
 const SPECIALTIES = [
-  'General practice',
-  'Large animal / Cattle',
-  'Reproduction',
-  'Emergency / Field calls',
-  'Poultry',
-  'Small ruminants',
-].map((s) => ({ label: s, value: s }));
+  { labelKey: 'enl.sp1', value: 'General practice' },
+  { labelKey: 'enl.sp2', value: 'Large animal / Cattle' },
+  { labelKey: 'enl.sp3', value: 'Reproduction' },
+  { labelKey: 'enl.sp4', value: 'Emergency / Field calls' },
+  { labelKey: 'enl.sp5', value: 'Poultry' },
+  { labelKey: 'enl.sp6', value: 'Small ruminants' },
+];
 
 function Toggle({ label, value, onToggle }: { label: string; value: boolean; onToggle: () => void }) {
   return (
@@ -40,7 +42,9 @@ function Toggle({ label, value, onToggle }: { label: string; value: boolean; onT
  */
 export default function EnlistVet() {
   const router = useRouter();
+  const t = useT();
   const { loading, isAuthenticated, isAdmin, user } = useAuth();
+  const specialtyOptions = SPECIALTIES.map((s) => ({ label: t(s.labelKey), value: s.value }));
 
   const [name, setName] = useState('');
   const [credentials, setCredentials] = useState('');
@@ -70,7 +74,7 @@ export default function EnlistVet() {
     try {
       const perm = await Location.requestForegroundPermissionsAsync();
       if (!perm.granted) {
-        Alert.alert('Location permission needed', 'Enable location access to drop the vet’s map pin.');
+        Alert.alert(t('reg.locPermTitle'), t('enl.locPermBody'));
         return;
       }
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
@@ -92,7 +96,7 @@ export default function EnlistVet() {
         setNearestKm(null);
       }
     } catch {
-      Alert.alert('Could not get location', 'Please try again to capture the vet’s coordinates.');
+      Alert.alert(t('reg.locFailTitle'), t('enl.locFailBody'));
     } finally {
       setLocating(false);
     }
@@ -122,40 +126,40 @@ export default function EnlistVet() {
         city: city.trim(),
         enlistedBy: user?.fullName ?? user?.email ?? undefined,
       });
-      notify(`${vet.name} enlisted`);
+      notify(t('enl.enlisted', { name: vet.name }));
       Alert.alert(
-        'Vet enlisted',
-        `${vet.name} is now listed and bookable in Find-a-Vet.\n\nTo give them app access, create their login (auth user + "veterinary" role)${email.trim() ? ` for ${email.trim()}` : ''}.`,
-        [{ text: 'Done', onPress: () => router.replace('/find-vet') }],
+        t('enl.enlistedTitle'),
+        t('enl.enlistedBody', { name: vet.name }),
+        [{ text: t('reg.done'), onPress: () => router.replace('/find-vet') }],
       );
     } catch {
       setSaving(false);
-      notify('Could not enlist the vet — please try again');
+      notify(t('enl.enlistFail'));
     }
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title="Enlist a Vet" subtitle="Onboard a veterinarian to the network" showBack />
+      <GradientHeader title={t('action.enlistVet')} subtitle={t('enl.subtitle')} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md, paddingBottom: spacing.xxl }}>
         <AppText variant="title" style={{ marginBottom: spacing.sm }}>
-          Professional profile
+          {t('enl.profProfile')}
         </AppText>
-        <TextField label="Full name" required value={name} onChangeText={setName} placeholder="e.g. Dr. Grace Auma" />
-        <TextField label="Credentials" value={credentials} onChangeText={setCredentials} placeholder="e.g. Veterinary Surgeon (BVM)" />
-        <PickerField label="Specialty" required value={specialty} placeholder="Select a specialty" options={SPECIALTIES} onSelect={setSpecialty} />
-        <TextField label="Clinic / practice" value={clinic} onChangeText={setClinic} placeholder="e.g. Kampala Livestock Vets" />
-        <TextField label="Institution" value={institution} onChangeText={setInstitution} placeholder="e.g. Makerere University" />
-        <TextField label="Years of experience" value={experience} onChangeText={setExperience} placeholder="e.g. 8" keyboardType="number-pad" />
+        <TextField label={t('signup.fullName')} required value={name} onChangeText={setName} placeholder={t('enl.namePlaceholder')} />
+        <TextField label={t('enl.credentials')} value={credentials} onChangeText={setCredentials} placeholder={t('enl.credPlaceholder')} />
+        <PickerField label={t('enl.specialty')} required value={specialty} placeholder={t('enl.specialtyPlaceholder')} options={specialtyOptions} onSelect={setSpecialty} />
+        <TextField label={t('enl.clinic')} value={clinic} onChangeText={setClinic} placeholder={t('enl.clinicPlaceholder')} />
+        <TextField label={t('enl.institution')} value={institution} onChangeText={setInstitution} placeholder={t('enl.instPlaceholder')} />
+        <TextField label={t('enl.yearsExp')} value={experience} onChangeText={setExperience} placeholder="e.g. 8" keyboardType="number-pad" />
 
         <AppText variant="title" style={{ marginTop: spacing.md, marginBottom: spacing.sm }}>
-          Location & discovery
+          {t('enl.locationDiscovery')}
         </AppText>
-        <TextField label="City / area" required value={city} onChangeText={setCity} placeholder="e.g. Kampala" />
+        <TextField label={t('enl.cityArea')} required value={city} onChangeText={setCity} placeholder={t('reg.cityPlaceholder')} />
 
         {/* GPS pin instead of manual distance (Sep 5 2026 standup). */}
         <AppText variant="body" style={{ fontWeight: '600', marginBottom: spacing.xs }}>
-          Location pin *
+          {t('enl.locationPin')}
         </AppText>
         <Pressable
           onPress={captureLocation}
@@ -164,16 +168,16 @@ export default function EnlistVet() {
           <Icon name={coords ? 'map-marker-check' : 'crosshairs-gps'} size={22} color={colors.primary} />
           <View style={{ flex: 1 }}>
             <AppText variant="body" style={{ fontWeight: '600' }} color={coords ? colors.primaryDark : colors.onSurface}>
-              {locating ? 'Getting location…' : coords ? 'Location captured' : 'Capture current location (drop pin)'}
+              {locating ? t('enl.gettingLoc') : coords ? t('enl.locCaptured') : t('enl.capturePin')}
             </AppText>
             {coords ? (
               <AppText variant="caption" color={colors.onSurfaceVariant}>
                 {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
-                {nearestKm != null ? ` · ~${nearestKm} km from nearest farm` : ' · no farm coordinates yet'}
+                {nearestKm != null ? ` · ${t('enl.nearestFarm', { km: nearestKm })}` : ` · ${t('enl.noFarmCoords')}`}
               </AppText>
             ) : (
               <AppText variant="caption" color={colors.onSurfaceVariant}>
-                Uses device GPS to set the vet’s pin. Vets within 5 km appear to farmers.
+                {t('enl.gpsHint')}
               </AppText>
             )}
           </View>
@@ -182,12 +186,12 @@ export default function EnlistVet() {
         <View style={{ marginBottom: spacing.md }} />
 
         <AppText variant="title" style={{ marginTop: spacing.md, marginBottom: spacing.sm }}>
-          Contact & options
+          {t('enl.contactOptions')}
         </AppText>
-        <TextField label="Email (to link their login later)" value={email} onChangeText={setEmail} placeholder="vet@example.com" keyboardType="email-address" />
-        <TextField label="Phone" value={phone} onChangeText={setPhone} placeholder="+256…" keyboardType="phone-pad" />
-        <Toggle label="Offers video visits" value={videoVisits} onToggle={() => setVideoVisits((v) => !v)} />
-        <Toggle label="Self-pay" value={selfPay} onToggle={() => setSelfPay((v) => !v)} />
+        <TextField label={t('enl.emailLink')} value={email} onChangeText={setEmail} placeholder="vet@example.com" keyboardType="email-address" />
+        <TextField label={t('enl.phone')} value={phone} onChangeText={setPhone} placeholder="+256…" keyboardType="phone-pad" />
+        <Toggle label={t('enl.offersVideo')} value={videoVisits} onToggle={() => setVideoVisits((v) => !v)} />
+        <Toggle label={t('vp.selfPay')} value={selfPay} onToggle={() => setSelfPay((v) => !v)} />
 
         <Pressable onPress={() => setTcs((v) => !v)} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginTop: spacing.sm, marginBottom: spacing.md }}>
           <Icon name={tcs ? 'checkbox-marked' : 'checkbox-blank-outline'} size={22} color={tcs ? colors.primary : colors.onSurfaceVariant} />
@@ -196,7 +200,7 @@ export default function EnlistVet() {
           </AppText>
         </Pressable>
 
-        <Button label="Enlist vet" icon="account-plus-outline" loading={saving} disabled={!canSubmit} onPress={onSubmit} />
+        <Button label={t('enl.enlistBtn')} icon="account-plus-outline" loading={saving} disabled={!canSubmit} onPress={onSubmit} />
       </Screen>
     </View>
   );
