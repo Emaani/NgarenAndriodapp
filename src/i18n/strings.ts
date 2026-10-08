@@ -399,6 +399,14 @@ const en: Dict = {
   'vrq.rateVisit': 'Rate this visit',
   'vrq.bookAnother': 'Book another vet',
 
+  // Visit scorecard view (chrome; clinical tiles stay English)
+  'vsc.title': 'Scorecard',
+  'vsc.notFoundTitle': 'Scorecard not found',
+  'vsc.notFoundSub': 'This record may have been removed.',
+  'vsc.visitTitle': 'Visit — {date}',
+  'vsc.readOnly': 'Read-only',
+  'vsc.locked': 'Locked record · {type} · attending {vet}',
+
   // Log a visit (vet)
   'lv.subtitle': 'Validate a field visit with a photo',
   'lv.animal': 'Animal (tag or name)',
@@ -1488,6 +1496,14 @@ const sw: Dict = {
   'vrq.sCompletedPending': 'Inasubiri ziara',
   'vrq.rateVisit': 'Kadiria ziara hii',
   'vrq.bookAnother': 'Weka miadi na daktari mwingine',
+
+  // Visit scorecard view (chrome; clinical tiles stay English)
+  'vsc.title': 'Kadi ya alama',
+  'vsc.notFoundTitle': 'Kadi ya alama haipatikani',
+  'vsc.notFoundSub': 'Rekodi hii huenda imeondolewa.',
+  'vsc.visitTitle': 'Ziara — {date}',
+  'vsc.readOnly': 'Kusoma tu',
+  'vsc.locked': 'Rekodi iliyofungwa · {type} · anayehudumia {vet}',
 
   // Log a visit (vet)
   'lv.subtitle': 'Thibitisha ziara ya shambani kwa picha',

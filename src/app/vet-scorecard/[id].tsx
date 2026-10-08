@@ -7,6 +7,7 @@ import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { statusVisual, bcsColor } from '@/lib/scorecardVisual';
 import { formatDate } from '@/lib/date';
+import { useT } from '@/i18n';
 import { AppText, EmptyState, GradientHeader, Icon, IconName, Screen } from '@/ui';
 
 function Tile({ icon, title, children }: { icon: IconName; title: string; children: ReactNode }) {
@@ -39,6 +40,7 @@ function Line({ children }: { children: ReactNode }) {
  * edited; corrections are a new dated entry (admin-only to modify).
  */
 export default function ScorecardView() {
+  const tr = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { loading, isAuthenticated } = useAuth();
   const { data: card } = useResource(() => getScorecardById(String(id)), undefined);
@@ -49,8 +51,8 @@ export default function ScorecardView() {
   if (!card) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <GradientHeader title="Scorecard" showBack />
-        <EmptyState icon="file-document-outline" title="Scorecard not found" subtitle="This record may have been removed." />
+        <GradientHeader title={tr('vsc.title')} showBack />
+        <EmptyState icon="file-document-outline" title={tr('vsc.notFoundTitle')} subtitle={tr('vsc.notFoundSub')} />
       </View>
     );
   }
@@ -68,13 +70,13 @@ export default function ScorecardView() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title={`Visit — ${formatDate(card.date)}`} subtitle={`${card.animalLabel} · Read-only`} showBack />
+      <GradientHeader title={tr('vsc.visitTitle', { date: formatDate(card.date) })} subtitle={`${card.animalLabel} · ${tr('vsc.readOnly')}`} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md, paddingBottom: spacing.xxl }}>
         {/* Locked banner */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.background, borderRadius: radius.md, padding: spacing.sm, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.divider }}>
           <Icon name="lock-check-outline" size={16} color={colors.onSurfaceVariant} />
           <AppText variant="caption" color={colors.onSurfaceVariant} style={{ flex: 1 }}>
-            Locked record · {card.visitType} · attending {card.vetName}
+            {tr('vsc.locked', { type: card.visitType, vet: card.vetName })}
           </AppText>
         </View>
 
