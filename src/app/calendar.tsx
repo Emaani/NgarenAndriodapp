@@ -187,7 +187,7 @@ export default function Calendar() {
                         <View key={e.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                           <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: TYPE_TINT[e.type] }} />
                           <AppText variant="caption" numberOfLines={1} style={{ flex: 1, fontSize: 9 }} color={colors.onSurface}>
-                            {e.title}
+                            {e.time ? `${e.time} ` : ''}{e.title}
                           </AppText>
                         </View>
                       ))}

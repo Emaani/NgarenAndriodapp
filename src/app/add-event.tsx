@@ -17,6 +17,16 @@ const TYPE_OPTIONS: { label: string; value: CalendarType }[] = [
   { label: 'ae.followUp', value: 'follow_up' },
 ];
 
+// Time-of-day slots (Oct 2026 standup — add a time field to event creation).
+// 30-minute steps across the working day; the time is optional.
+const TIME_OPTIONS = Array.from({ length: 29 }, (_, i) => {
+  const mins = 6 * 60 + i * 30; // 06:00 → 20:00
+  const hh = String(Math.floor(mins / 60)).padStart(2, '0');
+  const mm = String(mins % 60).padStart(2, '0');
+  const v = `${hh}:${mm}`;
+  return { label: v, value: v };
+});
+
 /**
  * Schedule a farm calendar activity (vet visit, routine stock take, …). Both
  * farmers and vets can view scheduled events per their access; scheduling is
@@ -32,6 +42,7 @@ export default function AddEvent() {
   const [title, setTitle] = useState('');
   const [type, setType] = useState<CalendarType>('vet_visit');
   const [date, setDate] = useState(presetDate ?? '');
+  const [time, setTime] = useState('');
   const [saving, setSaving] = useState(false);
 
   if (loading) return null;
@@ -41,7 +52,7 @@ export default function AddEvent() {
 
   const onSubmit = async () => {
     setSaving(true);
-    await addLocalEvent({ title: title.trim(), type, date });
+    await addLocalEvent({ title: title.trim(), type, date, time: time || undefined });
     setSaving(false);
     router.back();
   };
@@ -53,6 +64,7 @@ export default function AddEvent() {
         <TextField label={t('mkt.fTitle')} required value={title} onChangeText={setTitle} placeholder={t('ae.titlePlaceholder')} />
         <PickerField label={t('ae.activityType')} required value={type} options={typeOptions} onSelect={(v) => setType(v as CalendarType)} />
         <DatePickerField label={t('ae.date')} value={date} placeholder={t('ae.datePlaceholder')} onSelect={setDate} />
+        <PickerField label={t('ae.time')} value={time} placeholder={t('ae.timePlaceholder')} options={TIME_OPTIONS} onSelect={setTime} />
         <Button label={t('ae.addBtn')} icon="calendar-plus" loading={saving} disabled={!canSubmit} onPress={onSubmit} style={{ marginTop: spacing.sm }} />
       </Screen>
     </View>

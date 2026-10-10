@@ -52,6 +52,8 @@ export interface CalendarEvent {
   id: string;
   title: string;
   date: string;
+  /** Optional time of day (HH:MM) for the activity. Added Oct 2026 standup. */
+  time?: string;
   type: CalendarType;
 }
 
