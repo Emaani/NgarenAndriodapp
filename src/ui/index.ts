@@ -25,6 +25,7 @@ export { PhotoField } from './PhotoField';
 export { GradientHeader } from './GradientHeader';
 export { StatusBanner } from './StatusBanner';
 export { NavBanner } from './NavBanner';
+export { ActionGrid, type GridAction } from './ActionGrid';
 export { NotificationBell } from './NotificationBell';
 export { Input } from './Input';
 export { DonutChart } from './charts/DonutChart';

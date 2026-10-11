@@ -1,14 +1,24 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Redirect, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { CalloutRequest, CalloutStatus, CalloutUrgency, VetImpact } from '@/data/types';
 import { getCalloutRequests, updateCalloutStatus } from '@/data/api';
 import { getMyVetImpact } from '@/data/vetProfiles';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
+import { roleTheme } from '@/lib/roles';
 import { useT, useTStatus } from '@/i18n';
-import { ActionChip, AppText, Button, GradientHeader, Icon, IconChip, IconName, NavBanner, Screen, SyncStatus, VetImpactDashboard, VetSchedule } from '@/ui';
+import { ActionChip, ActionGrid, AppText, Button, GridAction, Icon, IconChip, NavBanner, NotificationBell, Screen, SyncStatus, VetImpactDashboard, VetSchedule } from '@/ui';
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 const EMPTY_IMPACT: VetImpact = {
   totalVisits: 0,
@@ -27,8 +37,9 @@ const FILTERS: { key: Filter; label: string }[] = [
 ];
 
 // Vet-side quick actions (Oct 2026 standup): register an (unregistered) animal,
-// start a scorecard, and the core service entry points.
-const QUICK_ACTIONS: { label: string; icon: IconName; route: string; tint: string }[] = [
+// start a scorecard, and the core service entry points. Shares the ActionGrid
+// tile style with the farmer dashboard for a consistent look across profiles.
+const QUICK_ACTIONS: GridAction[] = [
   { label: 'action.registerAnimal', icon: 'plus-circle-outline', route: '/register-animal', tint: '#6D874F' },
   { label: 'action.newScorecard', icon: 'clipboard-plus-outline', route: '/health-scorecard', tint: '#2563EB' },
   { label: 'action.stockTake', icon: 'clipboard-list-outline', route: '/stock-take', tint: '#F59E0B' },
@@ -37,13 +48,16 @@ const QUICK_ACTIONS: { label: string; icon: IconName; route: string; tint: strin
 
 // Clinical navigation (webapp vet nav parity): the sections a vet reaches
 // beyond the day-to-day quick actions above. Keeps every vetNav destination
-// discoverable from the dashboard rather than buried.
-const CLINICAL_NAV: { label: string; icon: IconName; route: string; tint: string }[] = [
+// discoverable from the dashboard rather than buried. Calendar + Reports live
+// here (vets have no bottom tab bar) so they stay one tap from the hub.
+const CLINICAL_NAV: GridAction[] = [
   // Livestock uses the dedicated vet herd list (/vet-animals), not the (tabs)
   // animals list — the tab group redirects vets back to this dashboard.
   { label: 'action.livestock', icon: 'cow', route: '/vet-animals', tint: '#2563EB' },
   { label: 'action.managedHealth', icon: 'heart-pulse', route: '/health', tint: '#EF4444' },
   { label: 'action.breeding', icon: 'dna', route: '/breeding', tint: '#EC4899' },
+  { label: 'action.calendar', icon: 'calendar-month-outline', route: '/calendar', tint: '#0EA5E9' },
+  { label: 'action.reports', icon: 'file-chart-outline', route: '/vet-reports', tint: '#6D874F' },
   { label: 'action.devices', icon: 'tag-outline', route: '/devices', tint: '#9333EA' },
   { label: 'action.messages', icon: 'message-text-outline', route: '/messaging', tint: '#F59E0B' },
   { label: 'action.marketplace', icon: 'storefront-outline', route: '/marketplace', tint: '#0D9488' },
@@ -162,7 +176,10 @@ function RequestCard({
 export default function VetDashboard() {
   const router = useRouter();
   const t = useT();
-  const { canVet, isAuthenticated, loading, user, signOut } = useAuth();
+  const insets = useSafeAreaInsets();
+  const theme = roleTheme('veterinary');
+  const { canVet, isAuthenticated, loading, user } = useAuth();
+  const displayName = user?.fullName?.trim() || user?.email?.split('@')[0] || t('vet.veterinarian');
   const [requests, setRequests] = useState<CalloutRequest[]>([]);
   const [filter, setFilter] = useState<Filter>('pending');
   const { data: impact } = useResource(getMyVetImpact, EMPTY_IMPACT);
@@ -200,45 +217,62 @@ export default function VetDashboard() {
     updateCalloutStatus(id, status).catch(() => {});
   };
 
-  const onSignOut = () => {
-    signOut();
-    router.replace('/login');
-  };
-
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader
-        showBack
-        right={
+      {/* Role-themed header — same structure as the farmer dashboard (role
+          chip, notifications, profile avatar, welcome + role stats) so the two
+          consoles read as one product. Slate-blue accent per roleTheme. */}
+      <LinearGradient
+        colors={[theme.accent, theme.accentDeep]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{
+          paddingTop: insets.top + spacing.sm,
+          paddingHorizontal: spacing.md,
+          paddingBottom: spacing.lg,
+          borderBottomLeftRadius: radius.lg,
+          borderBottomRightRadius: radius.lg,
+        }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+            <Icon name="stethoscope" size={16} color="#fff" />
+            <AppText variant="caption" color="#fff" style={{ fontWeight: '700', letterSpacing: 0.5 }}>
+              {t('role.veterinary').toUpperCase()} · {t('console.veterinary')}
+            </AppText>
+          </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-            <Pressable onPress={() => router.push('/calendar' as never)} hitSlop={8} accessibilityLabel="Calendar">
-              <Icon name="calendar-month-outline" size={24} color="#fff" />
-            </Pressable>
-            <Pressable onPress={() => router.push('/vet-reports' as never)} hitSlop={8} accessibilityLabel="Reports">
-              <Icon name="file-chart-outline" size={24} color="#fff" />
-            </Pressable>
-            <Pressable onPress={() => router.push('/settings' as never)} hitSlop={8} accessibilityLabel="Settings">
-              <Icon name="cog-outline" size={24} color="#fff" />
-            </Pressable>
-            <Pressable onPress={onSignOut} hitSlop={8}>
-              <Icon name="logout" size={24} color="#fff" />
+            <NotificationBell />
+            <Pressable hitSlop={8} onPress={() => router.push('/settings' as never)} accessibilityLabel={t('profile.row.settings')}>
+              <View
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: radius.full,
+                  backgroundColor: 'rgba(255,255,255,0.25)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                <AppText style={{ color: '#fff', fontWeight: '700' }}>{initials(displayName)}</AppText>
+              </View>
             </Pressable>
           </View>
-        }>
-        <View style={{ marginTop: spacing.xs }}>
+        </View>
+
+        <View style={{ marginTop: spacing.md }}>
           <AppText variant="bodyLarge" color="rgba(255,255,255,0.9)">
             {t('vet.dashboard')}
           </AppText>
           <AppText variant="headline" color="#fff">
-            {user?.fullName?.trim() || user?.email || t('vet.veterinarian')}
+            {displayName}
           </AppText>
         </View>
+
         <View style={{ flexDirection: 'row', marginTop: spacing.md }}>
           <HeaderStat value={counts.pending} label={t('vet.stat.pending')} />
           <HeaderStat value={counts.accepted} label={t('vet.stat.accepted')} />
           <HeaderStat value={counts.completed} label={t('vet.stat.completed')} />
         </View>
-      </GradientHeader>
+      </LinearGradient>
 
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         {/* Offline sync status — scorecards & photos reaching the backend. */}
@@ -248,50 +282,21 @@ export default function VetDashboard() {
 
         {/* Quick actions (Oct 2026 standup): animal registration + service entry
             points on the vet side, with clear navigation. */}
-        <AppText variant="title" style={{ marginBottom: spacing.sm }}>
+        <AppText variant="title" style={{ marginBottom: spacing.md }}>
           {t('home.section.quickActions')}
         </AppText>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg }}>
-          {QUICK_ACTIONS.map((a) => (
-            <Pressable
-              key={a.label}
-              onPress={() => router.push(a.route as never)}
-              style={({ pressed }) => [
-                { flexGrow: 1, flexBasis: '47%', flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.divider, opacity: pressed ? 0.9 : 1 },
-                shadow[1],
-              ]}>
-              <View style={{ width: 36, height: 36, borderRadius: radius.full, backgroundColor: a.tint + '1A', alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name={a.icon} size={19} color={a.tint} />
-              </View>
-              <AppText variant="body" style={{ fontWeight: '600', flex: 1 }}>
-                {t(a.label)}
-              </AppText>
-            </Pressable>
-          ))}
+        <View style={{ marginBottom: spacing.lg }}>
+          <ActionGrid actions={QUICK_ACTIONS} />
         </View>
 
         {/* Clinical navigation (webapp vet-nav parity) — Livestock, Managed
-            Health, Breeding, Devices, Messages all reachable from the hub. */}
-        <AppText variant="title" style={{ marginBottom: spacing.sm }}>
+            Health, Breeding, Calendar, Reports, Devices, Messages, Marketplace
+            all reachable from the hub with the same tiles as the farmer grid. */}
+        <AppText variant="title" style={{ marginBottom: spacing.md }}>
           {t('home.section.clinicalTools')}
         </AppText>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg }}>
-          {CLINICAL_NAV.map((a) => (
-            <Pressable
-              key={a.label}
-              onPress={() => router.push(a.route as never)}
-              style={({ pressed }) => [
-                { flexGrow: 1, flexBasis: '47%', flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.divider, opacity: pressed ? 0.9 : 1 },
-                shadow[1],
-              ]}>
-              <View style={{ width: 36, height: 36, borderRadius: radius.full, backgroundColor: a.tint + '1A', alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name={a.icon} size={19} color={a.tint} />
-              </View>
-              <AppText variant="body" style={{ fontWeight: '600', flex: 1 }}>
-                {t(a.label)}
-              </AppText>
-            </Pressable>
-          ))}
+        <View style={{ marginBottom: spacing.lg }}>
+          <ActionGrid actions={CLINICAL_NAV} />
         </View>
 
         {/* Veterinary impact dashboard — the vet's reach, counted from records. */}

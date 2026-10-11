@@ -16,7 +16,7 @@ import { roleTheme } from '@/lib/roles';
 import { Permission } from '@/lib/permissions';
 import { TAGGING_META, TaggingMethod, taggingMeta } from '@/lib/tagging';
 import { useT } from '@/i18n';
-import { AppText, Icon, IconName, NavBanner, NotificationBell } from '@/ui';
+import { ActionGrid, AppText, Icon, IconName, NavBanner, NotificationBell } from '@/ui';
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -379,40 +379,7 @@ export default function Home() {
         <AppText variant="title" style={{ marginBottom: spacing.md }}>
           {isAdmin ? t('home.section.controlCenter') : isVet ? t('home.section.clinicalTools') : t('home.section.quickActions')}
         </AppText>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
-          {actions.map((a) => (
-            <Pressable
-              key={a.label}
-              onPress={() => router.push(a.route as never)}
-              style={({ pressed }) => [
-                {
-                  width: '47%',
-                  flexGrow: 1,
-                  backgroundColor: colors.surface,
-                  borderRadius: radius.lg,
-                  padding: spacing.md,
-                  gap: spacing.sm,
-                  opacity: pressed ? 0.9 : 1,
-                },
-                shadow[1],
-              ]}>
-              <View
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: radius.md,
-                  backgroundColor: a.tint + '1A',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                <Icon name={a.icon} size={26} color={a.tint} />
-              </View>
-              <AppText variant="bodyLarge" style={{ fontWeight: '600' }}>
-                {t(a.label)}
-              </AppText>
-            </Pressable>
-          ))}
-        </View>
+        <ActionGrid actions={actions} />
       </ScrollView>
     </View>
   );
