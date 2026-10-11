@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Image, Pressable, View } from 'react-native';
+import { Alert, Image, Pressable, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Redirect, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
@@ -7,9 +7,10 @@ import { animals as animalsFallback } from '@/data/mock';
 import { getHerd } from '@/data/herd';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
+import { ageFromDate } from '@/lib/date';
 import { Animal } from '@/data/types';
 import { useT } from '@/i18n';
-import { AppText, Button, GradientHeader, Icon, IconChip, IconName, Screen } from '@/ui';
+import { AppText, BottomSheet, Button, DetailRow, GradientHeader, Icon, IconChip, IconName, Screen } from '@/ui';
 
 type Mark = 'pending' | 'present' | 'missing';
 type Phase = 'method' | 'count' | 'summary';
@@ -178,6 +179,11 @@ export default function StockTake() {
   const [method, setMethod] = useState<StockMethod>('manual_visual');
   // Confirmation photos captured in photo mode, keyed by animal id.
   const [photos, setPhotos] = useState<Record<number, string>>({});
+  // The animal whose photo-confirmation sheet is currently open (null = none).
+  // Tapping "Photo to confirm" opens a brief identity sheet first so the person
+  // verifies they are photographing the right animal (strict visual evidence).
+  const [confirmAnimal, setConfirmAnimal] = useState<Animal | null>(null);
+  const [capturing, setCapturing] = useState(false);
 
   // Add any newly-loaded animals to the count sheet as pending.
   useEffect(() => {
@@ -205,18 +211,27 @@ export default function StockTake() {
 
   const setMark = (id: number, m: Mark) => setMarks((prev) => ({ ...prev, [id]: m }));
 
-  // Photo mode: taking a current picture is what confirms presence.
+  // Photo mode: taking a current picture is what confirms presence. Robust with
+  // explicit feedback — a silent failure (e.g. a previously-denied camera
+  // permission) is exactly what made this feel "available but not functional".
   const captureFor = async (id: number) => {
+    setCapturing(true);
     try {
       const perm = await ImagePicker.requestCameraPermissionsAsync();
-      if (!perm.granted) return;
-      const res = await ImagePicker.launchCameraAsync({ quality: 0.5 });
+      if (!perm.granted) {
+        Alert.alert(t('stock.cameraNeededTitle'), t('stock.cameraNeededBody'));
+        return;
+      }
+      const res = await ImagePicker.launchCameraAsync({ quality: 0.5, allowsEditing: false });
       if (!res.canceled && res.assets?.[0]) {
         setPhotos((prev) => ({ ...prev, [id]: res.assets[0].uri }));
         setMark(id, 'present');
+        setConfirmAnimal(null);
       }
     } catch {
-      // camera unavailable — leave unmarked
+      Alert.alert(t('stock.cameraErrTitle'), t('stock.cameraErrBody'));
+    } finally {
+      setCapturing(false);
     }
   };
   // BLE: associate every animal whose tag is broadcasting (has a linked, active
@@ -427,7 +442,7 @@ export default function StockTake() {
             onMark={(m) => setMark(a.id, m)}
             photoMode={method === 'manual_visual'}
             photoUri={photos[a.id]}
-            onCapture={() => captureFor(a.id)}
+            onCapture={() => setConfirmAnimal(a)}
           />
         ))}
       </Screen>
@@ -449,6 +464,61 @@ export default function StockTake() {
           onPress={() => setPhase('summary')}
         />
       </View>
+
+      {/* Photo-confirmation sheet — brief animal identity + reference Photo ID
+          so the person confirms the animal before capturing the live evidence
+          photo (strict visual identification, Oct 2026 standup). */}
+      <BottomSheet
+        visible={confirmAnimal !== null}
+        onClose={() => setConfirmAnimal(null)}
+        title={t('stock.confirmTitle')}>
+        {confirmAnimal ? (
+          <View style={{ gap: spacing.md }}>
+            <AppText variant="body" color={colors.onSurfaceVariant}>
+              {t('stock.confirmIntro')}
+            </AppText>
+
+            {/* Reference Photo ID (if the animal has one) to match against. */}
+            <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
+              {confirmAnimal.photos?.[0] || confirmAnimal.onboardingPhotos?.[0] ? (
+                <Image
+                  source={{ uri: (confirmAnimal.photos?.[0] ?? confirmAnimal.onboardingPhotos?.[0])! }}
+                  style={{ width: 72, height: 72, borderRadius: radius.md }}
+                />
+              ) : (
+                <View style={{ width: 72, height: 72, borderRadius: radius.md, backgroundColor: colors.primaryTint, alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="cow" size={32} color={colors.primary} />
+                </View>
+              )}
+              <View style={{ flex: 1 }}>
+                <AppText variant="bodyLarge" style={{ fontWeight: '700' }}>
+                  {confirmAnimal.name ?? confirmAnimal.tag}
+                </AppText>
+                <AppText variant="caption" color={colors.onSurfaceVariant}>
+                  {confirmAnimal.photos?.[0] || confirmAnimal.onboardingPhotos?.[0] ? t('stock.photoRef') : t('stock.noRefPhoto')}
+                </AppText>
+              </View>
+            </View>
+
+            {/* Brief animal details. */}
+            <View style={[{ backgroundColor: colors.background, borderRadius: radius.md, paddingHorizontal: spacing.md }, shadow[1]]}>
+              <DetailRow label={t('ad.farmerRef')} value={confirmAnimal.accountNumber ?? confirmAnimal.tag} />
+              <DetailRow label={t('ad.breed')} value={confirmAnimal.breed.name} />
+              {confirmAnimal.color ? <DetailRow label={t('ad.colour')} value={confirmAnimal.color} /> : null}
+              <DetailRow label={t('ad.age')} value={ageFromDate(confirmAnimal.dateOfBirth)} />
+              <DetailRow label={t('ad.location')} value={confirmAnimal.locationName ?? '—'} last />
+            </View>
+
+            <Button
+              label={t('stock.takeLivePhoto')}
+              icon="camera"
+              loading={capturing}
+              onPress={() => captureFor(confirmAnimal.id)}
+            />
+            <Button label={t('common.cancel')} variant="outline" disabled={capturing} onPress={() => setConfirmAnimal(null)} />
+          </View>
+        ) : null}
+      </BottomSheet>
     </View>
   );
 }

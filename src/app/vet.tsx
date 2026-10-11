@@ -48,15 +48,16 @@ const QUICK_ACTIONS: GridAction[] = [
 
 // Clinical navigation (webapp vet nav parity): the sections a vet reaches
 // beyond the day-to-day quick actions above. Keeps every vetNav destination
-// discoverable from the dashboard rather than buried. Calendar + Reports live
-// here (vets have no bottom tab bar) so they stay one tap from the hub.
+// discoverable from the dashboard rather than buried. Reports lives here
+// (vets have no bottom tab bar); Calendar has its own section below.
 const CLINICAL_NAV: GridAction[] = [
   // Livestock uses the dedicated vet herd list (/vet-animals), not the (tabs)
   // animals list — the tab group redirects vets back to this dashboard.
   { label: 'action.livestock', icon: 'cow', route: '/vet-animals', tint: '#2563EB' },
   { label: 'action.managedHealth', icon: 'heart-pulse', route: '/health', tint: '#EF4444' },
   { label: 'action.breeding', icon: 'dna', route: '/breeding', tint: '#EC4899' },
-  { label: 'action.calendar', icon: 'calendar-month-outline', route: '/calendar', tint: '#0EA5E9' },
+  // Calendar is not duplicated here — the dashboard already has a dedicated
+  // "My Calendar" section with a full-calendar link (Oct 2026 clean-up).
   { label: 'action.reports', icon: 'file-chart-outline', route: '/vet-reports', tint: '#6D874F' },
   { label: 'action.devices', icon: 'tag-outline', route: '/devices', tint: '#9333EA' },
   { label: 'action.messages', icon: 'message-text-outline', route: '/messaging', tint: '#F59E0B' },

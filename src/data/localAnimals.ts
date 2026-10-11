@@ -59,11 +59,54 @@ export async function setLocalAnimalApproval(
 ): Promise<void> {
   try {
     const all = await getLocalAnimals();
-    const next = all.map((a) => (a.id === id ? { ...a, approvalStatus: status } : a));
+    const next = all.map((a) =>
+      a.id === id
+        ? { ...a, approvalStatus: status, adminApproved: status === 'approved', farmerApproved: status === 'approved' }
+        : a,
+    );
     await AsyncStorage.setItem(KEY, JSON.stringify(next));
   } catch {
     // best-effort
   }
+}
+
+/** True when a capture needs BOTH admin validation and farmer confirmation
+ *  before it is finalised — i.e. a record captured by a third party (a vet).
+ *  (Oct 2026 standup: vet-side registration is not final until both sign off.) */
+export function requiresDualApproval(a: Animal): boolean {
+  return a.capturedByRole === 'veterinary';
+}
+
+/**
+ * Apply one party's step of a dual approval (admin validation OR farmer
+ * confirmation). A rejection by either party rejects the record outright.
+ * When both parties have approved, the record is finalised ('approved').
+ * Returns the resulting status so callers can decide whether to sync.
+ */
+export async function setLocalAnimalApprovalStep(
+  id: number,
+  party: 'admin' | 'farmer',
+  status: 'approved' | 'rejected',
+): Promise<'approved' | 'rejected' | 'pending'> {
+  let resulting: 'approved' | 'rejected' | 'pending' = 'pending';
+  try {
+    const all = await getLocalAnimals();
+    const next = all.map((a) => {
+      if (a.id !== id) return a;
+      if (status === 'rejected') {
+        resulting = 'rejected';
+        return { ...a, approvalStatus: 'rejected' as const };
+      }
+      const adminApproved = a.adminApproved || party === 'admin';
+      const farmerApproved = a.farmerApproved || party === 'farmer';
+      resulting = adminApproved && farmerApproved ? 'approved' : 'pending';
+      return { ...a, adminApproved, farmerApproved, approvalStatus: resulting };
+    });
+    await AsyncStorage.setItem(KEY, JSON.stringify(next));
+  } catch {
+    // best-effort
+  }
+  return resulting;
 }
 
 /** Animals awaiting a checker's approval. */

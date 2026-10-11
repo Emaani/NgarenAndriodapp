@@ -86,7 +86,7 @@ function Stepper({ step, labels }: { step: number; labels: string[] }) {
 export default function RegisterAnimal() {
   const router = useRouter();
   const t = useT();
-  const { canManageTeam, user } = useAuth();
+  const { canManageTeam, user, appRole } = useAuth();
   const { data: breeds } = useResource(
     getBreeds,
     breedsFallback.map((name) => ({ key: name.toLowerCase(), name })),
@@ -279,8 +279,12 @@ export default function RegisterAnimal() {
         taggingMethod: methodForDevices(devices),
         // Maker-checker (Oct 2026 standup): a record captured by a third party
         // (vet / delegate — anyone who isn't the farm owner/admin) is NOT active.
-        // It needs admin validation AND the farmer's confirmation first.
+        // A vet capture needs admin validation AND the farmer's confirmation
+        // (dual approval); other delegated captures need a single checker.
         approvalStatus: autoApprove ? 'approved' : 'pending',
+        capturedByRole: appRole,
+        adminApproved: autoApprove || appRole === 'admin',
+        farmerApproved: autoApprove || appRole === 'farmer',
       };
       await addLocalAnimal(newAnimal);
       await enqueueAnimalSync({ animal: newAnimal, userId: user?.id, photoUris: photos, aan: code });

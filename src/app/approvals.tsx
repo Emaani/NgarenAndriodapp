@@ -3,7 +3,12 @@ import { Image, View } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { Animal } from '@/data/types';
-import { getPendingLocalAnimals, setLocalAnimalApproval } from '@/data/localAnimals';
+import {
+  getPendingLocalAnimals,
+  requiresDualApproval,
+  setLocalAnimalApproval,
+  setLocalAnimalApprovalStep,
+} from '@/data/localAnimals';
 import { setLineageApproval } from '@/data/herd';
 import { notify } from '@/lib/toast';
 import { useResource } from '@/data/hooks';
@@ -14,20 +19,43 @@ import { useT } from '@/i18n';
 import { AppText, Button, EmptyState, GradientHeader, Icon, IconChip, Screen } from '@/ui';
 
 /**
- * Maker-checker approvals — the "checker" step. A designated approver (owner or
- * admin) reviews animals captured by a maker and approves or rejects each before
- * the record is finalised. Data integrity per the management decision.
+ * Record Activation (maker-checker). A capture by a third party (a vet) is NOT
+ * final until BOTH an admin validates it AND the farmer confirms it (Oct 2026
+ * standup — dual approval). A record captured by a delegated farm member needs
+ * a single checker (owner/admin). Each approver only sees — and can action —
+ * the step that is theirs; the record finalises once both steps are done.
  */
+
+/** A small two-step progress chip row for a dual-approval record. */
+function DualProgress({ admin, farmer, t }: { admin: boolean; farmer: boolean; t: (k: string) => string }) {
+  const Step = ({ label, done }: { label: string; done: boolean }) => (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+      <Icon name={done ? 'check-circle' : 'clock-outline'} size={15} color={done ? colors.success : colors.onSurfaceVariant} />
+      <AppText variant="caption" color={done ? colors.success : colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
+        {label} · {done ? t('approvals.done') : t('approvals.awaiting')}
+      </AppText>
+    </View>
+  );
+  return (
+    <View style={{ gap: 4 }}>
+      <Step label={t('approvals.stepAdmin')} done={admin} />
+      <Step label={t('approvals.stepFarmer')} done={farmer} />
+    </View>
+  );
+}
+
 export default function Approvals() {
   const router = useRouter();
   const t = useT();
-  const { loading, isAuthenticated, canManageTeam, can } = useAuth();
+  const { loading, isAuthenticated, canManageTeam, can, isAdmin } = useAuth();
   const { data: pending, reload } = useResource(getPendingLocalAnimals, []);
   const [local, setLocal] = useState<Animal[] | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
 
   // Field-Operations validators (owner / admin / delegated approver) review here.
   const canApprove = canManageTeam || can('approve_records');
+  // Which party the signed-in user represents in a dual approval.
+  const party: 'admin' | 'farmer' = isAdmin ? 'admin' : 'farmer';
 
   if (loading) return null;
   if (!isAuthenticated) return <Redirect href="/login" />;
@@ -35,16 +63,41 @@ export default function Approvals() {
 
   const items = local ?? pending;
 
-  const decide = async (animal: Animal, status: 'approved' | 'rejected') => {
+  const removeRow = (id: number) => setLocal((prev) => (prev ?? pending).filter((a) => a.id !== id));
+
+  // Single-checker decision (non-dual captures).
+  const decideSingle = async (animal: Animal, status: 'approved' | 'rejected') => {
     setBusy(animal.id);
-    setLocal((prev) => (prev ?? pending).filter((a) => a.id !== animal.id));
+    removeRow(animal.id);
     await setLocalAnimalApproval(animal.id, status);
-    // Sync the checker's decision to animal_lineage so the web command centre
-    // sees the finalised animal. Best-effort — a local approval still stands.
     await setLineageApproval(animal.ngarenCode, status);
     setBusy(null);
     const who = animal.name ?? animal.tag;
     notify(status === 'approved' ? t('approvals.activated', { name: who }) : t('approvals.rejected', { name: who }));
+  };
+
+  // One party's step of a dual approval. Only removes the row once the record is
+  // finalised (approved) or rejected; a partial approval stays, now showing the
+  // other party's step as still outstanding.
+  const decideDual = async (animal: Animal, status: 'approved' | 'rejected') => {
+    setBusy(animal.id);
+    const result = await setLocalAnimalApprovalStep(animal.id, party, status);
+    if (result === 'approved' || result === 'rejected') {
+      removeRow(animal.id);
+      await setLineageApproval(animal.ngarenCode, result);
+      const who = animal.name ?? animal.tag;
+      notify(result === 'approved' ? t('approvals.activated', { name: who }) : t('approvals.rejected', { name: who }));
+    } else {
+      // Partial — reflect the new step state in place.
+      setLocal((prev) =>
+        (prev ?? pending).map((a) =>
+          a.id === animal.id
+            ? { ...a, adminApproved: a.adminApproved || party === 'admin', farmerApproved: a.farmerApproved || party === 'farmer' }
+            : a,
+        ),
+      );
+    }
+    setBusy(null);
   };
 
   return (
@@ -62,6 +115,8 @@ export default function Approvals() {
         ) : (
           items.map((a) => {
             const meta = taggingMeta(a.taggingMethod);
+            const dual = requiresDualApproval(a);
+            const myStepDone = party === 'admin' ? !!a.adminApproved : !!a.farmerApproved;
             return (
               <View
                 key={a.id}
@@ -93,10 +148,42 @@ export default function Approvals() {
                 <AppText variant="caption" color={colors.onSurfaceVariant}>
                   {t('approvals.rowMeta', { tag: a.tag, color: a.color ?? '—', location: a.locationName ?? '—', age: ageFromDate(a.dateOfBirth), photos: a.photos?.length ?? 0 })}
                 </AppText>
-                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                  <Button label={t('approvals.activate')} icon="check" loading={busy === a.id} onPress={() => decide(a, 'approved')} style={{ flex: 1 }} />
-                  <Button label={t('approvals.reject')} variant="outline" onPress={() => decide(a, 'rejected')} style={{ flex: 1 }} />
-                </View>
+
+                {dual ? (
+                  <>
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, backgroundColor: colors.warningTint, borderRadius: radius.sm, padding: spacing.sm }}>
+                      <Icon name="account-switch-outline" size={15} color={colors.warning} />
+                      <AppText variant="caption" color={colors.onSurface} style={{ flex: 1 }}>
+                        {t('approvals.capturedByVet')}
+                      </AppText>
+                    </View>
+                    <DualProgress admin={!!a.adminApproved} farmer={!!a.farmerApproved} t={t} />
+                    {myStepDone ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                        <Icon name="check" size={15} color={colors.success} />
+                        <AppText variant="caption" color={colors.onSurfaceVariant}>
+                          {t('approvals.awaitingOther')}
+                        </AppText>
+                      </View>
+                    ) : (
+                      <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                        <Button
+                          label={party === 'admin' ? t('approvals.validateAdmin') : t('approvals.confirmFarmer')}
+                          icon="check"
+                          loading={busy === a.id}
+                          onPress={() => decideDual(a, 'approved')}
+                          style={{ flex: 1 }}
+                        />
+                        <Button label={t('approvals.reject')} variant="outline" onPress={() => decideDual(a, 'rejected')} style={{ flex: 1 }} />
+                      </View>
+                    )}
+                  </>
+                ) : (
+                  <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                    <Button label={t('approvals.activate')} icon="check" loading={busy === a.id} onPress={() => decideSingle(a, 'approved')} style={{ flex: 1 }} />
+                    <Button label={t('approvals.reject')} variant="outline" onPress={() => decideSingle(a, 'rejected')} style={{ flex: 1 }} />
+                  </View>
+                )}
               </View>
             );
           })

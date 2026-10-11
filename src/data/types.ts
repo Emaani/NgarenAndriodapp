@@ -45,6 +45,14 @@ export interface Animal {
   taggingMethod?: string;
   /** Maker-checker state. Undefined is treated as approved (legacy records). */
   approvalStatus?: 'pending' | 'approved' | 'rejected';
+  /** Role of whoever captured this record — drives whether dual approval
+   *  (admin validation + farmer confirmation) is required (Oct 2026 standup).
+   *  A capture by a veterinary (third party) needs both; others need one. */
+  capturedByRole?: 'farmer' | 'veterinary' | 'admin';
+  /** Admin validation step of a third-party capture's dual approval. */
+  adminApproved?: boolean;
+  /** Farmer confirmation step of a third-party capture's dual approval. */
+  farmerApproved?: boolean;
   /** Physical farm address where the animal is based (Address Line 1/2, City, Country). */
   physicalAddress?: string;
   /** Google geospatial coordinates of the animal's base — optional, mandatory for satellite tags. */

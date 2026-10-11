@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Image, Pressable, ScrollView, View } from 'react-native';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { animals as animalsFallback } from '@/data/mock';
@@ -273,6 +273,33 @@ export default function HealthScoreCard() {
         <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.md }}>
           {tr('hsc.intro')}
         </AppText>
+
+        {/* Photo ID — the animal's visual identity, shown consistently with the
+            animal list, digital ID and approvals (photos[0], onboarding fallback). */}
+        {(() => {
+          const photoIds = animal.photos?.length ? animal.photos : animal.onboardingPhotos ?? [];
+          return (
+            <View style={{ marginBottom: spacing.md }}>
+              <AppText variant="overline" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.xs }}>
+                {tr('ad.photoId')}
+              </AppText>
+              {photoIds.length > 0 ? (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm }}>
+                  {photoIds.map((uri, i) => (
+                    <Image key={`${uri}-${i}`} source={{ uri }} style={{ width: 132, height: 132, borderRadius: radius.md }} />
+                  ))}
+                </ScrollView>
+              ) : (
+                <View style={{ height: 132, borderRadius: radius.md, backgroundColor: colors.primaryTint, alignItems: 'center', justifyContent: 'center', gap: spacing.xs }}>
+                  <Icon name="camera-outline" size={30} color={colors.primary} />
+                  <AppText variant="caption" color={colors.primaryDark}>
+                    {tr('hsc.noPhotoId')}
+                  </AppText>
+                </View>
+              )}
+            </View>
+          );
+        })()}
 
         {/* Current status (from the latest Visit Scorecard). */}
         {latestCard ? (

@@ -14,7 +14,7 @@ import { useAuth } from '@/services/auth';
 import { useResource } from '@/data/hooks';
 import { AppointmentMode, Animal, CalloutUrgency } from '@/data/types';
 import { useT } from '@/i18n';
-import { AppText, Button, GradientHeader, Icon, PhotoField, PickerField, Screen, TextField } from '@/ui';
+import { AppText, Button, DatePickerField, GradientHeader, Icon, PhotoField, PickerField, Screen, TextField } from '@/ui';
 
 const URGENCY = ['Routine', 'Emergency'] as const;
 const MODES: { key: AppointmentMode; icon: 'map-marker-check-outline' | 'video-outline' | 'account-switch-outline' }[] = [
@@ -56,8 +56,12 @@ export default function RequestCallout() {
   const [tcsAccepted, setTcsAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // A chosen calendar slot carried from the vet's availability calendar.
-  const scheduledFor = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : undefined;
+  // Preferred date for the visit. Pre-filled when the farmer arrived from a
+  // vet's availability calendar; otherwise the farmer picks one here, exactly
+  // like the Calendar "Schedule activity" flow (date + time are always captured).
+  const fromVetCalendar = !!date && /^\d{4}-\d{2}-\d{2}$/.test(date);
+  const [prefDate, setPrefDate] = useState(fromVetCalendar ? (date as string) : '');
+  const scheduledFor = prefDate && /^\d{4}-\d{2}-\d{2}$/.test(prefDate) ? prefDate : undefined;
 
   // Location is auto-derived from the selected animal's registered location — no
   // manual selection needed (Aug 29 2026 standup).
@@ -183,8 +187,10 @@ export default function RequestCallout() {
           </View>
         )}
 
-        {/* Chosen calendar slot from the preferred vet's availability. */}
-        {scheduledFor ? (
+        {/* Preferred date — a confirmed banner when carried from a vet's
+            availability calendar, otherwise a date picker. Date + time are
+            always captured, mirroring the Calendar "Schedule activity" flow. */}
+        {fromVetCalendar ? (
           <View
             style={{
               flexDirection: 'row',
@@ -198,38 +204,43 @@ export default function RequestCallout() {
             <Icon name="calendar-check" size={20} color={colors.primary} />
             <View style={{ flex: 1 }}>
               <AppText variant="body" style={{ fontWeight: '700' }} color={colors.primaryDark}>
-                {formatDate(scheduledFor)}
+                {formatDate(prefDate)}
               </AppText>
               <AppText variant="caption" color={colors.primaryDark}>
                 {vet ? t('fv.selectedFromVet', { name: vet.name }) : t('fv.selectedFromGeneric')}
               </AppText>
             </View>
           </View>
-        ) : null}
+        ) : (
+          <DatePickerField
+            label={t('fv.preferredDate')}
+            value={prefDate}
+            placeholder={t('fv.preferredDatePlaceholder')}
+            onSelect={setPrefDate}
+          />
+        )}
 
-        {/* Specific time slot (Sep 12 2026) — books a slot, not the whole day. */}
-        {scheduledFor ? (
-          <>
-            <AppText variant="body" style={{ fontWeight: '600', marginBottom: spacing.xs }}>
-              {t('fv.timeSlot')}
-            </AppText>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.md }}>
-              {TIME_SLOTS.map((s) => {
-                const active = slot === s;
-                return (
-                  <Pressable
-                    key={s}
-                    onPress={() => setSlot(s)}
-                    style={{ paddingHorizontal: spacing.mdMinus, paddingVertical: spacing.xs, borderRadius: radius.full, backgroundColor: active ? colors.primary : colors.surface, borderWidth: 1, borderColor: active ? colors.primary : colors.divider }}>
-                    <AppText variant="caption" color={active ? '#fff' : colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
-                      {s}
-                    </AppText>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </>
-        ) : null}
+        {/* Specific time slot (Sep 12 2026) — books a slot, not the whole day.
+            Always shown; required once a preferred date is set. */}
+        <AppText variant="body" style={{ fontWeight: '600', marginBottom: spacing.xs }}>
+          {t('fv.timeSlot')}
+          {scheduledFor ? ' *' : ''}
+        </AppText>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.md }}>
+          {TIME_SLOTS.map((s) => {
+            const active = slot === s;
+            return (
+              <Pressable
+                key={s}
+                onPress={() => setSlot(s)}
+                style={{ paddingHorizontal: spacing.mdMinus, paddingVertical: spacing.xs, borderRadius: radius.full, backgroundColor: active ? colors.primary : colors.surface, borderWidth: 1, borderColor: active ? colors.primary : colors.divider }}>
+                <AppText variant="caption" color={active ? '#fff' : colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
+                  {s}
+                </AppText>
+              </Pressable>
+            );
+          })}
+        </View>
 
         {/* Admin-only: book on behalf of a farmer. */}
         {isAdmin ? (

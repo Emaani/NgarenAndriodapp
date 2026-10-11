@@ -29,20 +29,24 @@ export const teamMembers: TeamMember[] = [
   { userId: 4, firstName: 'Pam', lastName: 'Karanja', email: 'pam@ngaren.com', role: 'Viewer', roleKey: 4 },
 ];
 
-export const summary: DashboardSummary = {
-  animals: 48,
-  devices: 32,
-  locations: 12,
-  users: 4,
-  allocation: { allocated: 28, free: 4 },
-  connectivity: { connected: 42, unconnected: 6 },
-};
+// NOTE: `summary` is declared AFTER the lists below and derived from them, so
+// the dashboard counters (animals / devices / locations) always agree with the
+// detail screens they drill into. Never hand-set these counts independently —
+// that is exactly what caused "Locations: 12" on the dashboard vs 4 on the map.
 
 export const locations: Location[] = [
   { id: 1, name: 'North Paddock', address: 'Lot 4, Nakasero', sizeHa: 42, animalCount: 12, kind: 'paddock' },
   { id: 2, name: 'Water Point A', address: 'Lot 7, Nakasero', sizeHa: 2, animalCount: 5, kind: 'water' },
   { id: 3, name: 'South Paddock', address: 'Lot 9, Nakasero', sizeHa: 38, animalCount: 18, kind: 'paddock' },
   { id: 4, name: 'Holding Yard', address: 'Lot 1, Nakasero', sizeHa: 1, animalCount: 3, kind: 'yard' },
+  { id: 5, name: 'East Paddock', address: 'Lot 12, Nakasero', sizeHa: 35, animalCount: 14, kind: 'paddock' },
+  { id: 6, name: 'West Paddock', address: 'Lot 15, Nakasero', sizeHa: 29, animalCount: 9, kind: 'paddock' },
+  { id: 7, name: 'Water Point B', address: 'Lot 18, Nakasero', sizeHa: 2, animalCount: 6, kind: 'water' },
+  { id: 8, name: 'Calving Shed', address: 'Lot 2, Nakasero', sizeHa: 1, animalCount: 4, kind: 'yard' },
+  { id: 9, name: 'Quarantine Yard', address: 'Lot 3, Nakasero', sizeHa: 1, animalCount: 2, kind: 'yard' },
+  { id: 10, name: 'River Paddock', address: 'Lot 21, Nakasero', sizeHa: 44, animalCount: 16, kind: 'paddock' },
+  { id: 11, name: 'Hilltop Paddock', address: 'Lot 24, Nakasero', sizeHa: 31, animalCount: 11, kind: 'paddock' },
+  { id: 12, name: 'Water Point C', address: 'Lot 27, Nakasero', sizeHa: 2, animalCount: 5, kind: 'water' },
 ];
 
 export const animals: Animal[] = [
@@ -97,47 +101,38 @@ export const animals: Animal[] = [
   },
 ];
 
+// Base Ceres-tag family used to synthesise a consistent, richer device list.
+const deviceBase = {
+  family: 'Gen 2',
+  brand: 'Ceres Tag',
+  firmware: 'v3.2.1',
+  chargeType: 'Solar',
+} as const;
+
 export const devices: Device[] = [
-  {
-    id: 1,
-    serial: 'CRS-00142',
-    model: 'Pro',
-    family: 'Gen 2',
-    brand: 'Ceres Tag',
-    firmware: 'v3.2.1',
-    chargeType: 'Solar',
-    activatedAt: '2024-01-01',
-    temperatureC: 26,
-    linkedAnimalId: 1,
-    linkedAnimalTag: 'Bull #A-042',
-  },
-  {
-    id: 3,
-    serial: 'CRS-00187',
-    model: 'Lite',
-    family: 'Gen 2',
-    brand: 'Ceres Tag',
-    firmware: 'v3.1.0',
-    chargeType: 'Solar',
-    activatedAt: '2024-03-03',
-    temperatureC: 2,
-    linkedAnimalId: 3,
-    linkedAnimalTag: 'Heifer #A-061',
-  },
-  {
-    id: 5,
-    serial: 'CRS-00210',
-    model: 'Pro',
-    family: 'Gen 2',
-    brand: 'Ceres Tag',
-    firmware: 'v3.2.1',
-    chargeType: 'Solar',
-    activatedAt: '2024-04-18',
-    temperatureC: 41,
-    linkedAnimalId: null,
-    linkedAnimalTag: null,
-  },
+  { id: 1, serial: 'CRS-00142', model: 'Pro', ...deviceBase, activatedAt: '2024-01-01', temperatureC: 26, linkedAnimalId: 1, linkedAnimalTag: 'Bull #A-042' },
+  { id: 3, serial: 'CRS-00187', model: 'Lite', ...deviceBase, firmware: 'v3.1.0', activatedAt: '2024-03-03', temperatureC: 2, linkedAnimalId: 3, linkedAnimalTag: 'Heifer #A-061' },
+  { id: 6, serial: 'CRS-00224', model: 'Pro', ...deviceBase, activatedAt: '2024-05-02', temperatureC: 24, linkedAnimalId: null, linkedAnimalTag: 'Cow #A-017' },
+  { id: 7, serial: 'CRS-00231', model: 'Pro', ...deviceBase, activatedAt: '2024-05-14', temperatureC: 27, linkedAnimalId: null, linkedAnimalTag: 'Cow #A-023' },
+  { id: 8, serial: 'CRS-00238', model: 'Lite', ...deviceBase, firmware: 'v3.1.0', activatedAt: '2024-06-01', temperatureC: 25, linkedAnimalId: null, linkedAnimalTag: 'Steer #A-031' },
+  { id: 9, serial: 'CRS-00245', model: 'Pro', ...deviceBase, activatedAt: '2024-06-19', temperatureC: 23, linkedAnimalId: null, linkedAnimalTag: 'Heifer #A-039' },
+  { id: 10, serial: 'CRS-00252', model: 'Pro', ...deviceBase, activatedAt: '2024-07-03', temperatureC: 28, linkedAnimalId: null, linkedAnimalTag: 'Cow #A-044' },
+  { id: 11, serial: 'CRS-00259', model: 'Lite', ...deviceBase, firmware: 'v3.1.0', activatedAt: '2024-07-21', temperatureC: 26, linkedAnimalId: null, linkedAnimalTag: 'Bull #A-050' },
+  { id: 12, serial: 'CRS-00266', model: 'Pro', ...deviceBase, activatedAt: '2024-08-08', temperatureC: 25, linkedAnimalId: null, linkedAnimalTag: 'Cow #A-056' },
+  { id: 13, serial: 'CRS-00273', model: 'Pro', ...deviceBase, activatedAt: '2024-08-27', temperatureC: 24, linkedAnimalId: null, linkedAnimalTag: 'Heifer #A-062' },
+  { id: 14, serial: 'CRS-00280', model: 'Lite', ...deviceBase, firmware: 'v3.1.0', activatedAt: '2024-09-10', temperatureC: 27, linkedAnimalId: null, linkedAnimalTag: 'Cow #A-068' },
+  { id: 15, serial: 'CRS-00287', model: 'Pro', ...deviceBase, activatedAt: '2024-09-29', temperatureC: 26, linkedAnimalId: null, linkedAnimalTag: 'Steer #A-074' },
+  // Unlinked / inactive tags — in stock, not yet allocated to an animal.
+  { id: 5, serial: 'CRS-00210', model: 'Pro', ...deviceBase, activatedAt: '2024-04-18', temperatureC: 41, linkedAnimalId: null, linkedAnimalTag: null },
+  { id: 16, serial: 'CRS-00294', model: 'Pro', ...deviceBase, activatedAt: '2024-10-05', temperatureC: 22, linkedAnimalId: null, linkedAnimalTag: null },
+  { id: 17, serial: 'CRS-00301', model: 'Lite', ...deviceBase, firmware: 'v3.1.0', activatedAt: '2024-10-12', temperatureC: 23, linkedAnimalId: null, linkedAnimalTag: null },
+  { id: 18, serial: 'CRS-00308', model: 'Pro', ...deviceBase, activatedAt: '2024-10-20', temperatureC: 24, linkedAnimalId: null, linkedAnimalTag: null },
 ];
+
+/** True when a device/tag is linked to an animal (an "active" tag). */
+export function isTagActive(d: Device): boolean {
+  return d.linkedAnimalId !== null || d.linkedAnimalTag !== null;
+}
 
 export const users: User[] = [
   { id: 1, fullName: 'Alice Kagawa', email: 'alice@ngaren.com', role: 'Admin' },
@@ -145,6 +140,21 @@ export const users: User[] = [
   { id: 3, fullName: 'James Otieno', email: 'james@ngaren.com', role: 'Operator' },
   { id: 4, fullName: 'Pam Karanja', email: 'pam@ngaren.com', role: 'Viewer' },
 ];
+
+// Dashboard summary — DERIVED from the lists above so every counter matches the
+// screen it drills into (animals list, devices list, farm map). Active tags =
+// linked devices; inactive/free = unlinked. Connectivity splits the animals by
+// whether they carry a device/tag.
+const _linkedDevices = devices.filter(isTagActive).length;
+const _connectedAnimals = animals.filter((a) => !!a.deviceSerial).length;
+export const summary: DashboardSummary = {
+  animals: animals.length,
+  devices: devices.length,
+  locations: locations.length,
+  users: users.length,
+  allocation: { allocated: _linkedDevices, free: devices.length - _linkedDevices },
+  connectivity: { connected: _connectedAnimals, unconnected: animals.length - _connectedAnimals },
+};
 
 export const notifications: AppNotification[] = [
   { id: 1, category: 'device', title: 'Device Activity', message: 'CRS-00142 low battery', timestamp: '2 hours ago', unread: true },

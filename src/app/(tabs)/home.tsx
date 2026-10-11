@@ -4,8 +4,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { summary as summaryFallback } from '@/data/mock';
-import { getSummary, getCalloutRequests } from '@/data/api';
+import { summary as summaryFallback, isTagActive, devices as devicesFallback, locations as locationsFallback } from '@/data/mock';
+import { getSummary, getCalloutRequests, getDevices, getLocations } from '@/data/api';
 import { getLocalAnimals } from '@/data/localAnimals';
 import { getHerd } from '@/data/herd';
 import { getFarmerPortfolio, portfolioTotals } from '@/data/portfolio';
@@ -41,9 +41,10 @@ const FARMER_ACTIONS: Action[] = [
   { icon: 'dna', label: 'action.breeding', route: '/breeding', tint: '#EC4899', perm: 'view_animals' },
   { icon: 'calendar-month-outline', label: 'action.calendar', route: '/calendar', tint: '#0EA5E9' },
   { icon: 'clipboard-list-outline', label: 'action.stockTake', route: '/stock-take', tint: '#F59E0B', perm: 'stock_take' },
-  { icon: 'cow', label: 'action.viewAnimals', route: '/(tabs)/animals', tint: '#2563EB', perm: 'view_animals' },
-  { icon: 'map-marker-radius', label: 'action.trackAnimals', route: '/(tabs)/track', tint: '#16A34A', perm: 'view_track' },
+  // View Animals and Track Animals are the bottom tabs (Animals / Track); not
+  // duplicated here to avoid repetitive navigation (Oct 2026 clean-up).
   { icon: 'map-marker-outline', label: 'action.farmMap', route: '/locations', tint: '#0D9488' },
+  { icon: 'tag-outline', label: 'action.devices', route: '/devices', tint: '#9333EA', perm: 'view_animals' },
   { icon: 'message-text-outline', label: 'action.messages', route: '/messaging', tint: '#F59E0B' },
   { icon: 'storefront-outline', label: 'action.marketplace', route: '/marketplace', tint: '#0D9488' },
   { icon: 'account-group-outline', label: 'action.teamSeats', route: '/team', tint: '#0284C7' },
@@ -103,23 +104,11 @@ function HeaderStat({ value, label }: { value: number; label: string }) {
   );
 }
 
-/** A compact KPI tile used in the admin executive summary. */
-function KpiTile({ value, label, icon, tint }: { value: number; label: string; icon: IconName; tint: string }) {
-  return (
-    <View
-      style={[
-        {
-          width: '47%',
-          flexGrow: 1,
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: spacing.sm,
-          backgroundColor: colors.surface,
-          borderRadius: radius.md,
-          padding: spacing.md,
-        },
-        shadow[1],
-      ]}>
+/** A compact KPI tile. When `onPress` is given it becomes a drill-down tile
+ *  (e.g. Active/Inactive tags → the filtered tags list) with a chevron. */
+function KpiTile({ value, label, icon, tint, onPress }: { value: number; label: string; icon: IconName; tint: string; onPress?: () => void }) {
+  const body = (
+    <>
       <View
         style={{
           width: 42,
@@ -131,14 +120,36 @@ function KpiTile({ value, label, icon, tint }: { value: number; label: string; i
         }}>
         <Icon name={icon} size={22} color={tint} />
       </View>
-      <View>
+      <View style={{ flex: 1 }}>
         <AppText variant="title">{value}</AppText>
         <AppText variant="caption" color={colors.onSurfaceVariant}>
           {label}
         </AppText>
       </View>
-    </View>
+      {onPress ? <Icon name="chevron-right" size={18} color={colors.onSurfaceVariant} /> : null}
+    </>
   );
+  const style = [
+    {
+      width: '47%' as const,
+      flexGrow: 1,
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      gap: spacing.sm,
+      backgroundColor: colors.surface,
+      borderRadius: radius.md,
+      padding: spacing.md,
+    },
+    shadow[1],
+  ];
+  if (onPress) {
+    return (
+      <Pressable onPress={onPress} style={({ pressed }) => [...style, { opacity: pressed ? 0.9 : 1 }]}>
+        {body}
+      </Pressable>
+    );
+  }
+  return <View style={style}>{body}</View>;
 }
 
 export default function Home() {
@@ -153,6 +164,11 @@ export default function Home() {
   const { data: localAnimals } = useResource(getLocalAnimals, []);
   const { data: herd } = useResource(getHerd, []);
   const { data: callouts } = useResource(getCalloutRequests, []);
+  // Devices & locations power the farmer header + tag KPIs so those counters
+  // match the screens they drill into (Devices list, Farm Map) — no more
+  // "Locations: 12" on the dashboard vs 4 on the map.
+  const { data: devices } = useResource(getDevices, devicesFallback);
+  const { data: locationList } = useResource(getLocations, locationsFallback);
 
   // Stock-take/validation reporting categorized by device type (management
   // decision), across the whole live herd. Only animals whose tagging method is
@@ -200,11 +216,17 @@ export default function Home() {
     if (a.route === '/approvals') return canApprove;
     return !a.perm || can(a.perm);
   });
-  const linkedDevices = Math.max(0, summary.devices - summary.connectivity.unconnected);
   const totals = portfolioTotals(portfolio);
-  // Farmer tag health for the "My Farm" insight band.
-  const activeTags = summary.allocation.allocated;
-  const inactiveTags = Math.max(0, summary.devices - activeTags);
+  // Farmer tag health — derived from the SAME device list the Active/Inactive
+  // tiles drill into, so the counts and the list always agree.
+  const activeTags = useMemo(() => devices.filter(isTagActive).length, [devices]);
+  const inactiveTags = Math.max(0, devices.length - activeTags);
+  // Farmer headline counts derived from the EXACT sources the detail screens
+  // read, so a dashboard counter always equals the list it drills into: herd
+  // (Animals list), devices (Devices list), locations (Farm Map).
+  const farmerAnimals = herd.length;
+  const farmerDevices = devices.length;
+  const farmerLocations = locationList.length;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -274,9 +296,9 @@ export default function Home() {
             </>
           ) : (
             <>
-              <HeaderStat value={summary.animals} label={t('home.stat.myAnimals')} />
-              <HeaderStat value={summary.devices} label={t('home.stat.devices')} />
-              <HeaderStat value={summary.locations} label={t('home.stat.locations')} />
+              <HeaderStat value={farmerAnimals} label={t('home.stat.myAnimals')} />
+              <HeaderStat value={farmerDevices} label={t('home.stat.devices')} />
+              <HeaderStat value={farmerLocations} label={t('home.stat.locations')} />
             </>
           )}
         </View>
@@ -292,8 +314,8 @@ export default function Home() {
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.lg }}>
               <KpiTile value={totals.farmers} label={t('home.kpi.farmers')} icon="account-multiple-outline" tint="#6D874F" />
               <KpiTile value={totals.needAttention} label={t('home.kpi.needAttention')} icon="alert-outline" tint="#F59E0B" />
-              <KpiTile value={totals.activeTags} label={t('home.kpi.activeTags')} icon="access-point" tint="#16A34A" />
-              <KpiTile value={summary.connectivity.unconnected} label={t('home.kpi.devicesOffline')} icon="access-point-off" tint="#EF4444" />
+              <KpiTile value={totals.activeTags} label={t('home.kpi.activeTags')} icon="access-point" tint="#16A34A" onPress={() => router.push('/devices?filter=active' as never)} />
+              <KpiTile value={summary.connectivity.unconnected} label={t('home.kpi.devicesOffline')} icon="access-point-off" tint="#EF4444" onPress={() => router.push('/devices?filter=inactive' as never)} />
             </View>
           </>
         )}
@@ -313,11 +335,12 @@ export default function Home() {
           </>
         )}
 
-        {/* Farmer-only tag-health insight band (per tester feedback). */}
+        {/* Farmer-only tag-health insight band (per tester feedback). Tiles drill
+            into the filtered tags list. */}
         {!isAdmin && !isVet && (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.lg }}>
-            <KpiTile value={activeTags} label={t('home.kpi.activeTags')} icon="access-point" tint="#16A34A" />
-            <KpiTile value={inactiveTags} label={t('home.kpi.inactiveTags')} icon="access-point-off" tint="#F59E0B" />
+            <KpiTile value={activeTags} label={t('home.kpi.activeTags')} icon="access-point" tint="#16A34A" onPress={() => router.push('/devices?filter=active' as never)} />
+            <KpiTile value={inactiveTags} label={t('home.kpi.inactiveTags')} icon="access-point-off" tint="#F59E0B" onPress={() => router.push('/devices?filter=inactive' as never)} />
           </View>
         )}
 

@@ -112,7 +112,7 @@ export default function Health() {
           {canBookVet ? (
             <ActionTile icon="clipboard-pulse-outline" label={t('health.tileRequests')} sublabel={t('health.tileRequestsSub')} tint="#EF4444" onPress={() => router.push('/vet-requests')} />
           ) : null}
-          <ActionTile icon="cow" label={t('health.tileAnimals')} sublabel={t('health.tileAnimalsSub')} tint="#16A34A" onPress={() => router.push('/(tabs)/animals')} />
+          <ActionTile icon="cow" label={t('health.tileAnimals')} sublabel={t('health.tileAnimalsSub')} tint="#16A34A" onPress={() => router.push('/health-scorecard' as never)} />
         </View>
 
         {/* Clinical record history */}
@@ -148,10 +148,15 @@ export default function Health() {
           visible.map((r) => {
             const meta = CATEGORY_META[r.category];
             return (
-              <View
+              <Pressable
                 key={r.id}
-                style={[
-                  { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, gap: spacing.sm, borderLeftWidth: 3, borderLeftColor: meta.tint },
+                onPress={() =>
+                  router.push(
+                    `/health-scorecard?key=${encodeURIComponent(r.tag ?? r.animalName)}&label=${encodeURIComponent(r.animalName)}` as never,
+                  )
+                }
+                style={({ pressed }) => [
+                  { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, gap: spacing.sm, borderLeftWidth: 3, borderLeftColor: meta.tint, opacity: pressed ? 0.9 : 1 },
                   shadow[1],
                 ]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.mdMinus }}>
@@ -166,6 +171,7 @@ export default function Health() {
                     </AppText>
                   </View>
                   <ActionChip label={tStatus(r.status)} variant={statusVariant(r.status)} />
+                  <Icon name="chevron-right" size={18} color={colors.onSurfaceVariant} />
                 </View>
 
                 {!!r.notes && (
@@ -192,7 +198,7 @@ export default function Health() {
                     </View>
                   )}
                 </View>
-              </View>
+              </Pressable>
             );
           })
         )}
