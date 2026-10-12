@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Image, Pressable, ScrollView, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { AppText, Button, GradientHeader, Icon, IconName, Input } from '@/ui';
 import { useAuth } from '@/services/auth';
 import { useT } from '@/i18n';
+
+type LoginRole = 'farmer' | 'provider';
 
 const ngarenLogo = require('@/assets/images/ngaren-logo.png');
 
@@ -36,6 +38,10 @@ export default function Login() {
   const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Which kind of user is signing in. "Service Provider" follows the existing
+  // vet workflow and is future-proofed for other provider types. The actual
+  // role is still authoritative from Supabase; this guides routing + framing.
+  const [loginRole, setLoginRole] = useState<LoginRole>('farmer');
 
   const onLogin = async () => {
     if (!email.trim() || !password || submitting) return;
@@ -55,7 +61,13 @@ export default function Login() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <GradientHeader title={t('auth.loginTitle')} subtitle={t('auth.subtitle')} />
 
-      <ScrollView contentContainerStyle={{ alignItems: 'center', paddingBottom: spacing.xl }}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView
+        contentContainerStyle={{ alignItems: 'center', paddingBottom: spacing.xxl * 2 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}>
         <View
           style={[
             {
@@ -77,7 +89,7 @@ export default function Login() {
           />
         </View>
 
-        <View style={{ flexDirection: 'row', marginTop: spacing.mdMinus, marginBottom: spacing.lg }}>
+        <View style={{ flexDirection: 'row', marginTop: spacing.mdMinus, marginBottom: spacing.md }}>
           <AppText variant="bodyLarge" color={colors.onSurfaceVariant}>
             {t('auth.noAccount')}
           </AppText>
@@ -87,6 +99,27 @@ export default function Login() {
             </AppText>
           </Pressable>
         </View>
+
+        {/* Login as — Farmer or Service Provider (the latter follows the vet
+            workflow; future: other provider types). */}
+        <View style={{ width: 320, flexDirection: 'row', backgroundColor: colors.surface, borderRadius: radius.full, borderWidth: 1, borderColor: colors.divider, padding: 4, marginBottom: spacing.sm }}>
+          {(['farmer', 'provider'] as LoginRole[]).map((r) => {
+            const on = loginRole === r;
+            return (
+              <Pressable
+                key={r}
+                onPress={() => setLoginRole(r)}
+                style={{ flex: 1, paddingVertical: spacing.sm, borderRadius: radius.full, backgroundColor: on ? colors.primary : 'transparent', alignItems: 'center' }}>
+                <AppText variant="body" color={on ? '#fff' : colors.onSurfaceVariant} style={{ fontWeight: '700' }}>
+                  {t(r === 'farmer' ? 'auth.asFarmer' : 'auth.asProvider')}
+                </AppText>
+              </Pressable>
+            );
+          })}
+        </View>
+        <AppText variant="caption" color={colors.onSurfaceVariant} style={{ width: 320, marginBottom: spacing.md, textAlign: 'center' }}>
+          {t(loginRole === 'farmer' ? 'auth.farmerHint' : 'auth.providerHint')}
+        </AppText>
 
         <View style={{ width: 320, gap: spacing.md }}>
           <Input
@@ -147,6 +180,7 @@ export default function Login() {
           </View>
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

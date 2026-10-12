@@ -416,7 +416,14 @@ export interface CalloutRequest {
   scheduledFor?: string;
   /** Booked time slot within the day, e.g. "08:00–10:00" (Sep 12 2026). */
   scheduledSlot?: string;
+  /** How the vet attends — on-site / video / hybrid (shown on the task card). */
+  mode?: AppointmentMode;
+  /** The service the farmer requested (shown + filterable on the task list). */
+  service?: CalloutService;
 }
+
+/** Services a farmer can request from a service provider (Oct 2026 Q&A). */
+export type CalloutService = 'Stocktaking' | 'Registration' | 'Treatment' | 'Vaccination' | 'Consultation';
 
 /** A subscription plan shown on the Payments screen. */
 export interface Plan {

@@ -7,7 +7,9 @@ import { colors, radius, shadow, spacing } from '@/theme';
 import { summary as summaryFallback, isTagActive, devices as devicesFallback, locations as locationsFallback } from '@/data/mock';
 import { getSummary, getCalloutRequests, getDevices, getLocations } from '@/data/api';
 import { getLocalAnimals } from '@/data/localAnimals';
+import { getLastStockTake } from '@/data/localStockTake';
 import { getHerd } from '@/data/herd';
+import { formatDate } from '@/lib/date';
 import { getFarmerPortfolio, portfolioTotals } from '@/data/portfolio';
 import { VET_METRICS_FALLBACK, getVetMetrics } from '@/data/vet';
 import { useResource } from '@/data/hooks';
@@ -29,26 +31,24 @@ function initials(name: string): string {
 // language with the rest of the app.
 type Action = { icon: IconName; label: string; route: string; tint: string; perm?: Permission };
 
-// Farmer "Herd Operations Console" — day-to-day herd work. `perm` gates the
-// action for delegated seat members; owners/solo farmers hold every permission
-// so they see the full grid unchanged. Team & Payments are owner-only.
+// Farmer Quick Actions (Oct 2026 Q&A) — refocused to the key activities. The
+// busy grid was cut: secondary destinations moved to Reports (below) or the
+// account profile (Payments, Messages, Marketplace, Team). `perm` still gates
+// actions for delegated seat members.
 const FARMER_ACTIONS: Action[] = [
-  { icon: 'stethoscope', label: 'action.findVet', route: '/find-vet', tint: '#21C45D', perm: 'book_vet' },
-  { icon: 'clipboard-pulse-outline', label: 'action.vetRequests', route: '/vet-requests', tint: '#EF4444', perm: 'book_vet' },
+  { icon: 'clipboard-check-outline', label: 'action.manageRecords', route: '/approvals', tint: '#F59E0B' },
+  { icon: 'calendar-month-outline', label: 'action.manageCalendar', route: '/calendar', tint: '#0EA5E9' },
   { icon: 'plus-circle-outline', label: 'action.registerAnimal', route: '/register-animal', tint: '#6D874F', perm: 'register_animal' },
-  { icon: 'check-decagram-outline', label: 'action.activation', route: '/approvals', tint: '#F59E0B' },
-  { icon: 'heart-pulse', label: 'action.managedHealth', route: '/health', tint: '#EF4444', perm: 'view_health' },
-  { icon: 'dna', label: 'action.breeding', route: '/breeding', tint: '#EC4899', perm: 'view_animals' },
-  { icon: 'calendar-month-outline', label: 'action.calendar', route: '/calendar', tint: '#0EA5E9' },
-  { icon: 'clipboard-list-outline', label: 'action.stockTake', route: '/stock-take', tint: '#F59E0B', perm: 'stock_take' },
-  // View Animals and Track Animals are the bottom tabs (Animals / Track); not
-  // duplicated here to avoid repetitive navigation (Oct 2026 clean-up).
-  { icon: 'map-marker-outline', label: 'action.farmMap', route: '/locations', tint: '#0D9488' },
-  { icon: 'tag-outline', label: 'action.devices', route: '/devices', tint: '#9333EA', perm: 'view_animals' },
-  { icon: 'message-text-outline', label: 'action.messages', route: '/messaging', tint: '#F59E0B' },
-  { icon: 'storefront-outline', label: 'action.marketplace', route: '/marketplace', tint: '#0D9488' },
-  { icon: 'account-group-outline', label: 'action.teamSeats', route: '/team', tint: '#0284C7' },
-  { icon: 'wallet-outline', label: 'action.payments', route: '/payments', tint: '#9333EA' },
+  { icon: 'stethoscope', label: 'action.findVetNear', route: '/find-vet', tint: '#21C45D', perm: 'book_vet' },
+];
+
+// Farmer Reports (Oct 2026 Q&A) — the detailed record sets.
+const FARMER_REPORTS: Action[] = [
+  { icon: 'cow', label: 'report.myAnimals', route: '/(tabs)/animals', tint: '#2563EB', perm: 'view_animals' },
+  { icon: 'clipboard-list-outline', label: 'report.stockTaking', route: '/stock-take', tint: '#F59E0B', perm: 'stock_take' },
+  { icon: 'heart-pulse', label: 'report.healthRecords', route: '/health', tint: '#EF4444', perm: 'view_health' },
+  { icon: 'tag-outline', label: 'report.deviceManager', route: '/devices', tint: '#9333EA', perm: 'view_animals' },
+  { icon: 'dna', label: 'report.breeding', route: '/breeding', tint: '#EC4899', perm: 'view_animals' },
 ];
 
 // Admin "Enterprise Control Center" — organisation-wide oversight tools that a
@@ -169,6 +169,7 @@ export default function Home() {
   // "Locations: 12" on the dashboard vs 4 on the map.
   const { data: devices } = useResource(getDevices, devicesFallback);
   const { data: locationList } = useResource(getLocations, locationsFallback);
+  const { data: lastStock } = useResource(getLastStockTake, null);
 
   // Stock-take/validation reporting categorized by device type (management
   // decision), across the whole live herd. Only animals whose tagging method is
@@ -216,6 +217,8 @@ export default function Home() {
     if (a.route === '/approvals') return canApprove;
     return !a.perm || can(a.perm);
   });
+  // Farmer Reports grid — same permission gating as the quick actions.
+  const farmerReports = FARMER_REPORTS.filter((a) => !a.perm || can(a.perm));
   const totals = portfolioTotals(portfolio);
   // Farmer tag health — derived from the SAME device list the Active/Inactive
   // tiles drill into, so the counts and the list always agree.
@@ -335,13 +338,69 @@ export default function Home() {
           </>
         )}
 
-        {/* Farmer-only tag-health insight band (per tester feedback). Tiles drill
-            into the filtered tags list. */}
+        {/* Farmer "My Animals" summary (Oct 2026 Q&A) — total registered, the
+            latest physical/visual stock take, and the live satellite tag split.
+            Rows drill into the stock take and the tags list. */}
         {!isAdmin && !isVet && (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.lg }}>
-            <KpiTile value={activeTags} label={t('home.kpi.activeTags')} icon="access-point" tint="#16A34A" onPress={() => router.push('/devices?filter=active' as never)} />
-            <KpiTile value={inactiveTags} label={t('home.kpi.inactiveTags')} icon="access-point-off" tint="#F59E0B" onPress={() => router.push('/devices?filter=inactive' as never)} />
-          </View>
+          <>
+            <AppText variant="title" style={{ marginBottom: spacing.md }}>
+              {t('home.section.myAnimals')}
+            </AppText>
+            <View style={[{ backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.md, gap: spacing.md }, shadow[1]]}>
+              {/* Total registered */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+                <View style={{ width: 46, height: 46, borderRadius: radius.md, backgroundColor: '#2563EB1A', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="cow" size={24} color="#2563EB" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <AppText variant="caption" color={colors.onSurfaceVariant}>{t('home.ma.totalRegistered')}</AppText>
+                  <AppText variant="headline">{farmerAnimals}</AppText>
+                </View>
+              </View>
+
+              <View style={{ height: 1, backgroundColor: colors.divider }} />
+
+              {/* Physical & visual stock take — latest */}
+              <Pressable onPress={() => router.push('/stock-take' as never)} style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1, gap: 4 })}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                  <Icon name="camera-outline" size={16} color="#F59E0B" />
+                  <AppText variant="body" style={{ fontWeight: '600', flex: 1 }}>{t('home.ma.physicalVisual')}</AppText>
+                  <Icon name="chevron-right" size={18} color={colors.onSurfaceVariant} />
+                </View>
+                {lastStock ? (
+                  <AppText variant="caption" color={colors.onSurfaceVariant}>
+                    {t('home.ma.latest', { date: formatDate(lastStock.date) })} · {t('home.ma.present')} {lastStock.present} · {t('home.ma.absent')} {lastStock.absent}
+                  </AppText>
+                ) : (
+                  <AppText variant="caption" color={colors.primary} style={{ fontWeight: '600' }}>{t('home.ma.runStockTake')}</AppText>
+                )}
+              </Pressable>
+
+              <View style={{ height: 1, backgroundColor: colors.divider }} />
+
+              {/* Satellite stock take — live tag split */}
+              <Pressable onPress={() => router.push('/devices?filter=active' as never)} style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1, gap: 4 })}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                  <Icon name="satellite-variant" size={16} color="#16A34A" />
+                  <AppText variant="body" style={{ fontWeight: '600', flex: 1 }}>{t('home.ma.satellite')}</AppText>
+                  <Icon name="chevron-right" size={18} color={colors.onSurfaceVariant} />
+                </View>
+                <AppText variant="caption" color={colors.onSurfaceVariant}>
+                  {t('home.ma.activeTags')} {activeTags} · {t('home.ma.inactiveTags')} {inactiveTags}
+                </AppText>
+              </Pressable>
+            </View>
+
+            {/* Satellite / GPS tracking & monitoring (Ceres / GSat). */}
+            <NavBanner
+              tint="#16A34A"
+              icon="map-marker-radius"
+              title={t('home.satelliteTrack')}
+              subtitle={t('home.satelliteTrackSub')}
+              onPress={() => router.push('/(tabs)/track' as never)}
+              style={{ marginBottom: spacing.lg }}
+            />
+          </>
         )}
 
         {/* Maker-checker: pending-approval prompt for approvers. */}
@@ -369,8 +428,8 @@ export default function Home() {
           />
         )}
 
-        {/* Reporting categorized by device type (management decision). */}
-        {!isVet && classifiedCount > 0 && (
+        {/* Reporting categorized by device type (admin oversight). */}
+        {isAdmin && classifiedCount > 0 && (
           <>
             <AppText variant="title" style={{ marginBottom: spacing.md }}>
               {t('home.section.byDevice')}
@@ -403,6 +462,16 @@ export default function Home() {
           {isAdmin ? t('home.section.controlCenter') : isVet ? t('home.section.clinicalTools') : t('home.section.quickActions')}
         </AppText>
         <ActionGrid actions={actions} />
+
+        {/* Farmer Reports (Oct 2026 Q&A) — detailed record sets. */}
+        {!isAdmin && !isVet && (
+          <>
+            <AppText variant="title" style={{ marginTop: spacing.lg, marginBottom: spacing.md }}>
+              {t('home.section.reports')}
+            </AppText>
+            <ActionGrid actions={farmerReports} />
+          </>
+        )}
       </ScrollView>
     </View>
   );

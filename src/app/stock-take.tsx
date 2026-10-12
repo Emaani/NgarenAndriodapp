@@ -7,6 +7,8 @@ import { animals as animalsFallback } from '@/data/mock';
 import { getHerd } from '@/data/herd';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
+import { sendLocalNotification } from '@/services/push';
+import { saveStockTakeResult } from '@/data/localStockTake';
 import { ageFromDate } from '@/lib/date';
 import { Animal } from '@/data/types';
 import { useT } from '@/i18n';
@@ -184,6 +186,7 @@ export default function StockTake() {
   // verifies they are photographing the right animal (strict visual evidence).
   const [confirmAnimal, setConfirmAnimal] = useState<Animal | null>(null);
   const [capturing, setCapturing] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   // Add any newly-loaded animals to the count sheet as pending.
   useEffect(() => {
@@ -234,6 +237,57 @@ export default function StockTake() {
       setCapturing(false);
     }
   };
+  // Finalise the stock take (Oct 2026 Q&A): submission succeeds only after a
+  // live facial identification of the registered user, and any animal marked
+  // absent triggers an escalation to Ngaren Admin / the farmer / set contacts.
+  const submitStockTake = async () => {
+    setSubmitting(true);
+    try {
+      // 1) Facial identification of the registered user (front-camera selfie).
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert(t('stock.faceIdTitle'), t('stock.faceIdNeeded'));
+        return;
+      }
+      const shot = await ImagePicker.launchCameraAsync({ quality: 0.4, cameraType: ImagePicker.CameraType.front });
+      if (shot.canceled || !shot.assets?.[0]) {
+        Alert.alert(t('stock.faceIdTitle'), t('stock.faceIdRequired'));
+        return;
+      }
+      // 2) Escalate absent animals.
+      const strict = method === 'manual_visual';
+      const absent = allAnimals.filter(
+        (a) => marks[a.id] === 'missing' || (strict && (marks[a.id] ?? 'pending') === 'pending'),
+      );
+      const presentCount = allAnimals.filter((a) => marks[a.id] === 'present').length;
+      // Persist the result so the farmer dashboard can show the latest count.
+      await saveStockTakeResult({
+        date: new Date().toISOString(),
+        present: presentCount,
+        absent: absent.length,
+        total: allAnimals.length,
+        method,
+      });
+      if (absent.length > 0) {
+        const names = absent.slice(0, 5).map((a) => a.name ?? a.tag).join(', ');
+        void sendLocalNotification(
+          t('stock.escalationTitle'),
+          t('stock.escalationBody', { count: absent.length, names: names + (absent.length > 5 ? '…' : '') }),
+          { type: 'STOCKTAKE_ABSENT', count: absent.length },
+        );
+      }
+      Alert.alert(
+        t('stock.submittedTitle'),
+        absent.length > 0 ? t('stock.submittedEscalated', { count: absent.length }) : t('stock.submittedOk'),
+      );
+      router.replace('/(tabs)/home');
+    } catch {
+      Alert.alert(t('stock.cameraErrTitle'), t('stock.cameraErrBody'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // BLE: associate every animal whose tag is broadcasting (has a linked, active
   // device) as present in one pass — the "acceptance" step of a BLE round.
   const associateBleTags = () =>
@@ -372,15 +426,24 @@ export default function StockTake() {
             </>
           )}
 
+          {/* Submission requires a live facial ID of the registered user; absent
+              animals escalate on submit (Oct 2026 Q&A). */}
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, marginTop: spacing.md, marginBottom: spacing.sm }}>
+            <Icon name="face-recognition" size={15} color={colors.primary} />
+            <AppText variant="caption" color={colors.onSurfaceVariant} style={{ flex: 1 }}>
+              {missingCount > 0 ? t('stock.submitNoteEscalate', { count: missingCount }) : t('stock.submitNote')}
+            </AppText>
+          </View>
           <Button
             label={t('stock.submit')}
-            icon="content-save-check"
-            onPress={() => router.replace('/(tabs)/home')}
-            style={{ marginTop: spacing.md }}
+            icon="face-recognition"
+            loading={submitting}
+            onPress={submitStockTake}
           />
           <Button
             label={t('stock.backToCount')}
             variant="outline"
+            disabled={submitting}
             onPress={() => setPhase('count')}
             style={{ marginTop: spacing.sm }}
           />

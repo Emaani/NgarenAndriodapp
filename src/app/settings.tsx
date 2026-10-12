@@ -1,10 +1,12 @@
-import { Pressable, View } from 'react-native';
+import { Linking, Pressable, View } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import Constants from 'expo-constants';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { useAuth } from '@/services/auth';
 import { useT } from '@/i18n';
 import { AppText, GradientHeader, Icon, IconName, Screen } from '@/ui';
+
+const NGAREN_SUPPORT_TEL = '+256200000000';
 
 type Row = { icon: IconName; label: string; value?: string; route?: string; destructive?: boolean; onPress?: () => void };
 
@@ -54,7 +56,7 @@ function Section({ title, rows }: { title: string; rows: Row[] }) {
 export default function Settings() {
   const router = useRouter();
   const t = useT();
-  const { loading, isAuthenticated, isAdmin, appRole, signOut } = useAuth();
+  const { loading, isAuthenticated, isAdmin, appRole, signOut, canManageTeam } = useAuth();
 
   if (loading) return null;
   if (!isAuthenticated) return <Redirect href="/login" />;
@@ -78,6 +80,23 @@ export default function Settings() {
     { icon: 'alert-octagon-outline', label: t('settings.row.incidentsSla'), onPress: () => router.push('/incidents' as never) },
   ];
 
+  // Billing + Service support live on the account (Oct 2026 Q&A) — off the
+  // dashboard. The provider/farmer contact label flips with the role.
+  const isVet = appRole === 'veterinary';
+  const billing: Row[] = [
+    { icon: 'wallet-outline', label: t('settings.row.payments'), onPress: () => router.push('/payments' as never) },
+  ];
+  const support: Row[] = [
+    { icon: 'message-text-outline', label: t('settings.row.messageNgaren'), onPress: () => router.push('/messaging' as never) },
+    { icon: 'phone-outline', label: t('settings.row.callNgaren'), onPress: () => { Linking.openURL(`tel:${NGAREN_SUPPORT_TEL}`).catch(() => {}); } },
+    { icon: 'message-reply-text-outline', label: t(isVet ? 'settings.row.contactFarmer' : 'settings.row.contactProvider'), onPress: () => router.push('/messaging' as never) },
+  ];
+  // Secondary destinations moved off the decluttered dashboard (Oct 2026 Q&A).
+  const more: Row[] = [
+    { icon: 'storefront-outline', label: t('action.marketplace'), onPress: () => router.push('/marketplace' as never) },
+    ...(canManageTeam ? [{ icon: 'account-group-outline' as IconName, label: t('action.teamSeats'), onPress: () => router.push('/team' as never) }] : []),
+  ];
+
   const about: Row[] = [
     { icon: 'shield-account-outline', label: t('settings.row.role'), value: t(`role.${appRole}`) },
     { icon: 'information-outline', label: t('settings.row.appVersion'), value: version },
@@ -90,6 +109,9 @@ export default function Settings() {
       <GradientHeader title={t('profile.row.settings')} subtitle={t(`console.${appRole}`)} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         <Section title={t('settings.section.preferences')} rows={preferences} />
+        <Section title={t('settings.section.billing')} rows={billing} />
+        <Section title={t('settings.section.support')} rows={support} />
+        <Section title={t('settings.section.more')} rows={more} />
         {isAdmin && <Section title={t('settings.section.administration')} rows={adminRows} />}
         <Section title={t('settings.section.about')} rows={about} />
         <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.md }, shadow[1]]}>
