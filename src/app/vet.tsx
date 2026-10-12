@@ -41,7 +41,9 @@ const FILTERS: { key: Filter; label: string }[] = [
 // start a scorecard, and the core service entry points. Shares the ActionGrid
 // tile style with the farmer dashboard for a consistent look across profiles.
 const QUICK_ACTIONS: GridAction[] = [
-  { label: 'action.registerAnimal', icon: 'plus-circle-outline', route: '/register-animal', tint: '#6D874F' },
+  // Register Animal now routes through the accepted meeting so the vet can amend
+  // an existing record (AAN locked, farmer approves) or register a new one.
+  { label: 'action.manageRecords', icon: 'clipboard-account-outline', route: '/vet-manage-animals', tint: '#6D874F' },
   { label: 'action.newScorecard', icon: 'clipboard-plus-outline', route: '/health-scorecard', tint: '#2563EB' },
   { label: 'action.stockTake', icon: 'clipboard-list-outline', route: '/stock-take', tint: '#F59E0B' },
   { label: 'action.logVisit', icon: 'clipboard-edit-outline', route: '/log-visit', tint: '#16A34A' },

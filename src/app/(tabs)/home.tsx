@@ -347,8 +347,8 @@ export default function Home() {
               {t('home.section.myAnimals')}
             </AppText>
             <View style={[{ backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.md, gap: spacing.md }, shadow[1]]}>
-              {/* Total registered */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+              {/* Total registered — tap to open the full animal list. */}
+              <Pressable onPress={() => router.push('/(tabs)/animals' as never)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: spacing.md, opacity: pressed ? 0.9 : 1 })}>
                 <View style={{ width: 46, height: 46, borderRadius: radius.md, backgroundColor: '#2563EB1A', alignItems: 'center', justifyContent: 'center' }}>
                   <Icon name="cow" size={24} color="#2563EB" />
                 </View>
@@ -356,7 +356,8 @@ export default function Home() {
                   <AppText variant="caption" color={colors.onSurfaceVariant}>{t('home.ma.totalRegistered')}</AppText>
                   <AppText variant="headline">{farmerAnimals}</AppText>
                 </View>
-              </View>
+                <Icon name="chevron-right" size={18} color={colors.onSurfaceVariant} />
+              </Pressable>
 
               <View style={{ height: 1, backgroundColor: colors.divider }} />
 

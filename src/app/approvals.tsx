@@ -8,7 +8,9 @@ import {
   requiresDualApproval,
   setLocalAnimalApproval,
   setLocalAnimalApprovalStep,
+  updateLocalAnimal,
 } from '@/data/localAnimals';
+import { getPendingAmendments, setAmendmentStatus, AnimalAmendment } from '@/data/localAmendments';
 import { setLineageApproval } from '@/data/herd';
 import { notify } from '@/lib/toast';
 import { useResource } from '@/data/hooks';
@@ -49,8 +51,11 @@ export default function Approvals() {
   const t = useT();
   const { loading, isAuthenticated, canManageTeam, can, isAdmin } = useAuth();
   const { data: pending, reload } = useResource(getPendingLocalAnimals, []);
+  const { data: amendmentsData, reload: reloadAmendments } = useResource(getPendingAmendments, []);
   const [local, setLocal] = useState<Animal[] | null>(null);
+  const [localAmend, setLocalAmend] = useState<AnimalAmendment[] | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
+  const [busyAmend, setBusyAmend] = useState<string | null>(null);
 
   // Field-Operations validators (owner / admin / delegated approver) review here.
   const canApprove = canManageTeam || can('approve_records');
@@ -62,8 +67,22 @@ export default function Approvals() {
   if (!canApprove) return <Redirect href="/(tabs)/home" />;
 
   const items = local ?? pending;
+  const amendments = localAmend ?? amendmentsData;
 
   const removeRow = (id: number) => setLocal((prev) => (prev ?? pending).filter((a) => a.id !== id));
+
+  // Farmer reviews a vet's proposed amendment to an existing record. On approval
+  // the patch is applied to the on-device animal; the AAN is never touched.
+  const decideAmendment = async (am: AnimalAmendment, status: 'approved' | 'rejected') => {
+    setBusyAmend(am.id);
+    setLocalAmend((prev) => (prev ?? amendmentsData).filter((x) => x.id !== am.id));
+    if (status === 'approved') {
+      await updateLocalAnimal((a) => a.id === am.animalId, am.patch);
+    }
+    await setAmendmentStatus(am.id, status);
+    setBusyAmend(null);
+    notify(status === 'approved' ? t('approvals.amendApproved', { name: am.animalLabel }) : t('approvals.amendRejected', { name: am.animalLabel }));
+  };
 
   // Single-checker decision (non-dual captures).
   const decideSingle = async (animal: Animal, status: 'approved' | 'rejected') => {
@@ -102,18 +121,24 @@ export default function Approvals() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title={t('approvals.title')} subtitle={t('approvals.subtitle', { count: items.length })} showBack />
+      <GradientHeader title={t('approvals.title')} subtitle={t('approvals.subtitle', { count: items.length + amendments.length })} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
-        {items.length === 0 ? (
+        {items.length === 0 && amendments.length === 0 ? (
           <EmptyState
             icon="check-decagram-outline"
             title={t('approvals.emptyTitle')}
             subtitle={t('approvals.emptySub')}
             actionLabel={t('common.refresh')}
-            onAction={reload}
+            onAction={() => { reload(); reloadAmendments(); }}
           />
         ) : (
-          items.map((a) => {
+          <>
+          {items.length > 0 ? (
+            <AppText variant="overline" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>
+              {t('approvals.sectionNew')}
+            </AppText>
+          ) : null}
+          {items.map((a) => {
             const meta = taggingMeta(a.taggingMethod);
             const dual = requiresDualApproval(a);
             const myStepDone = party === 'admin' ? !!a.adminApproved : !!a.farmerApproved;
@@ -186,7 +211,51 @@ export default function Approvals() {
                 )}
               </View>
             );
-          })
+          })}
+
+          {/* Vet-proposed amendments to existing records — the farmer approves
+              (AAN never changes; approval applies the patch). Oct 2026 Q&A 4.1. */}
+          {amendments.length > 0 ? (
+            <>
+              <AppText variant="overline" color={colors.onSurfaceVariant} style={{ marginTop: items.length > 0 ? spacing.lg : 0, marginBottom: spacing.sm }}>
+                {t('approvals.sectionAmend')}
+              </AppText>
+              {amendments.map((am) => (
+                <View
+                  key={am.id}
+                  style={[
+                    { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, gap: spacing.sm, borderWidth: 1, borderColor: colors.divider },
+                    shadow[1],
+                  ]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.mdMinus }}>
+                    <IconChip icon="pencil-outline" />
+                    <View style={{ flex: 1 }}>
+                      <AppText variant="bodyLarge" style={{ fontWeight: '600' }}>{am.animalLabel}</AppText>
+                      <AppText variant="caption" color={colors.onSurfaceVariant}>
+                        {am.animalKey} · {t('approvals.proposedBy', { name: am.proposedBy })}
+                      </AppText>
+                    </View>
+                  </View>
+                  {/* The proposed changes (before → after). */}
+                  <View style={{ gap: 4, backgroundColor: colors.background, borderRadius: radius.sm, padding: spacing.sm }}>
+                    {am.changes.map((c) => (
+                      <View key={c.field} style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', gap: spacing.xs }}>
+                        <AppText variant="caption" color={colors.onSurfaceVariant} style={{ fontWeight: '600' }}>{c.label}:</AppText>
+                        <AppText variant="caption" color={colors.onSurfaceVariant} style={{ textDecorationLine: 'line-through' }}>{c.before}</AppText>
+                        <Icon name="arrow-right" size={12} color={colors.onSurfaceVariant} />
+                        <AppText variant="caption" color={colors.primary} style={{ fontWeight: '600' }}>{c.after}</AppText>
+                      </View>
+                    ))}
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                    <Button label={t('approvals.approveChange')} icon="check" loading={busyAmend === am.id} onPress={() => decideAmendment(am, 'approved')} style={{ flex: 1 }} />
+                    <Button label={t('approvals.reject')} variant="outline" onPress={() => decideAmendment(am, 'rejected')} style={{ flex: 1 }} />
+                  </View>
+                </View>
+              ))}
+            </>
+          ) : null}
+          </>
         )}
       </Screen>
     </View>

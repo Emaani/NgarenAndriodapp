@@ -2,32 +2,13 @@ import { useState } from 'react';
 import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { AppText, Button, GradientHeader, Icon, IconName, Input } from '@/ui';
+import { AppText, Button, GradientHeader, Input } from '@/ui';
 import { useAuth } from '@/services/auth';
 import { useT } from '@/i18n';
 
 type LoginRole = 'farmer' | 'provider';
 
 const ngarenLogo = require('@/assets/images/ngaren-logo.png');
-
-function SocialButton({ icon, color }: { icon: IconName; color: string }) {
-  return (
-    <View
-      style={[
-        {
-          width: 100,
-          height: 60,
-          borderRadius: radius.md,
-          backgroundColor: colors.surface,
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
-        shadow[1],
-      ]}>
-      <Icon name={icon} size={32} color={color} />
-    </View>
-  );
-}
 
 export default function Login() {
   const router = useRouter();
@@ -165,19 +146,11 @@ export default function Login() {
             style={{ marginTop: spacing.sm }}
           />
 
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginVertical: spacing.md }}>
-            <View style={{ flex: 1, height: 1, backgroundColor: colors.divider }} />
-            <AppText variant="body" color={colors.onSurfaceVariant}>
-              {t('auth.orLoginWith')}
-            </AppText>
-            <View style={{ flex: 1, height: 1, backgroundColor: colors.divider }} />
-          </View>
-
-          <View style={{ flexDirection: 'row', justifyContent: 'center', gap: spacing.mdMinus }}>
-            <SocialButton icon="google" color="#EA4335" />
-            <SocialButton icon="apple" color="#000" />
-            <SocialButton icon="facebook" color="#1877F2" />
-          </View>
+          {/* Social sign-in removed — accounts are provisioned by the Ngaren
+              admin, so users sign in with their issued credentials only. */}
+          <AppText variant="caption" color={colors.onSurfaceVariant} style={{ textAlign: 'center', marginTop: spacing.md }}>
+            {t('auth.adminOnboarded')}
+          </AppText>
         </View>
       </ScrollView>
       </KeyboardAvoidingView>

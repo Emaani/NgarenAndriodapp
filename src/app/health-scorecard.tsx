@@ -83,14 +83,24 @@ export default function HealthScoreCard() {
   const { data: allVisits } = useResource(getVetVisits, []);
   const { data: allScorecards } = useResource(loadScorecards, []);
 
-  // Resolve the animal from a route param or an in-screen selection.
+  // Resolve the animal from an in-screen selection or a route param. An explicit
+  // pick in the "Choose animal" picker ALWAYS wins — otherwise, if the caller
+  // passed a ?key/?id that doesn't match this farmer's herd, the picker selection
+  // would be ignored and the right scorecard would never show.
   const animal: Animal | undefined = useMemo(() => {
-    if (id) return herd.find((a) => a.id === Number(id));
+    if (selectedId != null) {
+      const picked = herd.find((a) => a.id === selectedId);
+      if (picked) return picked;
+    }
+    if (id) {
+      const byId = herd.find((a) => a.id === Number(id));
+      if (byId) return byId;
+    }
     if (key) {
       const k = key.toLowerCase();
-      return herd.find((a) => [a.ngarenCode, a.tag, a.accountNumber, a.name].filter(Boolean).map((x) => String(x).toLowerCase()).includes(k));
+      const byKey = herd.find((a) => [a.ngarenCode, a.tag, a.accountNumber, a.name].filter(Boolean).map((x) => String(x).toLowerCase()).includes(k));
+      if (byKey) return byKey;
     }
-    if (selectedId != null) return herd.find((a) => a.id === selectedId);
     return undefined;
   }, [herd, id, key, selectedId]);
 
