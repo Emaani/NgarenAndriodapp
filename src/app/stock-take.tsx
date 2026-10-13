@@ -9,6 +9,7 @@ import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { sendLocalNotification } from '@/services/push';
 import { saveStockTakeResult } from '@/data/localStockTake';
+import { addLocalEvent } from '@/data/localEvents';
 import { ageFromDate } from '@/lib/date';
 import { Animal } from '@/data/types';
 import { useT } from '@/i18n';
@@ -172,7 +173,7 @@ function SummaryStat({ value, label, color }: { value: number; label: string; co
 export default function StockTake() {
   const router = useRouter();
   const t = useT();
-  const { can } = useAuth();
+  const { can, canVet } = useAuth();
   const { data: allAnimals } = useResource(getHerd, animalsFallback);
   const [marks, setMarks] = useState<Record<number, Mark>>(() =>
     Object.fromEntries(animalsFallback.map((a) => [a.id, 'pending' as Mark])),
@@ -260,13 +261,23 @@ export default function StockTake() {
         (a) => marks[a.id] === 'missing' || (strict && (marks[a.id] ?? 'pending') === 'pending'),
       );
       const presentCount = allAnimals.filter((a) => marks[a.id] === 'present').length;
+      const nowIso = new Date().toISOString();
       // Persist the result so the farmer dashboard can show the latest count.
       await saveStockTakeResult({
-        date: new Date().toISOString(),
+        date: nowIso,
         present: presentCount,
         absent: absent.length,
         total: allAnimals.length,
         method,
+      });
+      // Log the stock-take on the shared calendar so it is visible and managed
+      // consistently across profiles (farmer + vet) — Oct 2026 Q&A.
+      const hhmm = nowIso.slice(11, 16);
+      await addLocalEvent({
+        title: t('stock.calendarTitle', { present: presentCount, absent: absent.length }),
+        type: 'stock_take',
+        date: nowIso.slice(0, 10),
+        time: hhmm,
       });
       if (absent.length > 0) {
         const names = absent.slice(0, 5).map((a) => a.name ?? a.tag).join(', ');
@@ -309,7 +320,10 @@ export default function StockTake() {
 
   // Defence in depth: a delegated member without stock-take rights can't reach
   // this even via a deep link (the dashboard action is already hidden).
-  if (!can('stock_take')) return <Redirect href="/(tabs)/home" />;
+  // Vets (and admins, via canVet) perform stock-takes as a service; farmers/
+  // delegates need the stock_take permission. Without this, the vet tab bounced
+  // back to the dashboard ("nothing happens").
+  if (!can('stock_take') && !canVet) return <Redirect href="/(tabs)/home" />;
 
   // Step 1 — choose how this herd is tagged before counting.
   if (phase === 'method') {

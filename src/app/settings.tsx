@@ -87,9 +87,9 @@ export default function Settings() {
     { icon: 'wallet-outline', label: t('settings.row.payments'), onPress: () => router.push('/payments' as never) },
   ];
   const support: Row[] = [
-    { icon: 'message-text-outline', label: t('settings.row.messageNgaren'), onPress: () => router.push('/messaging' as never) },
+    { icon: 'message-text-outline', label: t('settings.row.messageNgaren'), onPress: () => router.push('/compose-message?to=ngaren' as never) },
     { icon: 'phone-outline', label: t('settings.row.callNgaren'), onPress: () => { Linking.openURL(`tel:${NGAREN_SUPPORT_TEL}`).catch(() => {}); } },
-    { icon: 'message-reply-text-outline', label: t(isVet ? 'settings.row.contactFarmer' : 'settings.row.contactProvider'), onPress: () => router.push('/messaging' as never) },
+    { icon: 'message-reply-text-outline', label: t(isVet ? 'settings.row.contactFarmer' : 'settings.row.contactProvider'), onPress: () => router.push(isVet ? '/compose-message?to=farmer' as never : '/messaging' as never) },
   ];
   // Secondary destinations moved off the decluttered dashboard (Oct 2026 Q&A).
   const more: Row[] = [

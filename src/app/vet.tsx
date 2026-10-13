@@ -54,10 +54,10 @@ const QUICK_ACTIONS: GridAction[] = [
 // it. Trend/log reports route to the Reports screen with a view param.
 const REPORTS: GridAction[] = [
   { label: 'vet.report.animalsManaged', icon: 'cow', route: '/vet-animals', tint: '#2563EB' },
-  { label: 'vet.report.farmersManaged', icon: 'account-multiple-outline', route: '/vet-reports?view=farmers', tint: '#6D874F' },
+  { label: 'vet.report.farmersManaged', icon: 'account-multiple-outline', route: '/vet-farmers', tint: '#6D874F' },
   { label: 'vet.report.healthRecords', icon: 'heart-pulse', route: '/health', tint: '#EF4444' },
   { label: 'vet.report.breeding', icon: 'dna', route: '/breeding', tint: '#EC4899' },
-  { label: 'vet.report.visitLog', icon: 'clipboard-text-outline', route: '/vet-reports?view=visits', tint: '#0EA5E9' },
+  { label: 'vet.report.visitLog', icon: 'clipboard-text-outline', route: '/vet-visit-log', tint: '#0EA5E9' },
   { label: 'vet.report.diseaseTrends', icon: 'virus-outline', route: '/vet-reports?view=disease', tint: '#DC2626' },
   { label: 'vet.report.parasiteTrends', icon: 'bug-outline', route: '/vet-reports?view=parasite', tint: '#F59E0B' },
 ];
@@ -395,10 +395,10 @@ export default function VetDashboard() {
         </AppText>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg }}>
           {([
-            { label: 'vet.support.messageNgaren', icon: 'message-text-outline', tint: '#0D9488', onPress: () => router.push('/messaging' as never) },
+            { label: 'vet.support.messageNgaren', icon: 'message-text-outline', tint: '#0D9488', onPress: () => router.push('/compose-message?to=ngaren' as never) },
             { label: 'vet.support.callNgaren', icon: 'phone-outline', tint: '#2563EB', onPress: () => Linking.openURL(`tel:${NGAREN_SUPPORT_TEL}`).catch(() => {}) },
-            { label: 'vet.support.messageFarmer', icon: 'message-reply-text-outline', tint: '#16A34A', onPress: () => router.push('/messaging' as never) },
-            { label: 'vet.support.callFarmer', icon: 'phone-in-talk-outline', tint: '#F59E0B', onPress: () => router.push('/messaging' as never) },
+            { label: 'vet.support.messageFarmer', icon: 'message-reply-text-outline', tint: '#16A34A', onPress: () => router.push('/compose-message?to=farmer' as never) },
+            { label: 'vet.support.callFarmer', icon: 'phone-in-talk-outline', tint: '#F59E0B', onPress: () => router.push('/compose-message?to=farmer' as never) },
           ] as { label: string; icon: IconName; tint: string; onPress: () => void }[]).map((s) => (
             <Pressable
               key={s.label}
