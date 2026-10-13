@@ -9,7 +9,8 @@ import { calloutRequests as calloutFallback } from '@/data/mock';
 import { getBreedingRecords, getHealthRecords } from '@/data/clinical';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
-import { exportCsv } from '@/lib/export';
+import { exportCsv, exportPdf } from '@/lib/export';
+import { logReportExport } from '@/data/reportAudit';
 import {
   REPORT_CATALOG,
   ReportKind,
@@ -29,7 +30,7 @@ import { AppText, GradientHeader, Icon, IconChip, Screen } from '@/ui';
  */
 export default function Reports() {
   const t = useT();
-  const { loading, isAuthenticated, isAdmin, canVet } = useAuth();
+  const { loading, isAuthenticated, isAdmin, canVet, user } = useAuth();
   const { data: animals } = useResource(getHerd, animalsFallback);
   const { data: devices } = useResource(() => getDevices(), devicesFallback);
   const { data: health } = useResource(getHealthRecords, []);
@@ -48,25 +49,72 @@ export default function Reports() {
       : id === 'vet_audit' ? callouts.length
       : breeding.length;
 
-  const runExport = async (id: ReportKind) => {
+  // Parse a CSV string back into a branded HTML table for the PDF export, so
+  // every report is available in both Excel (CSV) and PDF (FR-ADM-12).
+  const csvToHtml = (title: string, csv: string): string => {
+    const rows = csv.split(/\r?\n/).filter((l) => l.length > 0).map((line) => {
+      const cells: string[] = [];
+      let cur = '', q = false;
+      for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (q) {
+          if (c === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+          else if (c === '"') q = false;
+          else cur += c;
+        } else if (c === '"') q = true;
+        else if (c === ',') { cells.push(cur); cur = ''; }
+        else cur += c;
+      }
+      cells.push(cur);
+      return cells;
+    });
+    const head = rows[0] ?? [];
+    const body = rows.slice(1);
+    const esc = (s: string) => s.replace(/</g, '&lt;');
+    return `<!doctype html><html><head><meta charset="utf-8"><style>
+      body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#1b1a14;padding:24px}
+      h1{color:#6d874f;font-size:20px;margin:0 0 4px}.muted{color:#666;font-size:12px;margin:0 0 16px}
+      table{width:100%;border-collapse:collapse;font-size:11px}
+      th,td{border-bottom:1px solid #ddd;padding:5px 7px;text-align:left;vertical-align:top}
+      th{background:#f2f2ef;text-transform:uppercase;font-size:9px;letter-spacing:.04em}
+    </style></head><body><h1>Ngaren — ${esc(title)}</h1>
+      <p class="muted">Generated ${new Date().toISOString().slice(0, 10)} · ${body.length} rows</p>
+      <table><thead><tr>${head.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead>
+      <tbody>${body.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>
+    </body></html>`;
+  };
+
+  const runExport = async (id: ReportKind, format: 'csv' | 'pdf') => {
     setBusy(id);
     try {
       const stamp = new Date().toISOString().slice(0, 10);
-      const map: Record<ReportKind, { file: string; csv: string }> = {
-        livestock: { file: `livestock-${stamp}.csv`, csv: animalsCsv(animals) },
-        devices: { file: `devices-${stamp}.csv`, csv: devicesCsv(devices) },
-        health: { file: `health-${stamp}.csv`, csv: healthCsv(health) },
-        vet_audit: { file: `vet-visits-audit-${stamp}.csv`, csv: vetAuditCsv(callouts) },
-        breeding: { file: `breeding-${stamp}.csv`, csv: breedingCsv(breeding) },
+      const map: Record<ReportKind, { base: string; title: string; csv: string }> = {
+        livestock: { base: `livestock-${stamp}`, title: 'Animals Managed', csv: animalsCsv(animals) },
+        devices: { base: `devices-${stamp}`, title: 'Device Manager & Telemetry', csv: devicesCsv(devices) },
+        health: { base: `health-${stamp}`, title: 'Animal Health Records', csv: healthCsv(health) },
+        vet_audit: { base: `vet-visits-audit-${stamp}`, title: 'Visit Audit', csv: vetAuditCsv(callouts) },
+        breeding: { base: `breeding-${stamp}`, title: 'Breeding & Reproduction', csv: breedingCsv(breeding) },
       };
-      const { file, csv } = map[id];
-      const ok = await exportCsv(file, csv);
+      const { base, title, csv } = map[id];
+      const ok = format === 'pdf'
+        ? await exportPdf(`${base}.pdf`, csvToHtml(title, csv))
+        : await exportCsv(`${base}.csv`, csv);
+      // Record the export in the audit trail (FR-ADM-04 / FR-ADM-12).
+      void logReportExport({ report: `${title} (${format.toUpperCase()})`, rows: rowCount(id), by: user?.fullName ?? user?.email ?? 'Admin', actorId: user?.id, shared: ok });
       if (!ok) {
         Alert.alert(t('rep.exportFailTitle'), t('rep.exportFailBody'));
       }
     } finally {
       setBusy(null);
     }
+  };
+
+  const chooseFormat = (id: ReportKind, name: string) => {
+    Alert.alert(name, t('rep.chooseFormat'), [
+      { text: t('rep.pdf'), onPress: () => runExport(id, 'pdf') },
+      { text: t('rep.excel'), onPress: () => runExport(id, 'csv') },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
   };
 
   return (
@@ -84,7 +132,7 @@ export default function Reports() {
             <Pressable
               key={r.id}
               disabled={busy !== null || count === 0}
-              onPress={() => runExport(r.id)}
+              onPress={() => chooseFormat(r.id, r.name)}
               style={({ pressed }) => [
                 {
                   flexDirection: 'row',

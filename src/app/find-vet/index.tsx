@@ -5,6 +5,7 @@ import { colors, radius, shadow, spacing } from '@/theme';
 import { vets } from '@/data/mock';
 import { getPrimaryVetIds } from '@/data/primaryVets';
 import { getEnlistedVets } from '@/data/vetEnlistments';
+import { getProviderStatuses, ProviderStatus } from '@/data/localProviderStatus';
 import { getNearbyRadiusKm, setNearbyRadiusKm, RADIUS_OPTIONS } from '@/data/vetPrefs';
 import { getCalloutRequests } from '@/data/api';
 import { getUnratedCompleted } from '@/data/vetRatings';
@@ -103,6 +104,8 @@ export default function FindVet() {
   const [query, setQuery] = useState('');
   const [primaryIds, setPrimaryIds] = useState<number[]>([]);
   const [enlisted, setEnlisted] = useState<Vet[]>([]);
+  // Admin vetting statuses — only Active providers are bookable (FR-ADM-01).
+  const [providerStatuses, setProviderStatuses] = useState<Record<number, ProviderStatus>>({});
   // Configurable "near me" radius (Sep 12 2026): default 5 km, adjustable.
   const [radiusKm, setRadiusKm] = useState(5);
   // Completed services still awaiting a rating (service-linked ratings).
@@ -114,6 +117,7 @@ export default function FindVet() {
       let active = true;
       getPrimaryVetIds().then((ids) => active && setPrimaryIds(ids));
       getEnlistedVets().then((list) => active && setEnlisted(list));
+      getProviderStatuses().then((s) => active && setProviderStatuses(s));
       getNearbyRadiusKm().then((km) => active && setRadiusKm(km));
       getCalloutRequests()
         .then((cs) => getUnratedCompleted(cs))
@@ -130,8 +134,14 @@ export default function FindVet() {
     void setNearbyRadiusKm(km);
   };
 
-  // Admin-enlisted vets join the seeded pool.
-  const pool = useMemo(() => [...enlisted, ...vets], [enlisted]);
+  // Admin-enlisted vets join the seeded pool — but only providers the admin has
+  // vetted as Active are bookable (FR-ADM-01). Enlisted providers default to
+  // Pending (hidden until approved); seeded demo providers default to Active.
+  const pool = useMemo(() => {
+    const enlistedIds = new Set(enlisted.map((e) => e.id));
+    const statusOf = (id: number): ProviderStatus => providerStatuses[id] ?? (enlistedIds.has(id) ? 'pending' : 'active');
+    return [...enlisted, ...vets].filter((v) => statusOf(v.id) === 'active');
+  }, [enlisted, providerStatuses]);
 
   // Preferred vets are matched by the farmer's saved trusted list — booking is
   // tied to their calendar availability (Sep 5 2026 standup). When the farmer

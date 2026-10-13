@@ -11,6 +11,8 @@ import { getLastStockTake } from '@/data/localStockTake';
 import { getHerd } from '@/data/herd';
 import { formatDate } from '@/lib/date';
 import { getFarmerPortfolio, portfolioTotals } from '@/data/portfolio';
+import { getEnlistedVets } from '@/data/vetEnlistments';
+import { vets as seededVets } from '@/data/mock';
 import { VET_METRICS_FALLBACK, getVetMetrics } from '@/data/vet';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
@@ -69,10 +71,12 @@ const ADMIN_ACTIONS: Action[] = [
   { icon: 'dna', label: 'action.breeding', route: '/breeding', tint: '#EC4899' },
   { icon: 'radar', label: 'action.diseaseSurveillance', route: '/surveillance', tint: '#0D9488' },
   { icon: 'alert-octagon-outline', label: 'profile.row.incidentsSla', route: '/incidents', tint: '#DC2626' },
+  { icon: 'history', label: 'action.auditLog', route: '/audit-log', tint: '#64748B' },
   { icon: 'calendar-month-outline', label: 'action.calendar', route: '/calendar', tint: '#0EA5E9' },
   { icon: 'message-text-outline', label: 'action.messages', route: '/messaging', tint: '#F59E0B' },
   { icon: 'account-group-outline', label: 'action.teamUsers', route: '/users', tint: '#0284C7' },
   { icon: 'clipboard-pulse-outline', label: 'action.vetCallouts', route: '/vet', tint: '#F59E0B' },
+  { icon: 'shield-account-outline', label: 'action.serviceVetting', route: '/service-vetting', tint: '#0891B2' },
   { icon: 'account-plus-outline', label: 'action.enlistVet', route: '/enlist-vet', tint: '#21C45D' },
   { icon: 'tag-outline', label: 'action.devices', route: '/devices', tint: '#9333EA' },
   { icon: 'map-marker-outline', label: 'action.locations', route: '/locations', tint: '#0D9488' },
@@ -170,6 +174,9 @@ export default function Home() {
   const { data: devices } = useResource(getDevices, devicesFallback);
   const { data: locationList } = useResource(getLocations, locationsFallback);
   const { data: lastStock } = useResource(getLastStockTake, null);
+  const { data: enlistedVets } = useResource(getEnlistedVets, []);
+  // Enlisted service providers = seeded demo providers + admin-enlisted ones.
+  const providerCount = seededVets.length + enlistedVets.length;
 
   // Stock-take/validation reporting categorized by device type (management
   // decision), across the whole live herd. Only animals whose tagging method is
@@ -316,6 +323,8 @@ export default function Home() {
             </AppText>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.lg }}>
               <KpiTile value={totals.farmers} label={t('home.kpi.farmers')} icon="account-multiple-outline" tint="#6D874F" />
+              <KpiTile value={providerCount} label={t('home.kpi.providers')} icon="stethoscope" tint="#3D99F5" onPress={() => router.push('/service-vetting' as never)} />
+              <KpiTile value={totals.animals} label={t('home.kpi.animals')} icon="cow" tint="#2563EB" />
               <KpiTile value={totals.needAttention} label={t('home.kpi.needAttention')} icon="alert-outline" tint="#F59E0B" />
               <KpiTile value={totals.activeTags} label={t('home.kpi.activeTags')} icon="access-point" tint="#16A34A" onPress={() => router.push('/devices?filter=active' as never)} />
               <KpiTile value={summary.connectivity.unconnected} label={t('home.kpi.devicesOffline')} icon="access-point-off" tint="#EF4444" onPress={() => router.push('/devices?filter=inactive' as never)} />
