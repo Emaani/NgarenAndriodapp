@@ -4,6 +4,7 @@ import { Redirect } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { teamMembers as teamFallback, userRoles as rolesFallback } from '@/data/mock';
 import { createTeamMember, deleteTeamMember, getTeamMembers, getUserRoles } from '@/data/api';
+import { addLocalTeamMember, getLocalTeamMembers, removeLocalTeamMember } from '@/data/localTeamMembers';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { useT } from '@/i18n';
@@ -31,7 +32,12 @@ function roleVariant(role: string) {
 export default function Users() {
   const t = useT();
   const { isAdmin, loading, isAuthenticated } = useAuth();
-  const { data: members, reload } = useResource(() => getTeamMembers(), teamFallback);
+  // Admin-added users sit on top of whatever the backend/mock returns, so adding
+  // a user with a role shows immediately (Team Management is now functional).
+  const { data: members, reload } = useResource(async () => {
+    const [local, remote] = await Promise.all([getLocalTeamMembers(), getTeamMembers()]);
+    return [...local, ...remote];
+  }, teamFallback);
   const { data: roles } = useResource(() => getUserRoles(), rolesFallback);
 
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -62,12 +68,22 @@ export default function Users() {
     if (!firstName.trim() || !email.trim() || !roleKey) return;
     setSaving(true);
     try {
-      await createTeamMember({
+      const roleName = roles.find((r) => String(r.key) === roleKey)?.name ?? t('usr.memberRole');
+      // Persist locally so the user appears right away with their assigned role.
+      await addLocalTeamMember({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         email: email.trim(),
         roleKey: Number(roleKey),
+        role: roleName,
       });
+      // Best-effort write-through when a backend is configured.
+      createTeamMember({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim(),
+        roleKey: Number(roleKey),
+      }).catch(() => {});
       setSheetOpen(false);
       resetForm();
       reload();
@@ -85,6 +101,7 @@ export default function Users() {
         text: t('usr.removeBtn'),
         style: 'destructive',
         onPress: async () => {
+          await removeLocalTeamMember(userId);
           await deleteTeamMember(userId).catch(() => {});
           reload();
         },

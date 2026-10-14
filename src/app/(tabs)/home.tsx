@@ -322,10 +322,10 @@ export default function Home() {
               {t('home.section.portfolio')}
             </AppText>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.lg }}>
-              <KpiTile value={totals.farmers} label={t('home.kpi.farmers')} icon="account-multiple-outline" tint="#6D874F" />
+              <KpiTile value={totals.farmers} label={t('home.kpi.farmers')} icon="account-multiple-outline" tint="#6D874F" onPress={() => router.push('/farmers' as never)} />
               <KpiTile value={providerCount} label={t('home.kpi.providers')} icon="stethoscope" tint="#3D99F5" onPress={() => router.push('/service-vetting' as never)} />
-              <KpiTile value={totals.animals} label={t('home.kpi.animals')} icon="cow" tint="#2563EB" />
-              <KpiTile value={totals.needAttention} label={t('home.kpi.needAttention')} icon="alert-outline" tint="#F59E0B" />
+              <KpiTile value={totals.animals} label={t('home.kpi.animals')} icon="cow" tint="#2563EB" onPress={() => router.push('/(tabs)/animals' as never)} />
+              <KpiTile value={totals.needAttention} label={t('home.kpi.needAttention')} icon="alert-outline" tint="#F59E0B" onPress={() => router.push('/farmers?filter=attention' as never)} />
               <KpiTile value={totals.activeTags} label={t('home.kpi.activeTags')} icon="access-point" tint="#16A34A" onPress={() => router.push('/devices?filter=active' as never)} />
               <KpiTile value={summary.connectivity.unconnected} label={t('home.kpi.devicesOffline')} icon="access-point-off" tint="#EF4444" onPress={() => router.push('/devices?filter=inactive' as never)} />
             </View>
