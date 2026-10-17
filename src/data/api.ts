@@ -601,6 +601,8 @@ export interface CalloutRequestPayload {
   notes?: string;
   /** How the vet attends: on-site, video, or hybrid (Aug 29 2026 standup). */
   mode?: AppointmentMode;
+  /** The service/purpose the farmer requested (Oct 2026 spec). */
+  service?: string;
   /** Optional photo attached to the request (e.g. the symptom). */
   photo?: string | null;
   /**

@@ -43,6 +43,12 @@ export interface Animal {
   color?: string;
   /** Tagging method (satellite | bluetooth | qr | manual) for device-type views. */
   taggingMethod?: string;
+  /** Identification mechanism chosen at registration (Oct 2026 spec). */
+  identificationType?: 'physical' | 'satellite' | 'bluetooth';
+  /** Animal sex. */
+  sex?: 'male' | 'female';
+  /** Production purpose — Dairy / Beef / Dual-purpose. */
+  purpose?: string;
   /** Maker-checker state. Undefined is treated as approved (legacy records). */
   approvalStatus?: 'pending' | 'approved' | 'rejected';
   /** Role of whoever captured this record — drives whether dual approval

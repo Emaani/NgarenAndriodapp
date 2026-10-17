@@ -40,6 +40,8 @@ export default function RequestCallout() {
 
   const [onBehalfFarmerId, setOnBehalfFarmerId] = useState('');
   const [animal, setAnimal] = useState<Animal | null>(null);
+  // Mandatory purpose of the visit (Oct 2026 spec).
+  const [purpose, setPurpose] = useState('');
   const [urgency, setUrgency] = useState<(typeof URGENCY)[number]>(emergency === '1' ? 'Emergency' : 'Routine');
   const [mode, setMode] = useState<AppointmentMode>('onsite');
   const [notes, setNotes] = useState('');
@@ -114,7 +116,20 @@ export default function RequestCallout() {
 
   const permissionOk = noAnimalYet || allAnimals || permittedIds.length > 0;
   const slotOk = !scheduledFor || !!slot;
-  const canSubmit = (!!animal || noAnimalYet) && tcsAccepted && permissionOk && slotOk;
+  // Purpose options (Oct 2026 spec). Stock taking is only offered for animals
+  // identified Physical/Visual or Bluetooth (not satellite-tracked).
+  const stockTakeAllowed = !animal || animal.identificationType !== 'satellite';
+  const purposeOptions = useMemo(
+    () =>
+      [
+        { label: t('fv.purpose.registration'), value: 'Registration' },
+        ...(stockTakeAllowed ? [{ label: t('fv.purpose.stocktaking'), value: 'Stocktaking' }] : []),
+        { label: t('fv.purpose.health'), value: 'Treatment' },
+        { label: t('fv.purpose.advice'), value: 'Consultation' },
+      ],
+    [t, stockTakeAllowed],
+  );
+  const canSubmit = (!!animal || noAnimalYet) && !!purpose && tcsAccepted && permissionOk && slotOk;
 
   const onSubmit = async () => {
     if (!canSubmit || submitting) return;
@@ -127,13 +142,16 @@ export default function RequestCallout() {
           ? '[Access: all animals] '
           : `[Access: ${permittedLabels.length || 1} animal${permittedLabels.length === 1 ? '' : 's'}] `;
       const slotNote = scheduledFor && slot ? `[Slot: ${formatDate(scheduledFor)} ${slot}] ` : '';
+      const purposeLabel = purposeOptions.find((p) => p.value === purpose)?.label ?? purpose;
+      const purposeNote = purpose ? `[Purpose: ${purposeLabel}] ` : '';
       await submitCalloutRequest({
         vetId: vet?.id,
         animal: animalLabel,
         locationName: locationName || 'Farm',
         urgency: urgency as CalloutUrgency,
-        notes: `${onBehalfNote}${scopeNote}${slotNote}${notes}`.trim() || undefined,
+        notes: `${purposeNote}${onBehalfNote}${scopeNote}${slotNote}${notes}`.trim() || undefined,
         mode,
+        service: purpose || undefined,
         photo: photo || undefined,
         scheduledFor,
         scheduledSlot: slot || undefined,
@@ -159,6 +177,15 @@ export default function RequestCallout() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <GradientHeader title={isEmergency ? t('findVet.emergency') : t('health.requestVet')} subtitle={vet ? vet.name : isEmergency ? t('fv.subEmergency') : t('fv.subMatched')} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
+        {/* Purpose of the visit — mandatory (Oct 2026 spec). */}
+        <PickerField
+          label={t('fv.purposeLabel')}
+          required
+          value={purpose}
+          placeholder={t('fv.purposePlaceholder')}
+          options={purposeOptions}
+          onSelect={setPurpose}
+        />
         {isEmergency ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.errorTint, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.error }}>
             <Icon name="alarm-light-outline" size={20} color={colors.error} />

@@ -37,6 +37,29 @@ const COMMON_COLOURS = ['Brown', 'Black', 'White', 'Brown & white', 'Black & whi
 const UNKNOWN = '';
 const EXTERNAL = '__external__';
 
+// Identification mechanism — mandatory in step 2 (Oct 2026 spec). `label` holds
+// an i18n key translated at render.
+type IdType = 'physical' | 'satellite' | 'bluetooth';
+const ID_TYPES: { value: IdType; label: string; icon: 'camera-outline' | 'satellite-variant' | 'bluetooth' }[] = [
+  { value: 'physical', label: 'reg.idPhysical', icon: 'camera-outline' },
+  { value: 'satellite', label: 'reg.idSatellite', icon: 'satellite-variant' },
+  { value: 'bluetooth', label: 'reg.idBluetooth', icon: 'bluetooth' },
+];
+// Purpose values are stored as data; labels come from i18n at render.
+const PURPOSE_VALUES = ['Dairy', 'Beef', 'Dual-purpose'] as const;
+
+// Pre-approved device suppliers loaded by Ngaren (Oct 2026 spec) — farmers can
+// only pick from this list. Manual free-text is allowed only for Physical/Visual.
+const APPROVED_SUPPLIERS = ['Ceres Tag', 'GSat', 'Digitanimal', 'Ngaren Devices'];
+
+// City suggestions per country (dropdown once the country is chosen).
+const CITIES_BY_COUNTRY: Record<string, string[]> = {
+  Uganda: ['Kampala', 'Mbarara', 'Gulu', 'Jinja', 'Mbale', 'Fort Portal', 'Masaka', 'Sheema'],
+  Kenya: ['Nairobi', 'Nakuru', 'Eldoret', 'Mombasa', 'Kisumu', 'Nyeri', 'Meru'],
+  Tanzania: ['Dodoma', 'Arusha', 'Mwanza', 'Dar es Salaam', 'Mbeya'],
+  Rwanda: ['Kigali', 'Musanze', 'Huye', 'Rubavu'],
+};
+
 const STEP_COUNT = 5;
 const STEP_KEYS = ['reg.step.aan', 'reg.step.animal', 'reg.step.location', 'reg.step.device', 'reg.step.submit'];
 
@@ -103,6 +126,9 @@ export default function RegisterAnimal() {
   const [aan, setAan] = useState('');
 
   // (b) Animal information
+  const [idType, setIdType] = useState<IdType | ''>('');
+  const [sex, setSex] = useState<'male' | 'female' | ''>('');
+  const [purpose, setPurpose] = useState('');
   const [tag, setTag] = useState('');
   const [name, setName] = useState('');
   const [color, setColor] = useState('');
@@ -200,21 +226,22 @@ export default function RegisterAnimal() {
     [devices],
   );
 
-  // Per-step completion gates.
+  // Per-step completion gates (Oct 2026 spec): identification type is the only
+  // mandatory animal field; location (paddock) and coordinates are optional.
   const stepValid: Record<number, boolean> = {
     1: !!aan,
-    2: !!tag.trim() && !tagTaken && !!breedKey && !!photoFront,
-    3: !!locationId,
+    2: !!idType && !tagTaken,
+    3: true,
     4: true,
-    5: tcsAccepted && (!hasSatellite || !!coords),
+    5: tcsAccepted,
   };
   // A one-line hint for why the current step can't advance yet.
   const stepHint: Record<number, string> = {
     1: t('reg.needAanFirst'),
-    2: t('reg.needAnimal'),
-    3: t('reg.needLocation'),
+    2: !idType ? t('reg.needIdType') : t('reg.tagTaken'),
+    3: '',
     4: '',
-    5: !tcsAccepted ? t('reg.needTc') : t('reg.needCoords'),
+    5: t('reg.needTc'),
   };
 
   const captureCoords = async () => {
@@ -247,8 +274,7 @@ export default function RegisterAnimal() {
     );
   };
 
-  const canSubmit =
-    !!aan && !!tag.trim() && !tagTaken && !!breedKey && !!locationId && !!photoFront && tcsAccepted && (!hasSatellite || !!coords);
+  const canSubmit = !!aan && !!idType && !tagTaken && tcsAccepted;
 
   const onSubmit = async () => {
     setSubmitting(true);
@@ -276,7 +302,12 @@ export default function RegisterAnimal() {
         photos,
         ngarenCode: code,
         color: color.trim() || undefined,
-        taggingMethod: methodForDevices(devices),
+        identificationType: idType || undefined,
+        sex: sex || undefined,
+        purpose: purpose || undefined,
+        // Tagging method follows the devices; for a Physical/Visual-only animal
+        // it is 'manual' (no device), matching the chosen identification type.
+        taggingMethod: devices.length ? methodForDevices(devices) : idType === 'satellite' ? 'satellite' : idType === 'bluetooth' ? 'bluetooth' : 'manual',
         // Maker-checker (Oct 2026 standup): a record captured by a third party
         // (vet / delegate — anyone who isn't the farm owner/admin) is NOT active.
         // A vet capture needs admin validation AND the farmer's confirmation
@@ -358,14 +389,52 @@ export default function RegisterAnimal() {
             <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.md }}>
               {t('reg.animalSub')}
             </AppText>
-            <TextField label={t('reg.tag')} required value={tag} onChangeText={setTag} placeholder={t('reg.tagPlaceholder')} />
+
+            {/* Identification type — MANDATORY (Oct 2026 spec). */}
+            <AppText variant="bodyLarge" style={{ fontWeight: '600', marginBottom: spacing.xs }}>
+              {t('reg.idType')} <AppText color={colors.error}>*</AppText>
+            </AppText>
+            <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
+              {ID_TYPES.map((it) => {
+                const active = idType === it.value;
+                return (
+                  <Pressable
+                    key={it.value}
+                    onPress={() => setIdType(it.value)}
+                    style={{ flex: 1, alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.md, borderRadius: radius.md, backgroundColor: active ? colors.primary : colors.surface, borderWidth: active ? 2 : 1, borderColor: active ? colors.primary : colors.divider }}>
+                    <Icon name={it.icon} size={22} color={active ? '#fff' : colors.onSurfaceVariant} />
+                    <AppText variant="caption" color={active ? '#fff' : colors.onSurfaceVariant} style={{ fontWeight: '600', textAlign: 'center' }}>
+                      {t(it.label)}
+                    </AppText>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* Sex + Purpose. */}
+            <PickerField
+              label={t('reg.sex')}
+              value={sex}
+              placeholder={t('reg.sexPlaceholder')}
+              options={[{ label: t('reg.sexMale'), value: 'male' }, { label: t('reg.sexFemale'), value: 'female' }]}
+              onSelect={(v) => setSex(v as 'male' | 'female')}
+            />
+            <PickerField
+              label={t('reg.purpose')}
+              value={purpose}
+              placeholder={t('reg.purposePlaceholder')}
+              options={PURPOSE_VALUES.map((p) => ({ label: t(`reg.purpose.${p}`), value: p }))}
+              onSelect={setPurpose}
+            />
+
+            <TextField label={t('reg.tag')} value={tag} onChangeText={setTag} placeholder={t('reg.tagPlaceholder')} />
             {tagTaken ? (
               <AppText variant="caption" color={colors.error} style={{ marginTop: -spacing.sm, marginBottom: spacing.md }}>
                 {t('reg.tagTaken')}
               </AppText>
             ) : null}
             <TextField label={t('reg.name')} value={name} onChangeText={setName} placeholder={t('reg.namePlaceholder')} />
-            <PickerField label={t('reg.breed')} required value={breedKey} placeholder={t('reg.breedPlaceholder')} options={breedOptions} onSelect={setBreedKey} />
+            <PickerField label={t('reg.breed')} value={breedKey} placeholder={t('reg.breedPlaceholder')} options={breedOptions} onSelect={setBreedKey} />
             <TextField label={t('reg.colour')} value={color} onChangeText={setColor} placeholder={t('reg.colourPlaceholder')} />
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: -spacing.sm, marginBottom: spacing.md }}>
               {COMMON_COLOURS.map((c) => {
@@ -412,14 +481,31 @@ export default function RegisterAnimal() {
             <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.md }}>
               {t('reg.locationSub')}
             </AppText>
-            <PickerField label={t('reg.location')} required value={locationId} placeholder={t('reg.locationPlaceholder')} options={locationOptions} onSelect={setLocationId} />
+            {/* Paddock is optional (Oct 2026 spec). */}
+            <PickerField label={t('reg.location')} value={locationId} placeholder={t('reg.locationPlaceholder')} options={locationOptions} onSelect={setLocationId} />
             <TextField label={t('reg.addr1')} value={addr1} onChangeText={setAddr1} placeholder={t('reg.addr1Placeholder')} />
             <TextField label={t('reg.addr2')} value={addr2} onChangeText={setAddr2} placeholder={t('reg.addr2Placeholder')} />
-            <TextField label={t('reg.city')} value={city} onChangeText={setCity} placeholder={t('reg.cityPlaceholder')} />
-            <TextField label={t('reg.country')} value={country} onChangeText={setCountry} placeholder={t('reg.countryPlaceholder')} />
+
+            {/* Country code → auto-populates the country; city becomes a dropdown. */}
+            <PickerField
+              label={t('reg.countryCode')}
+              value={countryCode}
+              placeholder={t('reg.countryCodePlaceholder')}
+              options={Object.entries(COUNTRY_CODES).map(([code, nm]) => ({ label: `${nm} (${code})`, value: code }))}
+              onSelect={(code) => { setCountry(COUNTRY_CODES[code] ?? country); setCity(''); }}
+            />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: -spacing.sm, marginBottom: spacing.md }}>
+              <Icon name="flag-outline" size={14} color={colors.onSurfaceVariant} />
+              <AppText variant="caption" color={colors.onSurfaceVariant}>{t('reg.countryAuto', { country })}</AppText>
+            </View>
+            {(CITIES_BY_COUNTRY[country]?.length ?? 0) > 0 ? (
+              <PickerField label={t('reg.city')} value={city} placeholder={t('reg.cityPlaceholder')} options={CITIES_BY_COUNTRY[country].map((c) => ({ label: c, value: c }))} onSelect={setCity} />
+            ) : (
+              <TextField label={t('reg.city')} value={city} onChangeText={setCity} placeholder={t('reg.cityPlaceholder')} />
+            )}
 
             <AppText variant="bodyLarge" style={{ fontWeight: '600', marginTop: spacing.xs, marginBottom: spacing.xs }}>
-              {hasSatellite ? t('reg.geoRequired') : t('reg.geoOptional')}
+              {t('reg.geoOptional')}
             </AppText>
             <Pressable
               onPress={captureCoords}
@@ -437,7 +523,7 @@ export default function RegisterAnimal() {
               </View>
             </Pressable>
             <AppText variant="caption" color={colors.onSurfaceVariant}>
-              {hasSatellite ? t('reg.geoHintSat') : t('reg.geoHintOpt')}
+              {t('reg.geoHintOpt')}
             </AppText>
           </>
         )}
@@ -552,7 +638,19 @@ export default function RegisterAnimal() {
       <BottomSheet visible={deviceSheet} onClose={() => setDeviceSheet(false)} title={t('reg.deviceSheet')}>
         <PickerField label={t('reg.deviceType')} required value={dType} placeholder={t('reg.deviceTypePlaceholder')} options={DEVICE_MODEL_OPTIONS} onSelect={setDType} />
         <TextField label={t('reg.serial')} required value={dSerial} onChangeText={setDSerial} placeholder={t('reg.serialPlaceholder')} />
-        <TextField label={t('reg.supplier')} value={dSupplier} onChangeText={setDSupplier} placeholder={t('reg.supplierPlaceholder')} />
+        {/* Pre-approved suppliers only (Oct 2026 spec); free text is allowed only
+            when the identification mechanism is Physical/Visual. */}
+        {idType === 'physical' ? (
+          <TextField label={t('reg.supplier')} value={dSupplier} onChangeText={setDSupplier} placeholder={t('reg.supplierPlaceholder')} />
+        ) : (
+          <>
+            <PickerField label={t('reg.supplierApproved')} value={dSupplier} placeholder={t('reg.supplierApprovedPlaceholder')} options={APPROVED_SUPPLIERS.map((s) => ({ label: s, value: s }))} onSelect={setDSupplier} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: -spacing.sm, marginBottom: spacing.md }}>
+              <Icon name="shield-check-outline" size={13} color={colors.onSurfaceVariant} />
+              <AppText variant="caption" color={colors.onSurfaceVariant} style={{ flex: 1 }}>{t('reg.supplierApprovedNote')}</AppText>
+            </View>
+          </>
+        )}
         <PhotoField label={t('reg.devicePhoto')} value={dPhoto} onChange={setDPhoto} />
         {draftIsSatellite ? (
           <>

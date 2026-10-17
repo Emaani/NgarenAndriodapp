@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -156,6 +156,20 @@ function KpiTile({ value, label, icon, tint, onPress }: { value: number; label: 
   return <View style={style}>{body}</View>;
 }
 
+/** "More / Show less" toggle under a collapsed action grid. */
+function MoreToggle({ expanded, onToggle, count, t }: { expanded: boolean; onToggle: () => void; count: number; t: (k: string, v?: Record<string, string | number>) => string }) {
+  return (
+    <Pressable
+      onPress={onToggle}
+      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingVertical: spacing.md, opacity: pressed ? 0.8 : 1 })}>
+      <AppText variant="body" color={colors.primary} style={{ fontWeight: '600' }}>
+        {expanded ? t('home.showLess') : t('home.showMore', { count })}
+      </AppText>
+      <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={colors.primary} />
+    </Pressable>
+  );
+}
+
 export default function Home() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -173,7 +187,6 @@ export default function Home() {
   // "Locations: 12" on the dashboard vs 4 on the map.
   const { data: devices } = useResource(getDevices, devicesFallback);
   const { data: locationList } = useResource(getLocations, locationsFallback);
-  const { data: lastStock } = useResource(getLastStockTake, null);
   const { data: enlistedVets } = useResource(getEnlistedVets, []);
   // Enlisted service providers = seeded demo providers + admin-enlisted ones.
   const providerCount = seededVets.length + enlistedVets.length;
@@ -229,14 +242,21 @@ export default function Home() {
   const totals = portfolioTotals(portfolio);
   // Farmer tag health — derived from the SAME device list the Active/Inactive
   // tiles drill into, so the counts and the list always agree.
-  const activeTags = useMemo(() => devices.filter(isTagActive).length, [devices]);
-  const inactiveTags = Math.max(0, devices.length - activeTags);
   // Farmer headline counts derived from the EXACT sources the detail screens
   // read, so a dashboard counter always equals the list it drills into: herd
   // (Animals list), devices (Devices list), locations (Farm Map).
   const farmerAnimals = herd.length;
   const farmerDevices = devices.length;
   const farmerLocations = locationList.length;
+  // Visual Identity = animals that have a Photo ID on file.
+  const visualIdCount = useMemo(() => herd.filter((a) => (a.photos?.length ?? 0) > 0).length, [herd]);
+  // Farmer dashboard shows the 2 most-used actions/reports; the rest collapse
+  // under "More" (Oct 2026 spec — keep the dashboard uncluttered).
+  const isFarmer = !isAdmin && !isVet;
+  const [showAllActions, setShowAllActions] = useState(false);
+  const [showAllReports, setShowAllReports] = useState(false);
+  const displayedActions = isFarmer && !showAllActions ? actions.slice(0, 2) : actions;
+  const displayedReports = !showAllReports ? farmerReports.slice(0, 2) : farmerReports;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -347,16 +367,16 @@ export default function Home() {
           </>
         )}
 
-        {/* Farmer "My Animals" summary (Oct 2026 Q&A) — total registered, the
-            latest physical/visual stock take, and the live satellite tag split.
-            Rows drill into the stock take and the tags list. */}
+        {/* Farmer "My Animals" summary (Oct 2026 spec) — only My Animals, Devices
+            and Visual Identity. Stock-take, satellite tracking, active vet
+            requests and documents are intentionally not surfaced here. */}
         {!isAdmin && !isVet && (
           <>
             <AppText variant="title" style={{ marginBottom: spacing.md }}>
               {t('home.section.myAnimals')}
             </AppText>
-            <View style={[{ backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.md, gap: spacing.md }, shadow[1]]}>
-              {/* Total registered — tap to open the full animal list. */}
+            <View style={[{ backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.lg, gap: spacing.md }, shadow[1]]}>
+              {/* My Animals — total registered. */}
               <Pressable onPress={() => router.push('/(tabs)/animals' as never)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: spacing.md, opacity: pressed ? 0.9 : 1 })}>
                 <View style={{ width: 46, height: 46, borderRadius: radius.md, backgroundColor: '#2563EB1A', alignItems: 'center', justifyContent: 'center' }}>
                   <Icon name="cow" size={24} color="#2563EB" />
@@ -370,50 +390,28 @@ export default function Home() {
 
               <View style={{ height: 1, backgroundColor: colors.divider }} />
 
-              {/* Physical & visual stock take — latest */}
-              <Pressable onPress={() => router.push('/stock-take' as never)} style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1, gap: 4 })}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-                  <Icon name="camera-outline" size={16} color="#F59E0B" />
-                  <AppText variant="body" style={{ fontWeight: '600', flex: 1 }}>{t('home.ma.physicalVisual')}</AppText>
-                  <Icon name="chevron-right" size={18} color={colors.onSurfaceVariant} />
-                </View>
-                {lastStock ? (
-                  <AppText variant="caption" color={colors.onSurfaceVariant}>
-                    {t('home.ma.latest', { date: formatDate(lastStock.date) })} · {t('home.ma.present')} {lastStock.present} · {t('home.ma.absent')} {lastStock.absent}
-                  </AppText>
-                ) : (
-                  <AppText variant="caption" color={colors.primary} style={{ fontWeight: '600' }}>{t('home.ma.runStockTake')}</AppText>
-                )}
+              {/* Devices. */}
+              <Pressable onPress={() => router.push('/devices' as never)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, opacity: pressed ? 0.9 : 1 })}>
+                <Icon name="tag-outline" size={18} color="#9333EA" />
+                <AppText variant="body" style={{ fontWeight: '600', flex: 1 }}>{t('home.stat.devices')}</AppText>
+                <AppText variant="body" style={{ fontWeight: '700' }}>{farmerDevices}</AppText>
+                <Icon name="chevron-right" size={18} color={colors.onSurfaceVariant} />
               </Pressable>
 
               <View style={{ height: 1, backgroundColor: colors.divider }} />
 
-              {/* Satellite stock take — live tag split */}
-              <Pressable onPress={() => router.push('/devices?filter=active' as never)} style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1, gap: 4 })}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-                  <Icon name="satellite-variant" size={16} color="#16A34A" />
-                  <AppText variant="body" style={{ fontWeight: '600', flex: 1 }}>{t('home.ma.satellite')}</AppText>
-                  <Icon name="chevron-right" size={18} color={colors.onSurfaceVariant} />
-                </View>
-                <AppText variant="caption" color={colors.onSurfaceVariant}>
-                  {t('home.ma.activeTags')} {activeTags} · {t('home.ma.inactiveTags')} {inactiveTags}
-                </AppText>
+              {/* Visual Identity — animals with a Photo ID on file. */}
+              <Pressable onPress={() => router.push('/(tabs)/animals' as never)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, opacity: pressed ? 0.9 : 1 })}>
+                <Icon name="camera-outline" size={18} color="#F59E0B" />
+                <AppText variant="body" style={{ fontWeight: '600', flex: 1 }}>{t('home.ma.visualIdentity')}</AppText>
+                <AppText variant="body" style={{ fontWeight: '700' }}>{visualIdCount}</AppText>
+                <Icon name="chevron-right" size={18} color={colors.onSurfaceVariant} />
               </Pressable>
             </View>
-
-            {/* Satellite / GPS tracking & monitoring (Ceres / GSat). */}
-            <NavBanner
-              tint="#16A34A"
-              icon="map-marker-radius"
-              title={t('home.satelliteTrack')}
-              subtitle={t('home.satelliteTrackSub')}
-              onPress={() => router.push('/(tabs)/track' as never)}
-              style={{ marginBottom: spacing.lg }}
-            />
           </>
         )}
 
-        {/* Maker-checker: pending-approval prompt for approvers. */}
+        {/* Maker-checker: pending-approval prompt (Manage Animal Records review). */}
         {canApprove && pendingCount > 0 && (
           <NavBanner
             variant="alert"
@@ -426,8 +424,9 @@ export default function Home() {
           />
         )}
 
-        {/* Farmer vet-request awareness: in-flight call-outs, tap to track. */}
-        {!isAdmin && !isVet && can('book_vet') && vetReqCounts.total > 0 && (
+        {/* (Restricted on the farmer dashboard per Oct 2026 spec: active vet
+            requests + documents banners are not shown for farmers.) */}
+        {isAdmin && can('book_vet') && vetReqCounts.total > 0 && (
           <NavBanner
             tint="#21C45D"
             icon="clipboard-pulse-outline"
@@ -458,28 +457,36 @@ export default function Home() {
           </>
         )}
 
-        {/* Documents module — generated scorecards & reports, reachable from the
-            dashboard for every role (farmers/admins land here, not only vets). */}
-        <NavBanner
-          icon="folder-multiple-outline"
-          title={t('home.banner.documents')}
-          subtitle={t('home.banner.documentsSub')}
-          onPress={() => router.push('/documents' as never)}
-          style={{ marginBottom: spacing.lg }}
-        />
+        {/* Documents module — restricted on the farmer dashboard (Oct 2026 spec);
+            admins and vets keep it. */}
+        {(isAdmin || isVet) && (
+          <NavBanner
+            icon="folder-multiple-outline"
+            title={t('home.banner.documents')}
+            subtitle={t('home.banner.documentsSub')}
+            onPress={() => router.push('/documents' as never)}
+            style={{ marginBottom: spacing.lg }}
+          />
+        )}
 
         <AppText variant="title" style={{ marginBottom: spacing.md }}>
           {isAdmin ? t('home.section.controlCenter') : isVet ? t('home.section.clinicalTools') : t('home.section.quickActions')}
         </AppText>
-        <ActionGrid actions={actions} />
+        <ActionGrid actions={displayedActions} />
+        {isFarmer && actions.length > 2 ? (
+          <MoreToggle expanded={showAllActions} onToggle={() => setShowAllActions((v) => !v)} count={actions.length - 2} t={t} />
+        ) : null}
 
-        {/* Farmer Reports (Oct 2026 Q&A) — detailed record sets. */}
-        {!isAdmin && !isVet && (
+        {/* Farmer Reports (Oct 2026 spec) — show the 2 most-used, rest under More. */}
+        {isFarmer && (
           <>
             <AppText variant="title" style={{ marginTop: spacing.lg, marginBottom: spacing.md }}>
               {t('home.section.reports')}
             </AppText>
-            <ActionGrid actions={farmerReports} />
+            <ActionGrid actions={displayedReports} />
+            {farmerReports.length > 2 ? (
+              <MoreToggle expanded={showAllReports} onToggle={() => setShowAllReports((v) => !v)} count={farmerReports.length - 2} t={t} />
+            ) : null}
           </>
         )}
       </ScrollView>
