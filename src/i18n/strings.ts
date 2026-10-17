@@ -41,6 +41,11 @@ const en: Dict = {
 
   // Animal detail
   'ad.animalTitle': 'Animal',
+  'ad.deleteAnimal': 'Delete animal',
+  'ad.deleteTitle': 'Delete this animal?',
+  'ad.deleteBody': 'Permanently delete {name}? This is logged and the Ngaren admin is notified.',
+  'ad.deleteConfirm': 'Delete',
+  'ad.deletedToast': '{name} deleted · admin notified',
   'ad.notFoundTitle': 'Animal not found',
   'ad.notFoundSub': 'This animal may have been removed.',
   'ad.pendingActivation': 'Pending activation',
@@ -938,6 +943,7 @@ const en: Dict = {
   'audit.rejected': 'Rejected',
   'audit.pending': 'Pending',
   'audit.export': 'Export',
+  'audit.deleted': 'Deleted',
   'audit.exportPdf': 'Export audit log (PDF)',
   'audit.emptyTitle': 'No activity yet',
   'audit.emptySub': 'Record amendments and report exports will be logged here.',
@@ -1546,6 +1552,11 @@ const sw: Dict = {
 
   // Animal detail
   'ad.animalTitle': 'Mnyama',
+  'ad.deleteAnimal': 'Futa mnyama',
+  'ad.deleteTitle': 'Futa mnyama huyu?',
+  'ad.deleteBody': 'Futa {name} kabisa? Hatua hii inarekodiwa na msimamizi wa Ngaren anaarifiwa.',
+  'ad.deleteConfirm': 'Futa',
+  'ad.deletedToast': '{name} amefutwa · msimamizi amearifiwa',
   'ad.notFoundTitle': 'Mnyama hapatikani',
   'ad.notFoundSub': 'Mnyama huyu huenda ameondolewa.',
   'ad.pendingActivation': 'Inasubiri uwezeshaji',
@@ -2441,6 +2452,7 @@ const sw: Dict = {
   'audit.rejected': 'Imekataliwa',
   'audit.pending': 'Inasubiri',
   'audit.export': 'Hamisha',
+  'audit.deleted': 'Imefutwa',
   'audit.exportPdf': 'Hamisha kumbukumbu (PDF)',
   'audit.emptyTitle': 'Hakuna shughuli bado',
   'audit.emptySub': 'Marekebisho ya rekodi na uhamishaji wa ripoti zitaandikwa hapa.',

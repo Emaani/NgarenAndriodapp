@@ -87,6 +87,18 @@ export async function getHerdAnimalById(id: number): Promise<Animal | undefined>
  * No-ops (and returns false) when Supabase isn't configured or the row isn't
  * present yet (e.g. the maker's role couldn't insert it).
  */
+/** Delete an animal_lineage record by its internal animal_id (best-effort,
+ *  RLS-gated). Used by the Farmer/Admin delete action. */
+export async function deleteHerdAnimal(internalId: string | undefined): Promise<boolean> {
+  if (!isSupabaseConfigured() || !internalId) return false;
+  try {
+    const { error } = await supabase.from('animal_lineage').delete().eq('animal_id', internalId);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
 export async function setLineageApproval(
   internalId: string | undefined,
   status: 'approved' | 'rejected',

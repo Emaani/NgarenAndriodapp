@@ -52,6 +52,16 @@ export async function getLocalAnimalById(id: number): Promise<Animal | undefined
   return (await getLocalAnimals()).find((a) => a.id === id);
 }
 
+/** Delete a locally-stored animal (Farmer/Admin delete action). */
+export async function deleteLocalAnimal(id: number): Promise<void> {
+  try {
+    const all = await getLocalAnimals();
+    await AsyncStorage.setItem(KEY, JSON.stringify(all.filter((a) => a.id !== id)));
+  } catch {
+    // best-effort
+  }
+}
+
 /** Maker-checker: set an animal's approval state (approve / reject). */
 export async function setLocalAnimalApproval(
   id: number,

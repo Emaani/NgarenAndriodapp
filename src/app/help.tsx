@@ -3,6 +3,7 @@ import { Linking, Pressable, View } from 'react-native';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { useT } from '@/i18n';
 import { AppText, GradientHeader, Icon, IconName, Screen } from '@/ui';
+import { NGAREN_SUPPORT_EMAIL, NGAREN_SUPPORT_TEL, NGAREN_WHATSAPP_URL } from '@/lib/contact';
 
 // q/a and label hold i18n keys (value is contact data), translated at render.
 type Faq = { q: string; a: string };
@@ -17,9 +18,9 @@ const FAQS: Faq[] = [
 ];
 
 const CONTACTS: Contact[] = [
-  { icon: 'email-outline', label: 'help.emailUs', value: 'support@ngaren.com', url: 'mailto:support@ngaren.com', tint: '#2563EB' },
-  { icon: 'phone-outline', label: 'help.callSupport', value: '+254 700 000 000', url: 'tel:+254700000000', tint: '#16A34A' },
-  { icon: 'whatsapp', label: 'help.whatsapp', value: 'help.chatWithUs', url: 'https://wa.me/254700000000', tint: '#21C45D' },
+  { icon: 'email-outline', label: 'help.emailUs', value: NGAREN_SUPPORT_EMAIL, url: `mailto:${NGAREN_SUPPORT_EMAIL}`, tint: '#2563EB' },
+  { icon: 'phone-outline', label: 'help.callSupport', value: NGAREN_SUPPORT_TEL, url: `tel:${NGAREN_SUPPORT_TEL}`, tint: '#16A34A' },
+  { icon: 'whatsapp', label: 'help.whatsapp', value: NGAREN_SUPPORT_TEL, url: NGAREN_WHATSAPP_URL, tint: '#21C45D' },
 ];
 
 function FaqItem({ faq, open, onToggle, last }: { faq: Faq; open: boolean; onToggle: () => void; last?: boolean }) {

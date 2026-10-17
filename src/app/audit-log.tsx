@@ -4,6 +4,7 @@ import { Redirect } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { getAmendments } from '@/data/localAmendments';
 import { getReportAudit } from '@/data/reportAudit';
+import { getAuditEvents } from '@/data/localAuditEvents';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { exportPdf } from '@/lib/export';
@@ -67,6 +68,7 @@ export default function AuditLog() {
   const { loading, isAuthenticated, isAdmin, user } = useAuth();
   const { data: amendments } = useResource(getAmendments, []);
   const { data: exports } = useResource(getReportAudit, []);
+  const { data: events } = useResource(getAuditEvents, []);
   const [exporting, setExporting] = useState(false);
 
   const entries: Entry[] = useMemo(() => {
@@ -93,8 +95,17 @@ export default function AuditLog() {
       by: e.by,
       status: { label: t('audit.export'), variant: 'info' },
     }));
-    return [...amendEntries, ...exportEntries].sort((a, b) => b.at.localeCompare(a.at));
-  }, [amendments, exports, t]);
+    const eventEntries: Entry[] = events.map((e) => ({
+      id: e.id,
+      at: e.at,
+      icon: 'pencil-outline',
+      title: e.title,
+      detail: e.detail,
+      by: e.by,
+      status: e.type === 'animal_deleted' ? { label: t('audit.deleted'), variant: 'error' } : undefined,
+    }));
+    return [...amendEntries, ...exportEntries, ...eventEntries].sort((a, b) => b.at.localeCompare(a.at));
+  }, [amendments, exports, events, t]);
 
   if (loading) return null;
   if (!isAuthenticated) return <Redirect href="/login" />;

@@ -64,7 +64,7 @@ const REPORTS: GridAction[] = [
 
 // Service support (Oct 2026 Q&A): reach Ngaren or the farmer. Messaging routes
 // to the in-app thread; Call Ngaren dials the support line.
-const NGAREN_SUPPORT_TEL = '+256200000000';
+const NGAREN_SUPPORT_TEL = '256706760000';
 
 // Meeting-mode icons for the task card.
 const MODE_ICON: Record<'onsite' | 'video' | 'hybrid', IconName> = {

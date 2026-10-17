@@ -42,6 +42,7 @@
  */
 import { config, isBackendConfigured } from '../config';
 import { formatDateTime } from '../lib/date';
+import { getLocalNotifications } from './localNotifications';
 import * as mock from './mock';
 import {
   AlertChannel,
@@ -531,13 +532,16 @@ export async function getNotifications(
   pageNumber = 0,
   pageSize = 20,
 ): Promise<AppNotification[]> {
+  // App-raised in-app notifications (e.g. an animal deletion notifying the
+  // admin) are merged on top of whatever the backend/mock returns.
+  const local = await getLocalNotifications();
   if (!isBackendConfigured()) {
-    return mock.notifications;
+    return [...local, ...mock.notifications];
   }
   const data = await request<PageResponse<BackendNotification>>(
     `/api/notifications?pageNumber=${pageNumber}&pageSize=${pageSize}`,
   );
-  return (data.items ?? []).map(mapNotification);
+  return [...local, ...(data.items ?? []).map(mapNotification)];
 }
 
 /** Count of currently unread notifications, used by the bell badge. */

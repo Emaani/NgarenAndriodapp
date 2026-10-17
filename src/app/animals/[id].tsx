@@ -1,4 +1,5 @@
-import { Image, Pressable, ScrollView, View } from 'react-native';
+import { Alert, Image, Pressable, ScrollView, View } from 'react-native';
+import * as MailComposer from 'expo-mail-composer';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import {
@@ -7,8 +8,13 @@ import {
 } from '@/data/mock';
 import { getCalloutRequests } from '@/data/api';
 import { getCeresBehaviour } from '@/data/ceresBehaviour';
-import { getHerdAnimalById } from '@/data/herd';
-import { getLocalAnimalById } from '@/data/localAnimals';
+import { getHerdAnimalById, deleteHerdAnimal } from '@/data/herd';
+import { getLocalAnimalById, deleteLocalAnimal } from '@/data/localAnimals';
+import { logAuditEvent } from '@/data/localAuditEvents';
+import { addLocalNotification } from '@/data/localNotifications';
+import { sendLocalNotification } from '@/services/push';
+import { notify } from '@/lib/toast';
+import { NGAREN_SUPPORT_EMAIL } from '@/lib/contact';
 import { HEALTH_TYPE_LABELS, getLocalHealthRecords } from '@/data/localHealth';
 import { useResource } from '@/data/hooks';
 import { ageFromDate, formatDate } from '@/lib/date';
@@ -23,8 +29,10 @@ export default function AnimalDetail() {
   const tStatus = useTStatus();
   // Health-record input is reserved for certified professionals (Sep 5 2026
   // standup): farmers get a view-only Health Score Card + history.
-  const { canVet } = useAuth();
+  const { canVet, isAdmin, appRole, user } = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
+  // Farmers and admins can delete an animal (Oct 2026). Vets cannot.
+  const canDelete = isAdmin || appRole === 'farmer';
   // Local animals take precedence, else the live animal_lineage herd.
   const { data: animal } = useResource(
     () => getHerdAnimalById(Number(id)),
@@ -69,6 +77,41 @@ export default function AnimalDetail() {
   const animalKey = animal.ngarenCode ?? animal.tag;
   const animalLabel = animal.name ?? animal.tag;
   const animalHealth = allHealth.filter((r) => r.animalKey === animalKey);
+
+  // Delete the animal (Farmer/Admin). Records an Event Log entry and notifies
+  // the Ngaren Admin both in-app and by email.
+  const doDelete = async () => {
+    const by = user?.fullName ?? user?.email ?? (isAdmin ? 'Admin' : 'Farmer');
+    const refA = animal.ngarenCode ?? animal.accountNumber ?? animal.tag;
+    await deleteLocalAnimal(animal.id);
+    await deleteHerdAnimal(animal.ngarenCode ?? animal.tag);
+    // Event Log.
+    await logAuditEvent({ type: 'animal_deleted', title: `Animal deleted — ${animalLabel}`, detail: `${refA} · deleted by ${by}`, by });
+    // In-app notification to the Admin + a device push.
+    await addLocalNotification({ title: 'Animal deleted', message: `${animalLabel} (${refA}) was deleted by ${by}.` });
+    void sendLocalNotification('Animal deleted', `${animalLabel} (${refA}) was deleted by ${by}.`, { type: 'ANIMAL_DELETED' });
+    // Email notification to the Ngaren Admin (best-effort; opens the composer).
+    try {
+      if (await MailComposer.isAvailableAsync()) {
+        await MailComposer.composeAsync({
+          recipients: [NGAREN_SUPPORT_EMAIL],
+          subject: `Ngaren — Animal deleted (${refA})`,
+          body: `${animalLabel} (${refA}) was deleted by ${by} on ${new Date().toLocaleString()}.`,
+        });
+      }
+    } catch {
+      // best-effort
+    }
+    notify(t('ad.deletedToast', { name: animalLabel }));
+    router.replace('/(tabs)/animals');
+  };
+
+  const confirmDelete = () => {
+    Alert.alert(t('ad.deleteTitle'), t('ad.deleteBody', { name: animalLabel }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('ad.deleteConfirm'), style: 'destructive', onPress: () => void doDelete() },
+    ]);
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -271,6 +314,17 @@ export default function AnimalDetail() {
         ) : (
           behaviour.map((series) => <ChartCard key={series.label} series={series} />)
         )}
+
+        {/* Delete animal — Farmer/Admin only (Oct 2026). */}
+        {canDelete ? (
+          <Button
+            label={t('ad.deleteAnimal')}
+            icon="trash-can-outline"
+            variant="danger"
+            onPress={confirmDelete}
+            style={{ marginTop: spacing.xl }}
+          />
+        ) : null}
       </Screen>
     </View>
   );

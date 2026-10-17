@@ -6,7 +6,7 @@ import { useAuth } from '@/services/auth';
 import { useT } from '@/i18n';
 import { AppText, GradientHeader, Icon, IconName, Screen } from '@/ui';
 
-const NGAREN_SUPPORT_TEL = '+256200000000';
+const NGAREN_SUPPORT_TEL = '256706760000';
 
 type Row = { icon: IconName; label: string; value?: string; route?: string; destructive?: boolean; onPress?: () => void };
 
