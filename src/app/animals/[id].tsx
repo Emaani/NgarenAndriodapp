@@ -15,7 +15,7 @@ import { ageFromDate, formatDate } from '@/lib/date';
 import { taggingMeta } from '@/lib/tagging';
 import { useAuth } from '@/services/auth';
 import { useT, useTStatus } from '@/i18n';
-import { ActionChip, AppText, Button, ChartCard, DetailRow, EmptyState, GradientHeader, Icon, Screen } from '@/ui';
+import { ActionChip, AnimalPhoto, AppText, Button, ChartCard, DetailRow, EmptyState, GradientHeader, Icon, Screen } from '@/ui';
 
 export default function AnimalDetail() {
   const router = useRouter();
@@ -79,24 +79,7 @@ export default function AnimalDetail() {
       />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         <View style={{ alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md }}>
-          {animal.photos && animal.photos.length > 0 ? (
-            <Image
-              source={{ uri: animal.photos[0] }}
-              style={{ width: 120, height: 120, borderRadius: radius.lg, backgroundColor: colors.primaryTint }}
-            />
-          ) : (
-            <View
-              style={{
-                width: 88,
-                height: 88,
-                borderRadius: radius.full,
-                backgroundColor: colors.primaryTint,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-              <Icon name="cow" size={44} color={colors.primary} />
-            </View>
-          )}
+          <AnimalPhoto uri={animal.photos?.[0]} size={120} rounded={radius.lg} />
           <View style={{ flexDirection: 'row', gap: spacing.xs }}>
             <ActionChip
               label={tStatus(animal.status)}
@@ -130,11 +113,7 @@ export default function AnimalDetail() {
             contentContainerStyle={{ gap: spacing.sm }}
             style={{ marginBottom: spacing.lg }}>
             {animal.photos.map((uri, i) => (
-              <Image
-                key={uri + i}
-                source={{ uri }}
-                style={{ width: 150, height: 150, borderRadius: radius.md, backgroundColor: colors.primaryTint }}
-              />
+              <AnimalPhoto key={uri + i} uri={uri} size={150} />
             ))}
           </ScrollView>
         ) : (

@@ -10,7 +10,7 @@ import { useAuth } from '@/services/auth';
 import { ageFromDate } from '@/lib/date';
 import { CalloutRequest, Animal } from '@/data/types';
 import { useT } from '@/i18n';
-import { ActionChip, AppText, Button, GradientHeader, Icon, IconChip, Screen } from '@/ui';
+import { ActionChip, AnimalPhoto, AppText, Button, GradientHeader, Icon, IconChip, Screen } from '@/ui';
 
 /**
  * Manage Animal Records — the vet's entry to register or amend an animal in the
@@ -52,11 +52,7 @@ export default function VetManageAnimals() {
         { flexDirection: 'row', alignItems: 'center', gap: spacing.mdMinus, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, borderWidth: highlighted ? 2 : 1, borderColor: highlighted ? colors.primary : colors.divider },
         shadow[1],
       ]}>
-      {a.photos?.[0] ? (
-        <Image source={{ uri: a.photos[0] }} style={{ width: 44, height: 44, borderRadius: radius.md }} />
-      ) : (
-        <IconChip icon="cow" />
-      )}
+      <AnimalPhoto uri={a.photos?.[0]} size={44} />
       <View style={{ flex: 1 }}>
         <AppText variant="bodyLarge" style={{ fontWeight: '600' }}>{a.name ?? a.tag}</AppText>
         <AppText variant="caption" color={colors.onSurfaceVariant}>

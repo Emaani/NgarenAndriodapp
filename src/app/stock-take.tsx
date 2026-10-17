@@ -10,10 +10,11 @@ import { useAuth } from '@/services/auth';
 import { sendLocalNotification } from '@/services/push';
 import { saveStockTakeResult } from '@/data/localStockTake';
 import { addLocalEvent } from '@/data/localEvents';
+import { persistImage } from '@/lib/photos';
 import { ageFromDate } from '@/lib/date';
 import { Animal } from '@/data/types';
 import { useT } from '@/i18n';
-import { AppText, BottomSheet, Button, DetailRow, GradientHeader, Icon, IconChip, IconName, Screen } from '@/ui';
+import { AnimalPhoto, AppText, BottomSheet, Button, DetailRow, GradientHeader, Icon, IconChip, IconName, Screen } from '@/ui';
 
 type Mark = 'pending' | 'present' | 'missing';
 type Phase = 'method' | 'count' | 'summary';
@@ -116,11 +117,7 @@ function AnimalRow({
         shadow[1],
       ]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.mdMinus }}>
-        {photoUri ? (
-          <Image source={{ uri: photoUri }} style={{ width: 38, height: 38, borderRadius: radius.sm }} />
-        ) : (
-          <IconChip icon="cow" />
-        )}
+        <AnimalPhoto uri={photoUri} size={38} rounded={radius.sm} />
         <View style={{ flex: 1, gap: 2 }}>
           <AppText variant="bodyLarge" style={{ fontWeight: '600' }}>
             {animal.name ?? animal.tag}
@@ -228,7 +225,7 @@ export default function StockTake() {
       }
       const res = await ImagePicker.launchCameraAsync({ quality: 0.5, allowsEditing: false });
       if (!res.canceled && res.assets?.[0]) {
-        setPhotos((prev) => ({ ...prev, [id]: res.assets[0].uri }));
+        setPhotos((prev) => ({ ...prev, [id]: persistImage(res.assets[0].uri) ?? res.assets[0].uri }));
         setMark(id, 'present');
         setConfirmAnimal(null);
       }
@@ -557,16 +554,7 @@ export default function StockTake() {
 
             {/* Reference Photo ID (if the animal has one) to match against. */}
             <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
-              {confirmAnimal.photos?.[0] || confirmAnimal.onboardingPhotos?.[0] ? (
-                <Image
-                  source={{ uri: (confirmAnimal.photos?.[0] ?? confirmAnimal.onboardingPhotos?.[0])! }}
-                  style={{ width: 72, height: 72, borderRadius: radius.md }}
-                />
-              ) : (
-                <View style={{ width: 72, height: 72, borderRadius: radius.md, backgroundColor: colors.primaryTint, alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon name="cow" size={32} color={colors.primary} />
-                </View>
-              )}
+              <AnimalPhoto uri={confirmAnimal.photos?.[0] ?? confirmAnimal.onboardingPhotos?.[0]} size={72} />
               <View style={{ flex: 1 }}>
                 <AppText variant="bodyLarge" style={{ fontWeight: '700' }}>
                   {confirmAnimal.name ?? confirmAnimal.tag}

@@ -19,7 +19,7 @@ import { useAuth } from '@/services/auth';
 import { ageFromDate } from '@/lib/date';
 import { taggingMeta } from '@/lib/tagging';
 import { useT } from '@/i18n';
-import { AppText, Button, EmptyState, GradientHeader, Icon, IconChip, Screen } from '@/ui';
+import { AnimalPhoto, AppText, Button, EmptyState, GradientHeader, Icon, IconChip, Screen } from '@/ui';
 
 /**
  * Record Activation (maker-checker). A capture by a third party (a vet) is NOT
@@ -185,11 +185,7 @@ export default function Approvals() {
                   shadow[1],
                 ]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.mdMinus }}>
-                  {a.photos?.[0] ? (
-                    <Image source={{ uri: a.photos[0] }} style={{ width: 48, height: 48, borderRadius: radius.md }} />
-                  ) : (
-                    <IconChip icon="cow" />
-                  )}
+                  <AnimalPhoto uri={a.photos?.[0]} size={48} />
                   <View style={{ flex: 1 }}>
                     <AppText variant="bodyLarge" style={{ fontWeight: '600' }}>
                       {a.name ?? a.tag}

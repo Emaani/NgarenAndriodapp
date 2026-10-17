@@ -8,6 +8,7 @@ import { AppText } from './AppText';
 import { Icon } from './Icon';
 import { IconChip } from './IconChip';
 import { ActionChip } from './Chip';
+import { AnimalPhoto } from './AnimalPhoto';
 
 function Overflow({ onPress }: { onPress: () => void }) {
   return (
@@ -37,15 +38,10 @@ export function AnimalListItem({
   onPress: () => void;
   onMenu: () => void;
 }) {
-  const thumb = animal.photos?.[0];
   return (
     <Card onPress={onPress} style={{ marginBottom: spacing.mdMinus }}>
       <View style={{ flexDirection: 'row', gap: spacing.mdMinus }}>
-        {thumb ? (
-          <Image source={{ uri: thumb }} style={{ width: 44, height: 44, borderRadius: radius.md }} />
-        ) : (
-          <IconChip icon="cow" />
-        )}
+        <AnimalPhoto uri={animal.photos?.[0]} size={44} />
         <View style={{ flex: 1, gap: 2 }}>
           <AppText variant="title">{animal.name ?? animal.tag}</AppText>
           {animal.accountNumber ? <Line icon="identifier" text={`Account: ${animal.accountNumber}`} color={colors.primary} /> : null}

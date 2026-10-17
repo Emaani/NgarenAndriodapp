@@ -1,6 +1,7 @@
 import { Alert, Image, Pressable, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { colors, radius, spacing } from '@/theme';
+import { persistImage } from '@/lib/photos';
 import { AppText } from './AppText';
 import { Icon } from './Icon';
 
@@ -29,7 +30,8 @@ export function PhotoField({
       return;
     }
     const res = await ImagePicker.launchCameraAsync({ quality: 0.6, allowsEditing: true });
-    if (!res.canceled && res.assets?.[0]) onChange(res.assets[0].uri);
+    // Persist to the document directory so the Photo ID survives cache clearing.
+    if (!res.canceled && res.assets?.[0]) onChange(persistImage(res.assets[0].uri));
   };
 
   const pickFromLibrary = async () => {
@@ -39,7 +41,7 @@ export function PhotoField({
       return;
     }
     const res = await ImagePicker.launchImageLibraryAsync({ quality: 0.6, allowsEditing: true });
-    if (!res.canceled && res.assets?.[0]) onChange(res.assets[0].uri);
+    if (!res.canceled && res.assets?.[0]) onChange(persistImage(res.assets[0].uri));
   };
 
   const choose = () => {

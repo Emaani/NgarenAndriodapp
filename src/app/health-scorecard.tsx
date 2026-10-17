@@ -20,7 +20,7 @@ import { ageFromDate, formatDate } from '@/lib/date';
 import { statusVisual, bcsColor } from '@/lib/scorecardVisual';
 import { Animal } from '@/data/types';
 import { useT } from '@/i18n';
-import { AppText, Button, DetailRow, EmptyState, GradientHeader, Icon, IconChip, IconName, LineChart, Screen, SearchBar } from '@/ui';
+import { AnimalPhoto, AppText, Button, DetailRow, EmptyState, GradientHeader, Icon, IconChip, IconName, LineChart, Screen, SearchBar } from '@/ui';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -296,7 +296,7 @@ export default function HealthScoreCard() {
               {photoIds.length > 0 ? (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm }}>
                   {photoIds.map((uri, i) => (
-                    <Image key={`${uri}-${i}`} source={{ uri }} style={{ width: 132, height: 132, borderRadius: radius.md }} />
+                    <AnimalPhoto key={`${uri}-${i}`} uri={uri} size={132} />
                   ))}
                 </ScrollView>
               ) : (
