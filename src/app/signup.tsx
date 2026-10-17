@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { colors, spacing } from '@/theme';
-import { AppText, Button, GradientHeader, Input } from '@/ui';
+import { AppText, Button, GradientHeader, Input, PhotoField } from '@/ui';
 import { useAuth } from '@/services/auth';
 import { useT } from '@/i18n';
 
@@ -17,6 +18,9 @@ export default function SignUp() {
   const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Farmer identification (Oct 2026 spec 1.0): scan ID + capture a photo.
+  const [idPhoto, setIdPhoto] = useState<string | null>(null);
+  const [selfie, setSelfie] = useState<string | null>(null);
 
   const valid = name.trim() && email.trim() && password.trim();
 
@@ -25,11 +29,22 @@ export default function SignUp() {
     setSubmitting(true);
     setError(null);
     const { error: signUpError } = await signUp(email, password, name);
-    setSubmitting(false);
     if (signUpError) {
+      setSubmitting(false);
       setError(signUpError);
       return;
     }
+    // Persist the identity capture on-device, keyed by email, for later
+    // verification/linking when the identity backend lands.
+    try {
+      await AsyncStorage.setItem(
+        `ngaren.identity.${email.trim().toLowerCase()}`,
+        JSON.stringify({ name: name.trim(), phone: phone.trim(), idPhoto, selfie, at: new Date().toISOString() }),
+      );
+    } catch {
+      // best-effort
+    }
+    setSubmitting(false);
     // Whether or not email confirmation is required, send them to the success
     // screen; the route guards handle gating access until a session exists.
     router.replace('/signup-success');
@@ -53,6 +68,16 @@ export default function SignUp() {
             icon={show ? 'eye-off-outline' : 'eye-outline'}
             onIconPress={() => setShow((s) => !s)}
           />
+
+          {/* Farmer identification — scan ID + photo (spec 1.0). */}
+          <AppText variant="bodyLarge" style={{ fontWeight: '600', marginTop: spacing.xs }}>
+            {t('signup.identity')}
+          </AppText>
+          <AppText variant="caption" color={colors.onSurfaceVariant}>
+            {t('signup.identitySub')}
+          </AppText>
+          <PhotoField label={t('signup.scanId')} value={idPhoto} onChange={setIdPhoto} />
+          <PhotoField label={t('signup.yourPhoto')} value={selfie} onChange={setSelfie} liveOnly />
 
           {error && (
             <AppText variant="body" color={colors.error}>

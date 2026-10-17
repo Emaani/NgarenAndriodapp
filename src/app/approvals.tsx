@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Image, View } from 'react-native';
+import { Image, Pressable, View } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { Animal } from '@/data/types';
@@ -11,6 +11,7 @@ import {
   updateLocalAnimal,
 } from '@/data/localAnimals';
 import { getPendingAmendments, setAmendmentStatus, AnimalAmendment } from '@/data/localAmendments';
+import { getDrafts, deleteDraft, RegistrationDraft } from '@/data/localRegistrationDrafts';
 import { setLineageApproval } from '@/data/herd';
 import { notify } from '@/lib/toast';
 import { useResource } from '@/data/hooks';
@@ -52,6 +53,7 @@ export default function Approvals() {
   const { loading, isAuthenticated, canManageTeam, can, isAdmin } = useAuth();
   const { data: pending, reload } = useResource(getPendingLocalAnimals, []);
   const { data: amendmentsData, reload: reloadAmendments } = useResource(getPendingAmendments, []);
+  const { data: drafts, reload: reloadDrafts } = useResource(getDrafts, []);
   const [local, setLocal] = useState<Animal[] | null>(null);
   const [localAmend, setLocalAmend] = useState<AnimalAmendment[] | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
@@ -123,7 +125,40 @@ export default function Approvals() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <GradientHeader title={t('approvals.title')} subtitle={t('approvals.subtitle', { count: items.length + amendments.length })} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
-        {items.length === 0 && amendments.length === 0 ? (
+        {/* Registration in Progress — resume a draft or assign Ngaren Service
+            Support to complete it (spec 3.1.1). */}
+        {drafts.length > 0 ? (
+          <>
+            <AppText variant="overline" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>
+              {t('approvals.sectionDrafts')}
+            </AppText>
+            {drafts.map((d: RegistrationDraft) => (
+              <View
+                key={d.aan}
+                style={[{ backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, gap: spacing.sm, borderWidth: 1, borderColor: colors.divider }, shadow[1]]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.mdMinus }}>
+                  <IconChip icon="progress-clock" />
+                  <View style={{ flex: 1 }}>
+                    <AppText variant="bodyLarge" style={{ fontWeight: '600' }}>{d.aan}</AppText>
+                    <AppText variant="caption" color={colors.onSurfaceVariant}>
+                      {[d.name || d.tag, d.idType ? t(`reg.id${d.idType === 'physical' ? 'Physical' : d.idType === 'satellite' ? 'Satellite' : 'Bluetooth'}`) : t('approvals.draftNoInfo')].filter(Boolean).join(' · ')}
+                    </AppText>
+                  </View>
+                  <Pressable onPress={async () => { await deleteDraft(d.aan); reloadDrafts(); }} hitSlop={8}>
+                    <Icon name="trash-can-outline" size={18} color={colors.onSurfaceVariant} />
+                  </Pressable>
+                </View>
+                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                  <Button label={t('approvals.continueReg')} icon="pencil-outline" onPress={() => router.push(`/register-animal?draft=${encodeURIComponent(d.aan)}` as never)} style={{ flex: 1 }} />
+                  <Button label={t('approvals.assignNgaren')} variant="outline" icon="calendar-plus" onPress={() => router.push(`/find-vet/request?purpose=Registration&aan=${encodeURIComponent(d.aan)}` as never)} style={{ flex: 1 }} />
+                </View>
+              </View>
+            ))}
+            <View style={{ height: 1, backgroundColor: colors.divider, marginVertical: spacing.md }} />
+          </>
+        ) : null}
+
+        {items.length === 0 && amendments.length === 0 && drafts.length === 0 ? (
           <EmptyState
             icon="check-decagram-outline"
             title={t('approvals.emptyTitle')}

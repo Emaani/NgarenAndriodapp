@@ -30,7 +30,7 @@ const TIME_SLOTS = BOOKING_SLOTS;
 export default function RequestCallout() {
   const router = useRouter();
   const t = useT();
-  const { vetId, date, emergency } = useLocalSearchParams<{ vetId?: string; date?: string; emergency?: string }>();
+  const { vetId, date, emergency, purpose: purposeParam } = useLocalSearchParams<{ vetId?: string; date?: string; emergency?: string; purpose?: string }>();
   const vet = vetId ? vets.find((v) => v.id === Number(vetId)) : undefined;
   const isEmergency = emergency === '1';
   const { isAdmin } = useAuth();
@@ -40,8 +40,9 @@ export default function RequestCallout() {
 
   const [onBehalfFarmerId, setOnBehalfFarmerId] = useState('');
   const [animal, setAnimal] = useState<Animal | null>(null);
-  // Mandatory purpose of the visit (Oct 2026 spec).
-  const [purpose, setPurpose] = useState('');
+  // Mandatory purpose of the visit (Oct 2026 spec); pre-filled when the farmer
+  // arrives from registration / device linkage.
+  const [purpose, setPurpose] = useState(purposeParam === 'Registration' || purposeParam === 'Linkage' ? purposeParam : '');
   const [urgency, setUrgency] = useState<(typeof URGENCY)[number]>(emergency === '1' ? 'Emergency' : 'Routine');
   const [mode, setMode] = useState<AppointmentMode>('onsite');
   const [notes, setNotes] = useState('');
@@ -123,6 +124,7 @@ export default function RequestCallout() {
     () =>
       [
         { label: t('fv.purpose.registration'), value: 'Registration' },
+        { label: t('fv.purpose.linkage'), value: 'Linkage' },
         ...(stockTakeAllowed ? [{ label: t('fv.purpose.stocktaking'), value: 'Stocktaking' }] : []),
         { label: t('fv.purpose.health'), value: 'Treatment' },
         { label: t('fv.purpose.advice'), value: 'Consultation' },

@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Alert, Linking, Pressable, ScrollView, View } from 'react-native';
 import * as Location from 'expo-location';
-import { useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import {
   breeds as breedsFallback,
@@ -9,6 +10,7 @@ import {
 } from '@/data/mock';
 import { getBreeds, getLocations, registerAnimal } from '@/data/api';
 import { addLocalAnimal } from '@/data/localAnimals';
+import { getDraft, saveDraft, deleteDraft } from '@/data/localRegistrationDrafts';
 import { addSupportRequest } from '@/data/supportRequests';
 import { getHerd } from '@/data/herd';
 import { enqueueAnimalSync, processSyncQueue } from '@/data/syncQueue';
@@ -51,6 +53,9 @@ const PURPOSE_VALUES = ['Dairy', 'Beef', 'Dual-purpose'] as const;
 // Pre-approved device suppliers loaded by Ngaren (Oct 2026 spec) — farmers can
 // only pick from this list. Manual free-text is allowed only for Physical/Visual.
 const APPROVED_SUPPLIERS = ['Ceres Tag', 'GSat', 'Digitanimal', 'Ngaren Devices'];
+
+// Self-service satellite linkage portal (spec 3.1.4).
+const LINKAGE_PORTAL_URL = 'https://portal.cerestag.com';
 
 // City suggestions per country (dropdown once the country is chosen).
 const CITIES_BY_COUNTRY: Record<string, string[]> = {
@@ -109,6 +114,7 @@ function Stepper({ step, labels }: { step: number; labels: string[] }) {
 export default function RegisterAnimal() {
   const router = useRouter();
   const t = useT();
+  const { draft: draftParam } = useLocalSearchParams<{ draft?: string }>();
   const { canManageTeam, user, appRole } = useAuth();
   const { data: breeds } = useResource(
     getBreeds,
@@ -197,6 +203,85 @@ export default function RegisterAnimal() {
 
   const generateAan = () => setAan(generateNgarenCode(countryCode));
 
+  // ---- Registration in Progress: auto-save + resume (spec 3.1.1) ----
+  const [draftHydrated, setDraftHydrated] = useState(false);
+  const [faceVerifying, setFaceVerifying] = useState(false);
+
+  const collectDraft = () => ({
+    aan,
+    idType,
+    sex,
+    purpose,
+    tag,
+    name,
+    color,
+    breedKey,
+    dob,
+    damChoice,
+    damExternal,
+    sireChoice,
+    sireExternal,
+    photos: [photoFront, photoLeft, photoRight, photoBack],
+    locationId,
+    addr1,
+    addr2,
+    city,
+    country,
+    coords,
+    devices,
+    notes,
+    startedBy: user?.fullName ?? user?.email ?? undefined,
+  });
+
+  // Resume / edit an existing draft (or existing AAN) passed as ?draft=<aan>.
+  useEffect(() => {
+    if (!draftParam || draftHydrated) return;
+    let active = true;
+    getDraft(draftParam).then((d) => {
+      if (!active) return;
+      if (d) {
+        setAan(d.aan);
+        setIdType(d.idType ?? '');
+        setSex(d.sex ?? '');
+        setPurpose(d.purpose ?? '');
+        setTag(d.tag ?? '');
+        setName(d.name ?? '');
+        setColor(d.color ?? '');
+        setBreedKey(d.breedKey ?? '');
+        setDob(d.dob ?? '');
+        setDamChoice(d.damChoice ?? UNKNOWN);
+        setDamExternal(d.damExternal ?? '');
+        setSireChoice(d.sireChoice ?? UNKNOWN);
+        setSireExternal(d.sireExternal ?? '');
+        const ph = d.photos ?? [];
+        setPhotoFront(ph[0] ?? null);
+        setPhotoLeft(ph[1] ?? null);
+        setPhotoRight(ph[2] ?? null);
+        setPhotoBack(ph[3] ?? null);
+        setLocationId(d.locationId ?? '');
+        setAddr1(d.addr1 ?? '');
+        setAddr2(d.addr2 ?? '');
+        setCity(d.city ?? '');
+        setCountry(d.country ?? 'Uganda');
+        setCoords(d.coords ?? null);
+        setDevices(d.devices ?? []);
+        setNotes(d.notes ?? '');
+        setStep(2);
+      }
+      setDraftHydrated(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, [draftParam, draftHydrated]);
+
+  // Auto-save every change once an AAN exists ("registration in progress").
+  useEffect(() => {
+    if (!aan) return;
+    void saveDraft(collectDraft());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aan, idType, sex, purpose, tag, name, color, breedKey, dob, damChoice, damExternal, sireChoice, sireExternal, photoFront, photoLeft, photoRight, photoBack, locationId, addr1, addr2, city, country, coords, devices, notes]);
+
   const addDevice = () => {
     setDevices((prev) => [
       ...prev,
@@ -261,22 +346,47 @@ export default function RegisterAnimal() {
     }
   };
 
+  // Request Ngaren Service Support (spec 3.1.1): the draft is already saved under
+  // "Registration in Progress"; launch the booking calendar with the service
+  // pre-set to Animal Registration so the farmer picks a date/time.
   const requestSupport = async () => {
-    const wo = await addSupportRequest({
+    void addSupportRequest({
       animalsCount: 1,
-      notes: notes.trim() || undefined,
+      notes: `[Animal registration · ${aan || 'AAN pending'}] ${notes.trim()}`.trim() || undefined,
       requestedBy: user?.fullName ?? user?.email ?? undefined,
     });
-    Alert.alert(
-      t('reg.supportDoneTitle'),
-      t('reg.supportDoneBody', { id: wo.workOrderId }),
-      [{ text: t('reg.done'), onPress: () => router.replace('/(tabs)/animals') }],
-    );
+    router.push(`/find-vet/request?purpose=Registration&aan=${encodeURIComponent(aan)}` as never);
   };
 
   const canSubmit = !!aan && !!idType && !tagTaken && tcsAccepted;
 
+  // Face ID gate — submission only succeeds after a live selfie of the user
+  // (spec 3.1.5). Returns true when verified.
+  const verifyFaceId = async (): Promise<boolean> => {
+    setFaceVerifying(true);
+    try {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert(t('reg.faceIdTitle'), t('reg.faceIdNeeded'));
+        return false;
+      }
+      const shot = await ImagePicker.launchCameraAsync({ quality: 0.4, cameraType: ImagePicker.CameraType.front });
+      if (shot.canceled || !shot.assets?.[0]) {
+        Alert.alert(t('reg.faceIdTitle'), t('reg.faceIdRequired'));
+        return false;
+      }
+      return true;
+    } catch {
+      Alert.alert(t('reg.faceIdTitle'), t('reg.faceIdRequired'));
+      return false;
+    } finally {
+      setFaceVerifying(false);
+    }
+  };
+
   const onSubmit = async () => {
+    // Submission requires a live Face ID check (spec 3.1.5).
+    if (!(await verifyFaceId())) return;
     setSubmitting(true);
     try {
       const breedName = breedOptions.find((b) => b.value === breedKey)?.label ?? 'Unknown';
@@ -318,6 +428,8 @@ export default function RegisterAnimal() {
         farmerApproved: autoApprove || appRole === 'farmer',
       };
       await addLocalAnimal(newAnimal);
+      // The draft is now a real record — clear it from "Registration in Progress".
+      await deleteDraft(code);
       await enqueueAnimalSync({ animal: newAnimal, userId: user?.id, photoUris: photos, aan: code });
       void processSyncQueue();
       registerAnimal({
@@ -602,6 +714,12 @@ export default function RegisterAnimal() {
             <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>
               {autoApprove ? t('reg.approveOwner') : t('reg.approvePending')}
             </AppText>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, backgroundColor: colors.primaryTint, borderRadius: radius.md, padding: spacing.md }}>
+              <Icon name="face-recognition" size={16} color={colors.primary} />
+              <AppText variant="caption" color={colors.primaryDark} style={{ flex: 1 }}>
+                {t('reg.reviewNote')}
+              </AppText>
+            </View>
           </>
         )}
 
@@ -624,8 +742,9 @@ export default function RegisterAnimal() {
             <Button label={t('reg.next')} icon="chevron-right" disabled={!stepValid[step]} onPress={() => setStep((s) => s + 1)} style={{ flex: 2 }} />
           ) : (
             <Button
-              label={autoApprove ? t('reg.createAan') : t('reg.submitActivation')}
-              loading={submitting}
+              label={faceVerifying ? t('reg.verifying') : autoApprove ? t('reg.createAan') : t('reg.submitActivation')}
+              icon="face-recognition"
+              loading={submitting || faceVerifying}
               disabled={!canSubmit}
               onPress={onSubmit}
               style={{ flex: 2 }}
@@ -657,10 +776,25 @@ export default function RegisterAnimal() {
             <AppText variant="body" style={{ fontWeight: '600', marginBottom: spacing.xs }}>
               {t('reg.satLinkage')}
             </AppText>
-            <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
+            <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm }}>
               <Button label={t('reg.reqNgarenSupport')} variant={dLinkage === 'support' ? 'primary' : 'outline'} onPress={() => setDLinkage('support')} style={{ flex: 1 }} />
               <Button label={t('reg.selfLinkageOnline')} variant={dLinkage === 'self' ? 'primary' : 'outline'} onPress={() => setDLinkage('self')} style={{ flex: 1 }} />
             </View>
+            {/* Self-linkage → provider portal; Ngaren support → calendar booking
+                for linkage & tag activation (spec 3.1.4). */}
+            {dLinkage === 'self' ? (
+              <Pressable onPress={() => Linking.openURL(LINKAGE_PORTAL_URL).catch(() => {})} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.md }}>
+                <Icon name="open-in-new" size={15} color={colors.primary} />
+                <AppText variant="caption" color={colors.primary} style={{ fontWeight: '600' }}>{t('reg.openLinkagePortal')}</AppText>
+              </Pressable>
+            ) : dLinkage === 'support' ? (
+              <Pressable
+                onPress={() => { setDeviceSheet(false); router.push('/find-vet/request?purpose=Linkage' as never); }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.md }}>
+                <Icon name="calendar-plus" size={15} color={colors.primary} />
+                <AppText variant="caption" color={colors.primary} style={{ fontWeight: '600' }}>{t('reg.bookLinkage')}</AppText>
+              </Pressable>
+            ) : null}
           </>
         ) : null}
         <Button label={t('reg.addDevice')} icon="check" disabled={!canAddDevice} onPress={addDevice} />
