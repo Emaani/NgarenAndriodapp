@@ -99,6 +99,39 @@ function roleFor(roles: string[]): Role {
 }
 
 /**
+ * True when an auth error is a connectivity failure (DNS/host unreachable,
+ * network down, timeout) rather than a credential/validation error. The raw
+ * platform message — e.g. "java.net.UnknownHostException: Unable to resolve
+ * host …: No address associated with hostname" — is not something a user should
+ * see, so these are mapped to a single friendly message.
+ */
+function isNetworkError(message?: string): boolean {
+  const m = (message ?? '').toLowerCase();
+  return (
+    m.includes('fetch') ||
+    m.includes('network') ||
+    m.includes('resolve host') ||
+    m.includes('unknownhost') ||
+    m.includes('no address') ||
+    m.includes('failed to connect') ||
+    m.includes('connection') ||
+    m.includes('timeout') ||
+    m.includes('timed out') ||
+    m.includes('enotfound') ||
+    m.includes('econnrefused')
+  );
+}
+
+const NETWORK_ERROR_MESSAGE =
+  'Can’t reach the Ngaren servers right now. Please check your internet connection and try again.';
+
+/** Map any auth error into a user-friendly message (never a raw stack/host string). */
+function friendlyAuthError(error: unknown): string {
+  const message = error instanceof Error ? error.message : typeof error === 'string' ? error : undefined;
+  return isNetworkError(message) ? NETWORK_ERROR_MESSAGE : message || NETWORK_ERROR_MESSAGE;
+}
+
+/**
  * Who may open the vet call-out queue. Vets reach it as their home; admins can
  * open it from the dashboard while still having full farmer-app access.
  */
@@ -212,35 +245,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!isSupabaseConfigured()) {
       return { error: 'Authentication is not configured. Set the Supabase env vars.' };
     }
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-    if (error) return { error: error.message };
-    if (!data.user) return { error: 'Sign in failed' };
-    const profile = await fetchUserProfile(data.user);
-    setUser(profile);
-    return { role: roleFor(profile.roles) };
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      // supabase-js wraps a DNS/network failure as a retryable fetch error; map
+      // its raw host message to a friendly one, keep real credential errors.
+      if (error) return { error: isNetworkError(error.message) ? NETWORK_ERROR_MESSAGE : error.message };
+      if (!data.user) return { error: 'Sign in failed' };
+      const profile = await fetchUserProfile(data.user);
+      setUser(profile);
+      return { role: roleFor(profile.roles) };
+    } catch (e) {
+      // A thrown fetch/UnknownHostException never reaches the user as a raw string.
+      return { error: friendlyAuthError(e) };
+    }
   }, [fetchUserProfile]);
 
   const signUp = useCallback<AuthState['signUp']>(async (email, password, fullName) => {
     if (!isSupabaseConfigured()) {
       return { error: 'Authentication is not configured. Set the Supabase env vars.' };
     }
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-      // full_name flows into raw_user_meta_data; the handle_new_user trigger
-      // copies it into public.profiles, matching the web app.
-      options: { data: { full_name: fullName.trim() } },
-    });
-    if (error) return { error: error.message };
-    if (data.user) {
-      const profile = await fetchUserProfile(data.user);
-      setUser(profile);
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        // full_name flows into raw_user_meta_data; the handle_new_user trigger
+        // copies it into public.profiles, matching the web app.
+        options: { data: { full_name: fullName.trim() } },
+      });
+      if (error) return { error: isNetworkError(error.message) ? NETWORK_ERROR_MESSAGE : error.message };
+      if (data.user) {
+        const profile = await fetchUserProfile(data.user);
+        setUser(profile);
+      }
+      // No session means the project requires email confirmation first.
+      return { needsConfirmation: !data.session };
+    } catch (e) {
+      return { error: friendlyAuthError(e) };
     }
-    // No session means the project requires email confirmation first.
-    return { needsConfirmation: !data.session };
   }, [fetchUserProfile]);
 
   const updateProfile = useCallback<AuthState['updateProfile']>(
