@@ -20,7 +20,7 @@
       "predictiveBackGestureEnabled": false,
       "softwareKeyboardLayoutMode": "pan",
       "package": "com.emaanidev.ngarenconnectmobile",
-      "versionCode": 58
+      "versionCode": 59
     },
     "web": {
       "output": "static",
