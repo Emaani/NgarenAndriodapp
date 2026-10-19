@@ -204,6 +204,20 @@ export default function FindVet() {
           <Icon name="chevron-right" size={20} color={colors.error} />
         </Pressable>
 
+        {/* Refer a vet to Ngaren for enlistment (spec 7). */}
+        <Pressable
+          onPress={() => router.push('/refer-vet' as never)}
+          style={({ pressed }) => [
+            { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.divider, opacity: pressed ? 0.92 : 1 },
+          ]}>
+          <Icon name="account-arrow-right-outline" size={22} color={colors.primary} />
+          <View style={{ flex: 1 }}>
+            <AppText variant="bodyLarge" style={{ fontWeight: '700' }}>{t('findVet.refer')}</AppText>
+            <AppText variant="caption" color={colors.onSurfaceVariant}>{t('findVet.referSub')}</AppText>
+          </View>
+          <Icon name="chevron-right" size={20} color={colors.onSurfaceVariant} />
+        </Pressable>
+
         {/* Rate your recent visits — service-linked ratings (Sep 12 2026). */}
         {unrated.length > 0 ? (
           <View style={{ backgroundColor: colors.warningTint, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md, gap: spacing.sm }}>

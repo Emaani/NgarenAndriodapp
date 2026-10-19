@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Linking, Pressable, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { animals as animalsFallback, vets } from '@/data/mock';
@@ -42,7 +42,13 @@ export default function RequestCallout() {
   const [animal, setAnimal] = useState<Animal | null>(null);
   // Mandatory purpose of the visit (Oct 2026 spec); pre-filled when the farmer
   // arrives from registration / device linkage.
-  const [purpose, setPurpose] = useState(purposeParam === 'Registration' || purposeParam === 'Linkage' ? purposeParam : '');
+  // Multiple services can be requested in one visit (Oct 2026).
+  const [purposes, setPurposes] = useState<string[]>(
+    purposeParam === 'Registration' || purposeParam === 'Linkage' ? [purposeParam] : [],
+  );
+  const togglePurpose = (v: string) => setPurposes((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]));
+  // Video / hybrid visits get an auto-generated meeting link.
+  const [meetingLink, setMeetingLink] = useState('');
   const [urgency, setUrgency] = useState<(typeof URGENCY)[number]>(emergency === '1' ? 'Emergency' : 'Routine');
   const [mode, setMode] = useState<AppointmentMode>('onsite');
   const [notes, setNotes] = useState('');
@@ -115,6 +121,16 @@ export default function RequestCallout() {
     ? bookableAnimals.map((a) => a.name ?? a.tag)
     : bookableAnimals.filter((a) => permittedIds.includes(a.id)).map((a) => a.name ?? a.tag);
 
+  // Generate a meeting link once the visit is Video or Hybrid (spec 6); clear it
+  // for on-site visits.
+  useEffect(() => {
+    if (mode === 'video' || mode === 'hybrid') {
+      setMeetingLink((prev) => prev || `https://meet.jit.si/ngaren-${Math.random().toString(36).slice(2, 10)}`);
+    } else {
+      setMeetingLink('');
+    }
+  }, [mode]);
+
   const permissionOk = noAnimalYet || allAnimals || permittedIds.length > 0;
   const slotOk = !scheduledFor || !!slot;
   // Purpose options (Oct 2026 spec). Stock taking is only offered for animals
@@ -128,10 +144,11 @@ export default function RequestCallout() {
         ...(stockTakeAllowed ? [{ label: t('fv.purpose.stocktaking'), value: 'Stocktaking' }] : []),
         { label: t('fv.purpose.health'), value: 'Treatment' },
         { label: t('fv.purpose.advice'), value: 'Consultation' },
+        { label: t('fv.purpose.tagging'), value: 'Tagging' },
       ],
     [t, stockTakeAllowed],
   );
-  const canSubmit = (!!animal || noAnimalYet) && !!purpose && tcsAccepted && permissionOk && slotOk;
+  const canSubmit = (!!animal || noAnimalYet) && purposes.length > 0 && tcsAccepted && permissionOk && slotOk;
 
   const onSubmit = async () => {
     if (!canSubmit || submitting) return;
@@ -144,16 +161,17 @@ export default function RequestCallout() {
           ? '[Access: all animals] '
           : `[Access: ${permittedLabels.length || 1} animal${permittedLabels.length === 1 ? '' : 's'}] `;
       const slotNote = scheduledFor && slot ? `[Slot: ${formatDate(scheduledFor)} ${slot}] ` : '';
-      const purposeLabel = purposeOptions.find((p) => p.value === purpose)?.label ?? purpose;
-      const purposeNote = purpose ? `[Purpose: ${purposeLabel}] ` : '';
+      const purposeLabels = purposes.map((p) => purposeOptions.find((o) => o.value === p)?.label ?? p);
+      const purposeNote = purposes.length ? `[Purpose: ${purposeLabels.join(', ')}] ` : '';
+      const linkNote = meetingLink ? `[Meeting link: ${meetingLink}] ` : '';
       await submitCalloutRequest({
         vetId: vet?.id,
         animal: animalLabel,
         locationName: locationName || 'Farm',
         urgency: urgency as CalloutUrgency,
-        notes: `${purposeNote}${onBehalfNote}${scopeNote}${slotNote}${notes}`.trim() || undefined,
+        notes: `${purposeNote}${linkNote}${onBehalfNote}${scopeNote}${slotNote}${notes}`.trim() || undefined,
         mode,
-        service: purpose || undefined,
+        service: purposes.join(', ') || undefined,
         photo: photo || undefined,
         scheduledFor,
         scheduledSlot: slot || undefined,
@@ -179,15 +197,29 @@ export default function RequestCallout() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <GradientHeader title={isEmergency ? t('findVet.emergency') : t('health.requestVet')} subtitle={vet ? vet.name : isEmergency ? t('fv.subEmergency') : t('fv.subMatched')} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
-        {/* Purpose of the visit — mandatory (Oct 2026 spec). */}
-        <PickerField
-          label={t('fv.purposeLabel')}
-          required
-          value={purpose}
-          placeholder={t('fv.purposePlaceholder')}
-          options={purposeOptions}
-          onSelect={setPurpose}
-        />
+        {/* Purpose of the visit — mandatory; one or more services (Oct 2026). */}
+        <AppText variant="body" style={{ fontWeight: '600', marginBottom: spacing.xs }}>
+          {t('fv.purposeLabel')} <AppText color={colors.error}>*</AppText>
+        </AppText>
+        <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>
+          {t('fv.purposeMulti')}
+        </AppText>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.md }}>
+          {purposeOptions.map((o) => {
+            const on = purposes.includes(o.value);
+            return (
+              <Pressable
+                key={o.value}
+                onPress={() => togglePurpose(o.value)}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.mdMinus, paddingVertical: spacing.xs, borderRadius: radius.full, backgroundColor: on ? colors.primary : colors.surface, borderWidth: 1, borderColor: on ? colors.primary : colors.divider }}>
+                {on ? <Icon name="check" size={13} color="#fff" /> : null}
+                <AppText variant="caption" color={on ? '#fff' : colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
+                  {o.label}
+                </AppText>
+              </Pressable>
+            );
+          })}
+        </View>
         {isEmergency ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.errorTint, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.error }}>
             <Icon name="alarm-light-outline" size={20} color={colors.error} />
@@ -333,6 +365,20 @@ export default function RequestCallout() {
             );
           })}
         </View>
+
+        {/* Auto-generated meeting link for video / hybrid visits (spec 6). */}
+        {meetingLink ? (
+          <Pressable
+            onPress={() => Linking.openURL(meetingLink).catch(() => {})}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.primaryTint, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md }}>
+            <Icon name="video-outline" size={20} color={colors.primary} />
+            <View style={{ flex: 1 }}>
+              <AppText variant="caption" color={colors.primaryDark} style={{ fontWeight: '700' }}>{t('fv.meetingLink')}</AppText>
+              <AppText variant="caption" color={colors.primary} numberOfLines={1}>{meetingLink}</AppText>
+            </View>
+            <Icon name="open-in-new" size={16} color={colors.primary} />
+          </Pressable>
+        ) : null}
 
         {/* Priority — routine / emergency only */}
         <AppText variant="body" style={{ fontWeight: '600', marginBottom: spacing.sm }}>

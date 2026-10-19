@@ -77,6 +77,7 @@ const ADMIN_ACTIONS: Action[] = [
   { icon: 'account-group-outline', label: 'action.teamUsers', route: '/users', tint: '#0284C7' },
   { icon: 'clipboard-pulse-outline', label: 'action.vetCallouts', route: '/vet', tint: '#F59E0B' },
   { icon: 'shield-account-outline', label: 'action.serviceVetting', route: '/service-vetting', tint: '#0891B2' },
+  { icon: 'card-account-details-outline', label: 'action.kyc', route: '/kyc-review', tint: '#7C3AED' },
   { icon: 'account-plus-outline', label: 'action.enlistVet', route: '/enlist-vet', tint: '#21C45D' },
   { icon: 'tag-outline', label: 'action.devices', route: '/devices', tint: '#9333EA' },
   { icon: 'map-marker-outline', label: 'action.locations', route: '/locations', tint: '#0D9488' },
@@ -248,8 +249,15 @@ export default function Home() {
   const farmerAnimals = herd.length;
   const farmerDevices = devices.length;
   const farmerLocations = locationList.length;
-  // Visual Identity = animals that have a Photo ID on file.
-  const visualIdCount = useMemo(() => herd.filter((a) => (a.photos?.length ?? 0) > 0).length, [herd]);
+  // Device vs visual split of MY ANIMALS (Oct 2026): an animal is device-tracked
+  // when it carries a tag/device (satellite or Bluetooth), otherwise it is
+  // identified visually. The two always sum to the total herd, reflecting the
+  // latest device + visual confirmation.
+  const deviceCount = useMemo(
+    () => herd.filter((a) => !!a.deviceSerial || a.identificationType === 'satellite' || a.identificationType === 'bluetooth').length,
+    [herd],
+  );
+  const visualIdCount = Math.max(0, herd.length - deviceCount);
   // Farmer dashboard shows the 2 most-used actions/reports; the rest collapse
   // under "More" (Oct 2026 spec — keep the dashboard uncluttered).
   const isFarmer = !isAdmin && !isVet;
@@ -390,17 +398,17 @@ export default function Home() {
 
               <View style={{ height: 1, backgroundColor: colors.divider }} />
 
-              {/* Devices. */}
-              <Pressable onPress={() => router.push('/devices' as never)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, opacity: pressed ? 0.9 : 1 })}>
+              {/* Devices — device-tracked animals; tap to split by device type. */}
+              <Pressable onPress={() => router.push('/animal-devices' as never)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, opacity: pressed ? 0.9 : 1 })}>
                 <Icon name="tag-outline" size={18} color="#9333EA" />
                 <AppText variant="body" style={{ fontWeight: '600', flex: 1 }}>{t('home.stat.devices')}</AppText>
-                <AppText variant="body" style={{ fontWeight: '700' }}>{farmerDevices}</AppText>
+                <AppText variant="body" style={{ fontWeight: '700' }}>{deviceCount}</AppText>
                 <Icon name="chevron-right" size={18} color={colors.onSurfaceVariant} />
               </Pressable>
 
               <View style={{ height: 1, backgroundColor: colors.divider }} />
 
-              {/* Visual Identity — animals with a Photo ID on file. */}
+              {/* Visual Identity — visually-identified animals. */}
               <Pressable onPress={() => router.push('/(tabs)/animals' as never)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, opacity: pressed ? 0.9 : 1 })}>
                 <Icon name="camera-outline" size={18} color="#F59E0B" />
                 <AppText variant="body" style={{ fontWeight: '600', flex: 1 }}>{t('home.ma.visualIdentity')}</AppText>

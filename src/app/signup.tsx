@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
+import { addKycSubmission } from '@/data/localKyc';
 import { colors, spacing } from '@/theme';
 import { AppText, Button, GradientHeader, Input, PhotoField } from '@/ui';
 import { useAuth } from '@/services/auth';
@@ -34,16 +34,9 @@ export default function SignUp() {
       setError(signUpError);
       return;
     }
-    // Persist the identity capture on-device, keyed by email, for later
-    // verification/linking when the identity backend lands.
-    try {
-      await AsyncStorage.setItem(
-        `ngaren.identity.${email.trim().toLowerCase()}`,
-        JSON.stringify({ name: name.trim(), phone: phone.trim(), idPhoto, selfie, at: new Date().toISOString() }),
-      );
-    } catch {
-      // best-effort
-    }
+    // Submit KYC for Ngaren review (maker-checker, section B): captures the ID
+    // document + facial ID; Admin Support approves it.
+    await addKycSubmission({ name: name.trim(), email: email.trim(), phone: phone.trim(), idPhoto, selfie });
     setSubmitting(false);
     // Whether or not email confirmation is required, send them to the success
     // screen; the route guards handle gating access until a session exists.

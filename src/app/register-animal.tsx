@@ -12,6 +12,7 @@ import { getBreeds, getLocations, registerAnimal } from '@/data/api';
 import { addLocalAnimal } from '@/data/localAnimals';
 import { getDraft, saveDraft, deleteDraft } from '@/data/localRegistrationDrafts';
 import { addSupportRequest } from '@/data/supportRequests';
+import { sendLocalNotification } from '@/services/push';
 import { getHerd } from '@/data/herd';
 import { enqueueAnimalSync, processSyncQueue } from '@/data/syncQueue';
 import { notify } from '@/lib/toast';
@@ -177,11 +178,24 @@ export default function RegisterAnimal() {
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const breedOptions = useMemo(() => breeds.map((b) => ({ label: b.name, value: b.key })), [breeds]);
   const locationOptions = useMemo(() => locations.map((l) => ({ label: l.name, value: String(l.id) })), [locations]);
-  const parentOptions = useMemo(
+  // Lineage pickers enforce sex (Oct 2026): the Dam list excludes known males and
+  // the Sire list excludes known females, so a male can never be captured as the
+  // dam (and vice-versa). Unknown-sex animals appear in both.
+  const parentBase = [
+    { label: t('reg.unknown'), value: UNKNOWN },
+    { label: t('reg.anotherFarm'), value: EXTERNAL },
+  ];
+  const damOptions = useMemo(
     () => [
-      { label: t('reg.unknown'), value: UNKNOWN },
-      { label: t('reg.anotherFarm'), value: EXTERNAL },
-      ...herd.map((a) => ({ label: `${a.name ?? a.tag} · ${a.tag}`, value: a.tag })),
+      ...parentBase,
+      ...herd.filter((a) => a.sex !== 'male').map((a) => ({ label: `${a.name ?? a.tag} · ${a.tag}`, value: a.tag })),
+    ],
+    [herd, t],
+  );
+  const sireOptions = useMemo(
+    () => [
+      ...parentBase,
+      ...herd.filter((a) => a.sex !== 'female').map((a) => ({ label: `${a.name ?? a.tag} · ${a.tag}`, value: a.tag })),
     ],
     [herd, t],
   );
@@ -384,9 +398,38 @@ export default function RegisterAnimal() {
     }
   };
 
-  const onSubmit = async () => {
-    // Submission requires a live Face ID check (spec 3.1.5).
-    if (!(await verifyFaceId())) return;
+  // Approval (Oct 2026): Review the record, then Approve with Face ID OR OTP.
+  const [otpSheet, setOtpSheet] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpEntry, setOtpEntry] = useState('');
+
+  const approve = () => {
+    Alert.alert(t('reg.approveChoiceTitle'), t('reg.approveChoiceBody'), [
+      { text: t('reg.approveFaceId'), onPress: async () => { if (await verifyFaceId()) void doSubmit(); } },
+      { text: t('reg.approveOtp'), onPress: () => startOtp() },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
+  };
+
+  const startOtp = () => {
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    setOtpCode(code);
+    setOtpEntry('');
+    setOtpSheet(true);
+    // No SMS provider yet — surface the demo code so OTP is testable in-app.
+    void sendLocalNotification(t('reg.otpNotifyTitle'), t('reg.otpNotifyBody', { code }), { type: 'OTP' });
+  };
+
+  const verifyOtp = () => {
+    if (otpEntry.trim() === otpCode) {
+      setOtpSheet(false);
+      void doSubmit();
+    } else {
+      Alert.alert(t('reg.otpWrongTitle'), t('reg.otpWrongBody'));
+    }
+  };
+
+  const doSubmit = async () => {
     setSubmitting(true);
     try {
       const breedName = breedOptions.find((b) => b.value === breedKey)?.label ?? 'Unknown';
@@ -568,9 +611,9 @@ export default function RegisterAnimal() {
             <AppText variant="bodyLarge" style={{ fontWeight: '600', marginTop: spacing.xs, marginBottom: spacing.xs }}>
               {t('reg.lineage')}
             </AppText>
-            <PickerField label={t('reg.dam')} value={damChoice} placeholder={t('reg.unknown')} options={parentOptions} onSelect={setDamChoice} />
+            <PickerField label={t('reg.dam')} value={damChoice} placeholder={t('reg.unknown')} options={damOptions} onSelect={setDamChoice} />
             {damChoice === EXTERNAL ? <TextField label={t('reg.damExternal')} value={damExternal} onChangeText={setDamExternal} placeholder={t('reg.externalPlaceholder')} /> : null}
-            <PickerField label={t('reg.sire')} value={sireChoice} placeholder={t('reg.unknown')} options={parentOptions} onSelect={setSireChoice} />
+            <PickerField label={t('reg.sire')} value={sireChoice} placeholder={t('reg.unknown')} options={sireOptions} onSelect={setSireChoice} />
             {sireChoice === EXTERNAL ? <TextField label={t('reg.sireExternal')} value={sireExternal} onChangeText={setSireExternal} placeholder={t('reg.externalPlaceholder')} /> : null}
 
             <AppText variant="bodyLarge" style={{ fontWeight: '600', marginTop: spacing.xs, marginBottom: spacing.xs }}>
@@ -742,15 +785,25 @@ export default function RegisterAnimal() {
             <Button label={t('reg.next')} icon="chevron-right" disabled={!stepValid[step]} onPress={() => setStep((s) => s + 1)} style={{ flex: 2 }} />
           ) : (
             <Button
-              label={faceVerifying ? t('reg.verifying') : autoApprove ? t('reg.createAan') : t('reg.submitActivation')}
-              icon="face-recognition"
+              label={faceVerifying ? t('reg.verifying') : t('reg.submitForApproval')}
+              icon="shield-check-outline"
               loading={submitting || faceVerifying}
               disabled={!canSubmit}
-              onPress={onSubmit}
+              onPress={approve}
               style={{ flex: 2 }}
             />
           )}
         </View>
+        {/* Review the record before approving (Oct 2026). */}
+        {step === STEP_COUNT ? (
+          <Button
+            label={t('reg.reviewRecord')}
+            variant="outline"
+            icon="file-search-outline"
+            onPress={() => setStep(2)}
+            style={{ marginTop: spacing.sm }}
+          />
+        ) : null}
       </ScrollView>
 
       {/* Device capture sheet */}
@@ -798,6 +851,22 @@ export default function RegisterAnimal() {
           </>
         ) : null}
         <Button label={t('reg.addDevice')} icon="check" disabled={!canAddDevice} onPress={addDevice} />
+      </BottomSheet>
+
+      {/* OTP approval sheet (Oct 2026) — alternative to Face ID. The code is
+          shown here because no SMS provider is wired yet (demo mode). */}
+      <BottomSheet visible={otpSheet} onClose={() => setOtpSheet(false)} title={t('reg.otpTitle')}>
+        <AppText variant="body" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>
+          {t('reg.otpIntro')}
+        </AppText>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.warningTint, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md }}>
+          <Icon name="information-outline" size={16} color={colors.warning} />
+          <AppText variant="caption" color={colors.onSurface} style={{ flex: 1 }}>
+            {t('reg.otpDemo', { code: otpCode })}
+          </AppText>
+        </View>
+        <TextField label={t('reg.otpLabel')} value={otpEntry} onChangeText={setOtpEntry} placeholder="------" keyboardType="number-pad" />
+        <Button label={t('reg.otpVerify')} icon="check-decagram-outline" disabled={otpEntry.trim().length < 6} onPress={verifyOtp} />
       </BottomSheet>
     </View>
   );

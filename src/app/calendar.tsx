@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
+import { Alert, Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { colors, radius, spacing } from '@/theme';
 import { CalendarEvent, CalendarType, getCalendarEvents } from '@/data/clinical';
@@ -98,6 +98,16 @@ export default function Calendar() {
     });
   };
 
+  // Invite someone to a visit (Oct 2026) — discover saved/searched vets, or
+  // invite Ngaren Support.
+  const onInvite = () => {
+    Alert.alert(t('cal.inviteTitle'), t('cal.inviteBody'), [
+      { text: t('cal.inviteVet'), onPress: () => router.push('/find-vet' as never) },
+      { text: t('cal.inviteNgaren'), onPress: () => router.push('/compose-message?to=ngaren' as never) },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
+  };
+
   const monthEventCount = events.filter((e) => {
     const d = new Date(e.date);
     return d.getFullYear() === cursor.year && d.getMonth() === cursor.month;
@@ -114,6 +124,9 @@ export default function Calendar() {
             <Icon name="chevron-left" size={28} color={colors.onSurface} />
           </Pressable>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
+            <Pressable onPress={onInvite} hitSlop={8} accessibilityLabel={t('cal.invite')}>
+              <Icon name="account-plus-outline" size={24} color={colors.primary} />
+            </Pressable>
             <Pressable onPress={() => shiftMonth(-1)} hitSlop={8}>
               <Icon name="chevron-left" size={24} color={colors.onSurfaceVariant} />
             </Pressable>
