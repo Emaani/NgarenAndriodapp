@@ -51,6 +51,19 @@ export const GROOMING_CHIPS = [
   'Ear tag check',
 ] as const;
 
+/**
+ * Grooming / hygiene QUALITATIVE attributes (Oct 20 2026 spec 3.6) — each scored
+ * 1–5 (1 = least favourable, 5 = most favourable). `key` is stored; `label` is
+ * shown.
+ */
+export const GROOMING_ATTRIBUTES: { key: string; label: string }[] = [
+  { key: 'coatSkin', label: 'Coat / skin condition' },
+  { key: 'tickParasite', label: 'Tick / parasite presence' },
+  { key: 'deworming', label: 'Deworming status' },
+  { key: 'hoofNail', label: 'Hoof / nail condition' },
+  { key: 'dehorning', label: 'Dehorning' },
+];
+
 /** Formulary suggestions for the drug/treatment picker (plus free custom entry). */
 export const DRUG_FORMULARY = [
   'Oxytetracycline',
@@ -94,6 +107,40 @@ export interface ScorecardPregnancy {
   dueDate?: string | null;
 }
 
+/**
+ * One captured diagnostic within a visit (Oct 20 2026 spec 3.3) — a parasite OR
+ * a disease, with its type + subcategory (from the extensible clinical catalog),
+ * the drug given and dosage. A vet can capture several sequentially.
+ */
+export interface DiagnosticEntry {
+  id: string;
+  kind: 'parasite' | 'disease';
+  type: string;
+  subcategory?: string | null;
+  comment?: string | null;
+  drug?: string | null;
+  dose?: string | null;
+  dosageComment?: string | null;
+}
+
+/** One captured vaccination within a visit (spec 3.4). */
+export interface VaccinationEntry {
+  id: string;
+  vaccine: string;
+  drug?: string | null;
+  comment?: string | null;
+}
+
+/** A pre-scheduled vaccination plan over a date range (spec 3.4). */
+export interface VaccinationSchedule {
+  from: string;
+  to: string;
+  note?: string | null;
+}
+
+/** Qualitative grooming ratings keyed by GROOMING_ATTRIBUTES.key → 1–5. */
+export type GroomingRatings = Record<string, number>;
+
 export interface Scorecard {
   id: string;
   animalKey: string;
@@ -109,6 +156,12 @@ export interface Scorecard {
   diagnosisTags: string[];
   diagnosisNotes?: string | null;
   treatment: ScorecardTreatment;
+  /** Rich per-visit clinical captures (Oct 20 2026 spec 3.3/3.4/3.6). Stored
+   *  inside the `treatment` JSONB column for schema-safe write-through. */
+  diagnostics?: DiagnosticEntry[];
+  vaccinations?: VaccinationEntry[];
+  vaccinationSchedule?: VaccinationSchedule | null;
+  groomingRatings?: GroomingRatings | null;
   grooming: string[];
   groomingBcs?: number | null;
   pregnancy?: ScorecardPregnancy | null;
@@ -190,6 +243,12 @@ export async function getScorecardsForAnimal(keys: string[]): Promise<Scorecard[
 /** Map a Supabase `livestock_scorecards` row back to a Scorecard. */
 function rowToScorecard(r: Record<string, unknown>): Scorecard {
   const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
+  // The rich clinical captures ride inside the `treatment` JSONB under `_rich`
+  // (schema-safe — no new columns needed); split them back out here.
+  const treatmentRaw = (r.treatment as Record<string, unknown>) ?? {};
+  const rich = (treatmentRaw._rich as Record<string, unknown>) ?? {};
+  const { _rich: _omit, ...treatment } = treatmentRaw;
+  void _omit;
   return {
     id: String(r.id),
     animalKey: str(r.animal_key) ?? '',
@@ -202,7 +261,11 @@ function rowToScorecard(r: Record<string, unknown>): Scorecard {
     vitals: (r.vitals as Scorecard['vitals']) ?? { bcs: null },
     diagnosisTags: Array.isArray(r.diagnosis_tags) ? (r.diagnosis_tags as string[]) : [],
     diagnosisNotes: str(r.diagnosis_notes) ?? null,
-    treatment: (r.treatment as Scorecard['treatment']) ?? {},
+    treatment: treatment as Scorecard['treatment'],
+    diagnostics: Array.isArray(rich.diagnostics) ? (rich.diagnostics as DiagnosticEntry[]) : [],
+    vaccinations: Array.isArray(rich.vaccinations) ? (rich.vaccinations as VaccinationEntry[]) : [],
+    vaccinationSchedule: (rich.vaccinationSchedule as VaccinationSchedule) ?? null,
+    groomingRatings: (rich.groomingRatings as GroomingRatings) ?? null,
     grooming: Array.isArray(r.grooming) ? (r.grooming as string[]) : [],
     pregnancy: (r.pregnancy as Scorecard['pregnancy']) ?? null,
     notes: str(r.notes) ?? null,
@@ -316,7 +379,17 @@ export async function syncScorecardToSupabase(card: Scorecard, userId?: string):
       vitals: card.vitals,
       diagnosis_tags: card.diagnosisTags,
       diagnosis_notes: card.diagnosisNotes ?? null,
-      treatment: card.treatment,
+      // Nest the rich captures inside the free-form `treatment` JSONB so the
+      // write-through needs no schema change (see rowToScorecard).
+      treatment: {
+        ...card.treatment,
+        _rich: {
+          diagnostics: card.diagnostics ?? [],
+          vaccinations: card.vaccinations ?? [],
+          vaccinationSchedule: card.vaccinationSchedule ?? null,
+          groomingRatings: card.groomingRatings ?? null,
+        },
+      },
       grooming: card.grooming,
       pregnancy: card.pregnancy ?? null,
       notes: card.notes ?? null,

@@ -90,15 +90,25 @@ export default function RequestCallout() {
     [isAdmin, onBehalfFarmerId, animals],
   );
 
+  // Artificial insemination (Oct 20 2026 spec) applies to FEMALE animals only —
+  // the selectable AANs are restricted to females when AI is requested.
+  const isFemaleAnimal = (a: Animal) =>
+    (a as { sex?: string }).sex === 'female' || (a.description ?? '').toLowerCase().includes('female');
+  const aiSelected = purposes.includes('Artificial Insemination');
+  const selectableAnimals = useMemo(
+    () => (aiSelected ? bookableAnimals.filter(isFemaleAnimal) : bookableAnimals),
+    [aiSelected, bookableAnimals],
+  );
+
   // Animal selection dialog options (account number + name), per the Sep 3
   // standup ("add selection dialogs" for animal selection).
   const animalOptions = useMemo(
     () =>
-      bookableAnimals.map((a) => ({
+      selectableAnimals.map((a) => ({
         label: `${a.accountNumber ?? a.tag}${a.name ? ` · ${a.name}` : ''}`,
         value: String(a.id),
       })),
-    [bookableAnimals],
+    [selectableAnimals],
   );
   const selectAnimal = (v: string) => {
     const a = bookableAnimals.find((x) => String(x.id) === v) ?? null;
@@ -106,6 +116,13 @@ export default function RequestCallout() {
     // The visit's primary animal is permitted by default.
     if (a && !permittedIds.includes(a.id)) setPermittedIds((prev) => [...prev, a.id]);
   };
+
+  // If AI is turned on while a non-female animal is selected, clear it so the
+  // farmer re-picks a female AAN.
+  useEffect(() => {
+    if (aiSelected && animal && !isFemaleAnimal(animal)) setAnimal(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiSelected]);
   const pickFarmer = (v: string) => {
     setOnBehalfFarmerId(v);
     setAnimal(null); // re-scope the animal list to the chosen farmer
@@ -145,6 +162,7 @@ export default function RequestCallout() {
         { label: t('fv.purpose.health'), value: 'Treatment' },
         { label: t('fv.purpose.advice'), value: 'Consultation' },
         { label: t('fv.purpose.tagging'), value: 'Tagging' },
+        { label: t('fv.purpose.ai'), value: 'Artificial Insemination' },
       ],
     [t, stockTakeAllowed],
   );
@@ -326,6 +344,14 @@ export default function RequestCallout() {
               options={animalOptions}
               onSelect={selectAnimal}
             />
+            {aiSelected ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: -spacing.sm, marginBottom: spacing.sm }}>
+                <Icon name="gender-female" size={15} color={colors.primary} />
+                <AppText variant="caption" color={colors.primary}>
+                  {t('fv.aiFemaleOnly')}
+                </AppText>
+              </View>
+            ) : null}
             {animal ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: -spacing.sm, marginBottom: spacing.sm }}>
                 <Icon name="map-marker-outline" size={15} color={colors.onSurfaceVariant} />

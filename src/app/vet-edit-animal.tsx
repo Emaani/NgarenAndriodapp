@@ -1,18 +1,20 @@
 import { useMemo, useState } from 'react';
-import { View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { animals as animalsFallback, breeds as breedsFallback, locations as locationsFallback } from '@/data/mock';
 import { getBreeds, getLocations } from '@/data/api';
 import { getHerd } from '@/data/herd';
 import { addAmendment, AnimalAmendment, FieldChange } from '@/data/localAmendments';
+import { logAuditEvent } from '@/data/localAuditEvents';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { sendLocalNotification } from '@/services/push';
 import { notify } from '@/lib/toast';
 import { useT } from '@/i18n';
 import { Animal } from '@/data/types';
-import { AppText, Button, DatePickerField, DetailRow, GradientHeader, Icon, PickerField, Screen, TextField } from '@/ui';
+import { AppText, BottomSheet, Button, DatePickerField, DetailRow, GradientHeader, Icon, PickerField, Screen, TextField } from '@/ui';
 
 /**
  * Vet edit of an EXISTING animal record (Oct 2026 Q&A 4.1). The vet may amend
@@ -42,6 +44,10 @@ export default function VetEditAnimal() {
   const [dob, setDob] = useState<string | null>(null);
   const [notes, setNotes] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // AAN-change approval gate (spec 2.1): Face ID or OTP before submission.
+  const [otpSheet, setOtpSheet] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpEntry, setOtpEntry] = useState('');
 
   if (loading) return null;
   if (!isAuthenticated) return <Redirect href="/login" />;
@@ -102,10 +108,57 @@ export default function VetEditAnimal() {
 
   const hasChanges = changes.length > 0;
 
-  const onSubmit = async () => {
+  // Face ID / OTP gate before submitting an AAN change for approval (spec 2.1).
+  const confirmSubmit = () => {
+    if (!hasChanges || submitting) return;
+    Alert.alert(t('reg.approveChoiceTitle'), t('ve.approveBody'), [
+      { text: t('reg.approveFaceId'), onPress: async () => { if (await verifyFaceId()) void doSubmit(); } },
+      { text: t('reg.approveOtp'), onPress: () => startOtp() },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
+  };
+
+  const verifyFaceId = async (): Promise<boolean> => {
+    try {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert(t('reg.faceIdTitle'), t('reg.faceIdNeeded'));
+        return false;
+      }
+      const shot = await ImagePicker.launchCameraAsync({ quality: 0.4, cameraType: ImagePicker.CameraType.front });
+      if (shot.canceled || !shot.assets?.[0]) {
+        Alert.alert(t('reg.faceIdTitle'), t('reg.faceIdRequired'));
+        return false;
+      }
+      return true;
+    } catch {
+      Alert.alert(t('reg.faceIdTitle'), t('reg.faceIdRequired'));
+      return false;
+    }
+  };
+
+  const startOtp = () => {
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    setOtpCode(code);
+    setOtpEntry('');
+    setOtpSheet(true);
+    void sendLocalNotification(t('reg.otpNotifyTitle'), t('reg.otpNotifyBody', { code }), { type: 'OTP' });
+  };
+
+  const verifyOtp = () => {
+    if (otpEntry.trim() === otpCode) {
+      setOtpSheet(false);
+      void doSubmit();
+    } else {
+      Alert.alert(t('reg.otpWrongTitle'), t('reg.otpWrongBody'));
+    }
+  };
+
+  const doSubmit = async () => {
     if (!hasChanges || submitting) return;
     setSubmitting(true);
     try {
+      const by = user?.fullName ?? user?.email ?? 'Vet';
       const amendment: AnimalAmendment = {
         id: `am-${Date.now()}`,
         animalId: animal.id,
@@ -113,12 +166,14 @@ export default function VetEditAnimal() {
         animalLabel: animal.name ?? animal.tag,
         changes,
         patch,
-        proposedBy: user?.fullName ?? user?.email ?? 'Vet',
+        proposedBy: by,
         proposedAt: new Date().toISOString(),
         farmerName: farmer ?? animal.locationName,
         status: 'pending',
       };
       await addAmendment(amendment);
+      // Track the change per user with a date/time log (spec 2.1 note).
+      void logAuditEvent({ type: 'other', title: `AAN edit submitted — ${amendment.animalLabel}`, detail: `${amendment.animalKey} · ${changes.map((c) => c.label).join(', ')}`, by });
       void sendLocalNotification(
         t('ve.notifyTitle'),
         t('ve.notifyBody', { label: amendment.animalLabel, count: changes.length }),
@@ -166,7 +221,7 @@ export default function VetEditAnimal() {
           icon="send-check-outline"
           loading={submitting}
           disabled={!hasChanges || submitting}
-          onPress={onSubmit}
+          onPress={confirmSubmit}
         />
         {!hasChanges ? (
           <AppText variant="caption" color={colors.onSurfaceVariant} style={{ textAlign: 'center', marginTop: spacing.sm }}>
@@ -174,6 +229,18 @@ export default function VetEditAnimal() {
           </AppText>
         ) : null}
       </Screen>
+
+      {/* OTP approval sheet — alternative to Face ID. Demo code (no SMS yet). */}
+      <BottomSheet visible={otpSheet} onClose={() => setOtpSheet(false)} title={t('reg.otpTitle')}>
+        <AppText variant="body" color={colors.onSurface} style={{ marginBottom: spacing.sm }}>
+          {t('reg.otpIntro')}
+        </AppText>
+        <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>
+          {t('reg.otpDemo', { code: otpCode })}
+        </AppText>
+        <TextField label={t('reg.otpLabel')} value={otpEntry} onChangeText={setOtpEntry} placeholder="------" keyboardType="number-pad" />
+        <Button label={t('reg.otpVerify')} icon="check-decagram-outline" disabled={otpEntry.trim().length < 6} onPress={verifyOtp} />
+      </BottomSheet>
     </View>
   );
 }

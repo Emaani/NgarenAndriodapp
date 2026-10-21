@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 import { Image, View } from 'react-native';
 import { Redirect, useLocalSearchParams } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { getScorecardById, STATUS_LABEL } from '@/data/scorecards';
+import { getScorecardById, GROOMING_ATTRIBUTES, STATUS_LABEL } from '@/data/scorecards';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { statusVisual, bcsColor } from '@/lib/scorecardVisual';
@@ -97,33 +97,73 @@ export default function ScorecardView() {
           {vitalsLine ? <Line>{vitalsLine}</Line> : <AppText variant="caption" color={colors.onSurfaceVariant}>No other vitals recorded.</AppText>}
         </Tile>
 
-        <Tile icon="stethoscope" title="Diagnosis">
-          {card.diagnosisTags.length ? <Line>{card.diagnosisTags.join(', ')}</Line> : null}
-          {card.diagnosisNotes ? <AppText variant="caption" color={colors.onSurfaceVariant}>{card.diagnosisNotes}</AppText> : null}
-          {!card.diagnosisTags.length && !card.diagnosisNotes && !card.photo ? <AppText variant="caption" color={colors.onSurfaceVariant}>No diagnosis recorded.</AppText> : null}
+        <Tile icon="stethoscope" title="Treatment — Diagnosis">
+          {(card.diagnostics ?? []).length ? (
+            (card.diagnostics ?? []).map((d) => (
+              <View key={d.id} style={{ paddingVertical: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.divider }}>
+                <Line>
+                  {d.kind === 'parasite' ? 'Parasite' : 'Disease'}: {d.type}
+                  {d.subcategory ? ` — ${d.subcategory}` : ''}
+                </Line>
+                {d.drug ? <AppText variant="caption" color={colors.onSurfaceVariant}>Drug: {d.drug}{d.dose ? ` · ${d.dose}` : ''}</AppText> : null}
+                {d.dosageComment ? <AppText variant="caption" color={colors.onSurfaceVariant}>Dosage: {d.dosageComment}</AppText> : null}
+                {d.comment ? <AppText variant="caption" color={colors.onSurfaceVariant}>{d.comment}</AppText> : null}
+              </View>
+            ))
+          ) : (
+            <>
+              {card.diagnosisTags.length ? <Line>{card.diagnosisTags.join(', ')}</Line> : null}
+              {card.diagnosisNotes ? <AppText variant="caption" color={colors.onSurfaceVariant}>{card.diagnosisNotes}</AppText> : null}
+              {!card.diagnosisTags.length && !card.diagnosisNotes && !card.photo ? <AppText variant="caption" color={colors.onSurfaceVariant}>No diagnosis recorded.</AppText> : null}
+            </>
+          )}
           {card.photo ? (
             <Image source={{ uri: card.photo }} style={{ width: '100%', height: 200, borderRadius: radius.sm, backgroundColor: colors.divider, marginTop: spacing.xs }} resizeMode="cover" />
           ) : null}
         </Tile>
 
-        <Tile icon="needle" title="Medication & Treatment">
-          {t.drug ? (
-            <>
-              <Line>
-                {t.drug}
-                {t.dose ? ` — ${t.dose}` : ''}
-                {t.route ? ` · ${t.route}` : ''}
-                {t.frequency ? ` · ${t.frequency}` : ''}
-              </Line>
-              {t.nextDueDate ? <AppText variant="caption" color={colors.onSurfaceVariant}>Next due: {formatDate(t.nextDueDate)}</AppText> : null}
-            </>
-          ) : (
-            <AppText variant="caption" color={colors.onSurfaceVariant}>No medication given.</AppText>
-          )}
-        </Tile>
+        {(card.vaccinations ?? []).length || card.vaccinationSchedule ? (
+          <Tile icon="needle" title="Vaccination">
+            {(card.vaccinations ?? []).map((vx) => (
+              <View key={vx.id} style={{ paddingVertical: 2 }}>
+                <Line>{vx.vaccine}{vx.drug ? ` · ${vx.drug}` : ''}</Line>
+                {vx.comment ? <AppText variant="caption" color={colors.onSurfaceVariant}>{vx.comment}</AppText> : null}
+              </View>
+            ))}
+            {card.vaccinationSchedule ? (
+              <AppText variant="caption" color={colors.onSurfaceVariant}>
+                Plan: {card.vaccinationSchedule.from ? formatDate(card.vaccinationSchedule.from) : '—'} → {card.vaccinationSchedule.to ? formatDate(card.vaccinationSchedule.to) : '—'}
+                {card.vaccinationSchedule.note ? ` · ${card.vaccinationSchedule.note}` : ''}
+              </AppText>
+            ) : null}
+          </Tile>
+        ) : null}
 
-        <Tile icon="content-cut" title="Grooming & Hygiene">
-          {card.grooming.length ? <Line>{card.grooming.join(' · ')}</Line> : <AppText variant="caption" color={colors.onSurfaceVariant}>Nothing recorded.</AppText>}
+        {t.drug && !(card.diagnostics ?? []).length ? (
+          <Tile icon="needle" title="Medication & Treatment">
+            <Line>
+              {t.drug}
+              {t.dose ? ` — ${t.dose}` : ''}
+              {t.route ? ` · ${t.route}` : ''}
+              {t.frequency ? ` · ${t.frequency}` : ''}
+            </Line>
+            {t.nextDueDate ? <AppText variant="caption" color={colors.onSurfaceVariant}>Next due: {formatDate(t.nextDueDate)}</AppText> : null}
+          </Tile>
+        ) : null}
+
+        <Tile icon="star-outline" title="Grooming / Hygiene">
+          {card.groomingRatings && Object.keys(card.groomingRatings).length ? (
+            GROOMING_ATTRIBUTES.filter((g) => card.groomingRatings?.[g.key]).map((g) => (
+              <View key={g.key} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <AppText variant="caption" color={colors.onSurface}>{g.label}</AppText>
+                <AppText variant="caption" color={colors.primary} style={{ fontWeight: '700' }}>{card.groomingRatings?.[g.key]} / 5</AppText>
+              </View>
+            ))
+          ) : card.grooming.length ? (
+            <Line>{card.grooming.join(' · ')}</Line>
+          ) : (
+            <AppText variant="caption" color={colors.onSurfaceVariant}>Nothing recorded.</AppText>
+          )}
         </Tile>
 
         {card.pregnancy?.applicable ? (

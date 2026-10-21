@@ -12,6 +12,8 @@ import { getHerd } from '@/data/herd';
 import { formatDate } from '@/lib/date';
 import { getFarmerPortfolio, portfolioTotals } from '@/data/portfolio';
 import { getEnlistedVets } from '@/data/vetEnlistments';
+import { getVetProfile } from '@/data/vetSelfProfile';
+import { getPendingFollowUps } from '@/data/followUps';
 import { vets as seededVets } from '@/data/mock';
 import { VET_METRICS_FALLBACK, getVetMetrics } from '@/data/vet';
 import { useResource } from '@/data/hooks';
@@ -40,6 +42,7 @@ type Action = { icon: IconName; label: string; route: string; tint: string; perm
 const FARMER_ACTIONS: Action[] = [
   { icon: 'clipboard-check-outline', label: 'action.manageRecords', route: '/approvals', tint: '#F59E0B' },
   { icon: 'calendar-month-outline', label: 'action.manageCalendar', route: '/calendar', tint: '#0EA5E9' },
+  { icon: 'calendar-clock-outline', label: 'action.followUps', route: '/follow-ups', tint: '#16A34A', perm: 'book_vet' },
   { icon: 'plus-circle-outline', label: 'action.registerAnimal', route: '/register-animal', tint: '#6D874F', perm: 'register_animal' },
   { icon: 'stethoscope', label: 'action.findVetNear', route: '/find-vet', tint: '#21C45D', perm: 'book_vet' },
 ];
@@ -78,6 +81,7 @@ const ADMIN_ACTIONS: Action[] = [
   { icon: 'clipboard-pulse-outline', label: 'action.vetCallouts', route: '/vet', tint: '#F59E0B' },
   { icon: 'shield-account-outline', label: 'action.serviceVetting', route: '/service-vetting', tint: '#0891B2' },
   { icon: 'card-account-details-outline', label: 'action.kyc', route: '/kyc-review', tint: '#7C3AED' },
+  { icon: 'account-check-outline', label: 'action.vetApprovals', route: '/vet-credential-reviews', tint: '#0891B2' },
   { icon: 'account-plus-outline', label: 'action.enlistVet', route: '/enlist-vet', tint: '#21C45D' },
   { icon: 'tag-outline', label: 'action.devices', route: '/devices', tint: '#9333EA' },
   { icon: 'map-marker-outline', label: 'action.locations', route: '/locations', tint: '#0D9488' },
@@ -86,11 +90,14 @@ const ADMIN_ACTIONS: Action[] = [
 // Vet "Health Intelligence System" — clinical oversight across assigned farms.
 const VET_ACTIONS: Action[] = [
   { icon: 'clipboard-pulse-outline', label: 'action.calloutQueue', route: '/vet', tint: '#3D99F5' },
-  { icon: 'clipboard-edit-outline', label: 'action.logVisit', route: '/log-visit', tint: '#16A34A' },
+  { icon: 'clipboard-list-outline', label: 'action.manageAnimals', route: '/vet-manage-animals', tint: '#2563EB' },
+  { icon: 'clipboard-pulse', label: 'action.healthScorecard', route: '/health-scorecard', tint: '#DC2626' },
+  { icon: 'calendar-clock-outline', label: 'action.followUps', route: '/follow-ups', tint: '#16A34A' },
   { icon: 'heart-pulse', label: 'action.managedHealth', route: '/health', tint: '#EF4444' },
   { icon: 'cow', label: 'action.livestock', route: '/vet-animals', tint: '#2563EB' },
   { icon: 'calendar-month-outline', label: 'action.calendar', route: '/calendar', tint: '#0EA5E9' },
   { icon: 'file-chart-outline', label: 'action.reports', route: '/vet-reports', tint: '#6D874F' },
+  { icon: 'account-badge-outline', label: 'action.myVetProfile', route: '/vet-credentials', tint: '#0891B2' },
   { icon: 'tag-outline', label: 'action.devices', route: '/devices', tint: '#9333EA' },
   { icon: 'storefront-outline', label: 'action.marketplace', route: '/marketplace', tint: '#0D9488' },
   { icon: 'message-text-outline', label: 'action.messages', route: '/messaging', tint: '#F59E0B' },
@@ -191,6 +198,11 @@ export default function Home() {
   const { data: enlistedVets } = useResource(getEnlistedVets, []);
   // Enlisted service providers = seeded demo providers + admin-enlisted ones.
   const providerCount = seededVets.length + enlistedVets.length;
+  // The logged-in vet's own enlisting status (spec 1): drives the activation
+  // banner so an unapproved vet is prompted to complete / await approval.
+  const { data: myVetProfile } = useResource(() => (user?.id ? getVetProfile(user.id) : Promise.resolve(undefined)), undefined);
+  // Pending follow-up invitations a vet booked, awaiting this farmer's acceptance.
+  const { data: pendingFollowUps } = useResource(getPendingFollowUps, []);
 
   // Stock-take/validation reporting categorized by device type (management
   // decision), across the whole live herd. Only animals whose tagging method is
@@ -428,6 +440,34 @@ export default function Home() {
             title={pendingCount === 1 ? t('home.banner.awaitingActivationOne') : t('home.banner.awaitingActivation', { count: pendingCount })}
             subtitle={t('home.banner.validateActivate')}
             onPress={() => router.push('/approvals' as never)}
+            style={{ marginBottom: spacing.lg }}
+          />
+        )}
+
+        {/* Vet self-enlisting (spec 1): prompt the vet to complete/await approval
+            until Ngaren activates their professional profile. */}
+        {isVet && (!myVetProfile || myVetProfile.status !== 'approved') && (
+          <NavBanner
+            variant="alert"
+            tint={myVetProfile?.status === 'pending' ? '#F59E0B' : '#0891B2'}
+            icon={myVetProfile?.status === 'pending' ? 'clock-outline' : 'account-badge-outline'}
+            title={myVetProfile?.status === 'pending' ? t('home.banner.vetPending') : t('home.banner.vetEnlist')}
+            subtitle={myVetProfile?.status === 'rejected' ? (myVetProfile.rejectionReason ?? t('home.banner.vetEnlistSub')) : t('home.banner.vetEnlistSub')}
+            onPress={() => router.push('/vet-credentials' as never)}
+            style={{ marginBottom: spacing.lg }}
+          />
+        )}
+
+        {/* Follow-up invitations awaiting the farmer's acceptance (Log Visit
+            rework): accepting schedules them on the calendar. */}
+        {!isAdmin && !isVet && pendingFollowUps.length > 0 && (
+          <NavBanner
+            variant="alert"
+            tint="#16A34A"
+            icon="calendar-clock-outline"
+            title={pendingFollowUps.length === 1 ? t('home.banner.followUpOne') : t('home.banner.followUp', { count: pendingFollowUps.length })}
+            subtitle={t('home.banner.followUpSub')}
+            onPress={() => router.push('/follow-ups' as never)}
             style={{ marginBottom: spacing.lg }}
           />
         )}

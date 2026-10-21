@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Image, Pressable, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Redirect, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
@@ -8,13 +9,16 @@ import { getHerd } from '@/data/herd';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { sendLocalNotification } from '@/services/push';
-import { saveStockTakeResult } from '@/data/localStockTake';
+import { addAbsenceReports, saveStockTakeResult, StockTakeAbsence } from '@/data/localStockTake';
 import { addLocalEvent } from '@/data/localEvents';
 import { persistImage } from '@/lib/photos';
-import { ageFromDate } from '@/lib/date';
+import { ageFromDate, formatDateTime } from '@/lib/date';
 import { Animal } from '@/data/types';
 import { useT } from '@/i18n';
 import { AnimalPhoto, AppText, BottomSheet, Button, DetailRow, GradientHeader, Icon, IconChip, IconName, Screen } from '@/ui';
+
+/** The AAN / reference identifier used to list an animal in reports. */
+const aanOf = (a: Animal): string => a.ngarenCode ?? a.accountNumber ?? a.tag;
 
 type Mark = 'pending' | 'present' | 'missing';
 type Phase = 'method' | 'count' | 'summary';
@@ -170,7 +174,8 @@ function SummaryStat({ value, label, color }: { value: number; label: string; co
 export default function StockTake() {
   const router = useRouter();
   const t = useT();
-  const { can, canVet } = useAuth();
+  const insets = useSafeAreaInsets();
+  const { can, canVet, user } = useAuth();
   const { data: allAnimals } = useResource(getHerd, animalsFallback);
   const [marks, setMarks] = useState<Record<number, Mark>>(() =>
     Object.fromEntries(animalsFallback.map((a) => [a.id, 'pending' as Mark])),
@@ -241,24 +246,30 @@ export default function StockTake() {
   const submitStockTake = async () => {
     setSubmitting(true);
     try {
-      // 1) Facial identification of the registered user (front-camera selfie).
-      const perm = await ImagePicker.requestCameraPermissionsAsync();
-      if (!perm.granted) {
-        Alert.alert(t('stock.faceIdTitle'), t('stock.faceIdNeeded'));
-        return;
-      }
-      const shot = await ImagePicker.launchCameraAsync({ quality: 0.4, cameraType: ImagePicker.CameraType.front });
-      if (shot.canceled || !shot.assets?.[0]) {
-        Alert.alert(t('stock.faceIdTitle'), t('stock.faceIdRequired'));
-        return;
-      }
-      // 2) Escalate absent animals.
       const strict = method === 'manual_visual';
+      // Visual stocktaking confirms each animal with a live CAMERA photo, so the
+      // submit does NOT require a facial-recognition selfie (Oct 20 2026 spec).
+      // Device-based rounds (BLE / QR) still verify the registered user with a
+      // front-camera Face ID, since they have no per-animal photo evidence.
+      if (!strict) {
+        const perm = await ImagePicker.requestCameraPermissionsAsync();
+        if (!perm.granted) {
+          Alert.alert(t('stock.faceIdTitle'), t('stock.faceIdNeeded'));
+          return;
+        }
+        const shot = await ImagePicker.launchCameraAsync({ quality: 0.4, cameraType: ImagePicker.CameraType.front });
+        if (shot.canceled || !shot.assets?.[0]) {
+          Alert.alert(t('stock.faceIdTitle'), t('stock.faceIdRequired'));
+          return;
+        }
+      }
+      // Escalate absent animals.
       const absent = allAnimals.filter(
         (a) => marks[a.id] === 'missing' || (strict && (marks[a.id] ?? 'pending') === 'pending'),
       );
       const presentCount = allAnimals.filter((a) => marks[a.id] === 'present').length;
       const nowIso = new Date().toISOString();
+      const reportedBy = user?.fullName ?? user?.email ?? 'Stock-taker';
       // Persist the result so the farmer dashboard can show the latest count.
       await saveStockTakeResult({
         date: nowIso,
@@ -267,6 +278,16 @@ export default function StockTake() {
         total: allAnimals.length,
         method,
       });
+      // Persist a follow-up report per absent animal — by AAN, date & user.
+      const absenceReports: StockTakeAbsence[] = absent.map((a) => ({
+        id: `abs-${a.id}-${Date.now()}`,
+        aan: aanOf(a),
+        animalLabel: a.name ?? a.tag,
+        locationName: a.locationName ?? null,
+        date: nowIso,
+        reportedBy,
+      }));
+      await addAbsenceReports(absenceReports);
       // Log the stock-take on the shared calendar so it is visible and managed
       // consistently across profiles (farmer + vet) — Oct 2026 Q&A.
       const hhmm = nowIso.slice(11, 16);
@@ -327,7 +348,7 @@ export default function StockTake() {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <GradientHeader title={t('action.stockTake')} subtitle={t('stock.methodSubtitle')} showBack />
-        <Screen contentStyle={{ paddingTop: spacing.md }}>
+        <Screen contentStyle={{ paddingTop: spacing.md, paddingBottom: spacing.xxl + 72 + insets.bottom }}>
           <AppText variant="body" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.md }}>
             {t('stock.intro')}
           </AppText>
@@ -368,13 +389,24 @@ export default function StockTake() {
               </Pressable>
             );
           })}
-          <Button
-            label={t('stock.startCount')}
-            icon="arrow-right"
-            onPress={() => setPhase('count')}
-            style={{ marginTop: spacing.md }}
-          />
         </Screen>
+        {/* Sticky, safe-area-aware footer so "Start count" is always reachable
+            and never hidden below the phone edge (Oct 20 2026 spec). */}
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            paddingHorizontal: spacing.md,
+            paddingTop: spacing.md,
+            paddingBottom: insets.bottom + spacing.md,
+            backgroundColor: colors.surface,
+            borderTopWidth: 1,
+            borderTopColor: colors.divider,
+          }}>
+          <Button label={t('stock.startCount')} icon="arrow-right" onPress={() => setPhase('count')} />
+        </View>
       </View>
     );
   }
@@ -425,8 +457,12 @@ export default function StockTake() {
                     <AppText variant="bodyLarge" style={{ fontWeight: '600' }}>
                       {a.name ?? a.tag}
                     </AppText>
+                    {/* Follow-up report: AAN · date of reported absence · user. */}
                     <AppText variant="caption" color={colors.onSurfaceVariant}>
-                      {t('stock.lastSeen', { loc: a.locationName ?? '—' })}
+                      {t('stock.absenceAan', { aan: aanOf(a) })}
+                    </AppText>
+                    <AppText variant="caption" color={colors.onSurfaceVariant}>
+                      {t('stock.absenceMeta', { date: formatDateTime(new Date().toISOString()), by: user?.fullName ?? user?.email ?? 'Stock-taker' })}
                     </AppText>
                   </View>
                   <Pressable onPress={() => router.push('/(tabs)/track')} hitSlop={8}>
@@ -507,7 +543,7 @@ export default function StockTake() {
         )}
       </View>
 
-      <Screen contentStyle={{ paddingTop: spacing.md, paddingBottom: spacing.xxl + 72 }}>
+      <Screen contentStyle={{ paddingTop: spacing.md, paddingBottom: spacing.xxl + 72 + insets.bottom }}>
         {allAnimals.map((a) => (
           <AnimalRow
             key={a.id}
@@ -527,7 +563,11 @@ export default function StockTake() {
           left: 0,
           right: 0,
           bottom: 0,
-          padding: spacing.md,
+          paddingHorizontal: spacing.md,
+          paddingTop: spacing.md,
+          // Clear the system nav bar / home indicator so the button is never
+          // cut off below the phone edge (Oct 20 2026 spec).
+          paddingBottom: insets.bottom + spacing.md,
           backgroundColor: colors.surface,
           borderTopWidth: 1,
           borderTopColor: colors.divider,
