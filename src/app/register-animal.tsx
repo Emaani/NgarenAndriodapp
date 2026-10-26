@@ -19,7 +19,17 @@ import { notify } from '@/lib/toast';
 import { Animal, RegisteredDevice } from '@/data/types';
 import { useAuth } from '@/services/auth';
 import { COUNTRY_CODES, DEFAULT_COUNTRY_CODE, generateNgarenCode } from '@/lib/ngaren';
-import { DEVICE_MODEL_OPTIONS, deviceModel, methodForDevices } from '@/lib/tagging';
+import {
+  BLE_FRAME_FORMATS,
+  BLE_INTERVAL_OPTIONS,
+  BLE_TX_POWER_OPTIONS,
+  DEVICE_MODEL_OPTIONS,
+  deviceModel,
+  isBleModel,
+  methodForDevices,
+} from '@/lib/tagging';
+import { normalizeBleMac } from '@/lib/bleFrame';
+import { buildMacIndex } from '@/lib/bleResolve';
 import { useResource } from '@/data/hooks';
 import { useT } from '@/i18n';
 import {
@@ -53,7 +63,7 @@ const PURPOSE_VALUES = ['Dairy', 'Beef', 'Dual-purpose'] as const;
 
 // Pre-approved device suppliers loaded by Ngaren (Oct 2026 spec) — farmers can
 // only pick from this list. Manual free-text is allowed only for Physical/Visual.
-const APPROVED_SUPPLIERS = ['Ceres Tag', 'GSat', 'Digitanimal', 'Ngaren Devices'];
+const APPROVED_SUPPLIERS = ['Ceres Tag', 'GSat', 'ELA Innovation', 'Digitanimal', 'Ngaren Devices'];
 
 // Self-service satellite linkage portal (spec 3.1.4).
 const LINKAGE_PORTAL_URL = 'https://portal.cerestag.com';
@@ -167,6 +177,11 @@ export default function RegisterAnimal() {
   const [dSupplier, setDSupplier] = useState('');
   const [dPhoto, setDPhoto] = useState<string | null>(null);
   const [dLinkage, setDLinkage] = useState<'support' | 'self' | ''>('');
+  // BLE tag configuration (ELA Blue COIN / PUCK — static MAC identity).
+  const [dMac, setDMac] = useState('');
+  const [dFrame, setDFrame] = useState<NonNullable<RegisteredDevice['frameFormat']>>('ngaren_custom');
+  const [dInterval, setDInterval] = useState('2');
+  const [dPower, setDPower] = useState('0');
 
   // (e) T&Cs
   const [tcsAccepted, setTcsAccepted] = useState(false);
@@ -206,7 +221,17 @@ export default function RegisterAnimal() {
   );
 
   const draftIsSatellite = !!deviceModel(dType)?.satellite;
-  const canAddDevice = !!dType && !!dSerial.trim() && (!draftIsSatellite || !!dLinkage);
+  // BLE tags are identified by their STATIC MAC (ELA, Oct 2026): it is required,
+  // validated, and must not already be bound to another animal (one MAC → one AAN).
+  const draftIsBle = isBleModel(dType);
+  const draftMac = normalizeBleMac(dMac);
+  const macTaken = useMemo(() => {
+    if (!draftMac) return false;
+    return buildMacIndex(herd).has(draftMac) || devices.some((d) => normalizeBleMac(d.bleMac) === draftMac);
+  }, [draftMac, herd, devices]);
+  const canAddDevice = draftIsBle
+    ? !!dType && !!draftMac && !macTaken
+    : !!dType && !!dSerial.trim() && (!draftIsSatellite || !!dLinkage);
 
   const countryCode = useMemo(
     () =>
@@ -297,15 +322,27 @@ export default function RegisterAnimal() {
   }, [aan, idType, sex, purpose, tag, name, color, breedKey, dob, damChoice, damExternal, sireChoice, sireExternal, photoFront, photoLeft, photoRight, photoBack, locationId, addr1, addr2, city, country, coords, devices, notes]);
 
   const addDevice = () => {
-    setDevices((prev) => [
-      ...prev,
-      { type: dType, serial: dSerial.trim(), supplier: dSupplier.trim() || undefined, photo: dPhoto, linkage: draftIsSatellite ? (dLinkage || undefined) as RegisteredDevice['linkage'] : undefined },
-    ]);
+    const base: RegisteredDevice = {
+      type: dType,
+      // A BLE tag's serial defaults to its static MAC when none is printed.
+      serial: dSerial.trim() || (draftIsBle && draftMac ? draftMac : ''),
+      supplier: dSupplier.trim() || undefined,
+      photo: dPhoto,
+      linkage: draftIsSatellite ? (dLinkage || undefined) as RegisteredDevice['linkage'] : undefined,
+    };
+    const device: RegisteredDevice = draftIsBle && draftMac
+      ? { ...base, bleMac: draftMac, frameFormat: dFrame, advIntervalSec: Number(dInterval), txPowerDbm: Number(dPower) }
+      : base;
+    setDevices((prev) => [...prev, device]);
     setDType('');
     setDSerial('');
     setDSupplier('');
     setDPhoto(null);
     setDLinkage('');
+    setDMac('');
+    setDFrame('ngaren_custom');
+    setDInterval('2');
+    setDPower('0');
     setDeviceSheet(false);
   };
 
@@ -702,6 +739,11 @@ export default function RegisterAnimal() {
                     {d.supplier ? ` · ${d.supplier}` : ''}
                     {d.linkage ? ` · ${d.linkage === 'support' ? t('reg.ngarenLinkage') : t('reg.selfLinkage')}` : ''}
                   </AppText>
+                  {d.bleMac ? (
+                    <AppText variant="caption" color={colors.onSurfaceVariant}>
+                      MAC {d.bleMac} · {d.advIntervalSec ?? 2}s · {d.txPowerDbm ? `+${d.txPowerDbm}` : '0'} dBm · {BLE_FRAME_FORMATS.find((f) => f.value === d.frameFormat)?.label ?? 'ELA ID'}
+                    </AppText>
+                  ) : null}
                 </View>
                 <Pressable
                   accessibilityLabel={`Remove ${d.type} device`}
@@ -809,7 +851,33 @@ export default function RegisterAnimal() {
       {/* Device capture sheet */}
       <BottomSheet visible={deviceSheet} onClose={() => setDeviceSheet(false)} title={t('reg.deviceSheet')}>
         <PickerField label={t('reg.deviceType')} required value={dType} placeholder={t('reg.deviceTypePlaceholder')} options={DEVICE_MODEL_OPTIONS} onSelect={setDType} />
-        <TextField label={t('reg.serial')} required value={dSerial} onChangeText={setDSerial} placeholder={t('reg.serialPlaceholder')} />
+        {draftIsBle ? (
+          <>
+            {/* Static MAC = the tag's durable identity (ELA confirmed). */}
+            <TextField label={t('reg.bleMac')} required value={dMac} onChangeText={setDMac} placeholder="AA:BB:CC:DD:EE:FF" />
+            {dMac.trim() && !draftMac ? (
+              <AppText variant="caption" color={colors.error} style={{ marginTop: -spacing.sm, marginBottom: spacing.sm }}>{t('reg.bleMacInvalid')}</AppText>
+            ) : macTaken ? (
+              <AppText variant="caption" color={colors.error} style={{ marginTop: -spacing.sm, marginBottom: spacing.sm }}>{t('reg.bleMacTaken')}</AppText>
+            ) : null}
+            <TextField label={t('reg.serialOptional')} value={dSerial} onChangeText={setDSerial} placeholder={t('reg.serialPlaceholder')} />
+            <PickerField label={t('reg.bleFrame')} value={dFrame} options={BLE_FRAME_FORMATS} onSelect={(v) => setDFrame(v as NonNullable<RegisteredDevice['frameFormat']>)} />
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              <View style={{ flex: 1 }}>
+                <PickerField label={t('reg.bleInterval')} value={dInterval} options={BLE_INTERVAL_OPTIONS} onSelect={setDInterval} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <PickerField label={t('reg.blePower')} value={dPower} options={BLE_TX_POWER_OPTIONS} onSelect={setDPower} />
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, marginTop: -spacing.xs, marginBottom: spacing.md }}>
+              <Icon name="battery-heart-variant" size={14} color={colors.onSurfaceVariant} />
+              <AppText variant="caption" color={colors.onSurfaceVariant} style={{ flex: 1 }}>{t('reg.bleBatteryNote')}</AppText>
+            </View>
+          </>
+        ) : (
+          <TextField label={t('reg.serial')} required value={dSerial} onChangeText={setDSerial} placeholder={t('reg.serialPlaceholder')} />
+        )}
         {/* Pre-approved suppliers only (Oct 2026 spec); free text is allowed only
             when the identification mechanism is Physical/Visual. */}
         {idType === 'physical' ? (

@@ -14,6 +14,9 @@
  */
 const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'; // no I, L, O, U — avoids confusion
 
+/** The AAN sequence alphabet — shared with the BLE frame codec (lib/bleFrame). */
+export const AAN_ALPHABET = ALPHABET;
+
 /** Operational country codes — activated per territory as Ngaren goes live there. */
 export const COUNTRY_CODES: Record<string, string> = {
   UG: 'Uganda',

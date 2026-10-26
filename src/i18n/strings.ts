@@ -1646,6 +1646,18 @@ const en: Dict = {
   // Artificial Insemination (Oct 20 2026 spec).
   'fv.purpose.ai': 'Artificial Insemination',
   'fv.aiFemaleOnly': 'Artificial insemination applies to female animals only.',
+
+  // BLE tags — ELA Blue COIN / PUCK (static MAC identity, Oct 26 2026).
+  'reg.bleMac': 'Tag MAC address',
+  'reg.bleMacInvalid': 'Enter a valid MAC address (12 hex digits, e.g. AA:BB:CC:DD:EE:FF).',
+  'reg.bleMacTaken': 'This tag is already bound to another animal. One tag can only identify one AAN.',
+  'reg.serialOptional': 'Printed serial (optional)',
+  'reg.bleFrame': 'Identification frame',
+  'reg.bleInterval': 'Advertising period',
+  'reg.blePower': 'Transmit power',
+  'reg.bleBatteryNote': 'Battery life is capped at 5 years by the cell. Shorter periods and +4 dBm reduce it.',
+  'stock.bleNoneTitle': 'No Bluetooth tags registered',
+  'stock.bleNoneBody': 'None of these animals has a Bluetooth tag bound to its AAN. Register the tag’s MAC address on the animal first.',
 };
 
 // Kiswahili — navigation + primary surfaces. UI copy only (no clinical/consent).
@@ -2592,6 +2604,8 @@ const sw: Dict = {
   'home.banner.followUpOne': 'Mwaliko 1 wa ufuatiliaji',
   'home.banner.followUpSub': 'Daktari ameweka ufuatiliaji — kubali ili uongeze kwenye kalenda yako.',
   'fv.purpose.ai': 'Uhimilishaji wa Bandia',
+  'stock.bleNoneTitle': 'Hakuna vitambulisho vya Bluetooth',
+  'stock.bleNoneBody': 'Hakuna mnyama hapa mwenye kitambulisho cha Bluetooth kilichounganishwa na AAN yake. Sajili anwani ya MAC ya kitambulisho kwanza.',
   'action.serviceVetting': 'Uhakiki wa Watoa Huduma',
   'action.auditLog': 'Kumbukumbu ya Ukaguzi',
   'action.kyc': 'Ukaguzi wa KYC',

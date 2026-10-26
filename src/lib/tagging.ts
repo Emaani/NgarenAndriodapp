@@ -36,6 +36,8 @@ export const DEVICE_MODELS: { value: string; method: TaggingMethod; satellite: b
   { value: 'Ceres Gen6', method: 'satellite', satellite: true },
   { value: 'Ceres Rancher', method: 'satellite', satellite: true },
   { value: 'Gsat Rancher', method: 'satellite', satellite: true },
+  { value: 'ELA Blue COIN ID', method: 'bluetooth', satellite: false },
+  { value: 'ELA Blue PUCK ID', method: 'bluetooth', satellite: false },
   { value: 'Bluetooth', method: 'bluetooth', satellite: false },
 ];
 
@@ -44,6 +46,30 @@ export const DEVICE_MODEL_OPTIONS = DEVICE_MODELS.map((m) => ({ label: m.value, 
 export function deviceModel(type: string) {
   return DEVICE_MODELS.find((m) => m.value === type);
 }
+
+/** True for BLE models — these are identified by their static MAC. */
+export function isBleModel(type: string): boolean {
+  return deviceModel(type)?.method === 'bluetooth';
+}
+
+/**
+ * BLE tag configuration (ELA BAF, Oct 2026). Battery life is chemistry-capped
+ * at 5 years; shorter periods and +4 dBm shorten it (ELA lifecycle curves).
+ * 2 s suits handheld walk-by reads; 5 s suits fixed gateways.
+ */
+export const BLE_FRAME_FORMATS: { value: 'ela_id' | 'ngaren_custom' | 'name_aan'; label: string }[] = [
+  { value: 'ngaren_custom', label: 'Ngaren custom frame (AAN in payload)' },
+  { value: 'ela_id', label: 'Standard ELA ID frame (MAC → AAN)' },
+  { value: 'name_aan', label: 'AAN in advertising name (NFC-written)' },
+];
+export const BLE_INTERVAL_OPTIONS = [
+  { value: '2', label: '2 s — handheld walk-by reads' },
+  { value: '5', label: '5 s — fixed gateways, longer battery' },
+];
+export const BLE_TX_POWER_OPTIONS = [
+  { value: '0', label: '0 dBm — standard' },
+  { value: '4', label: '+4 dBm — extended range, shorter battery' },
+];
 
 /** Derive the animal's overall tagging method from its devices. */
 export function methodForDevices(devices?: { type: string }[]): TaggingMethod {

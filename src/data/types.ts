@@ -76,6 +76,17 @@ export interface RegisteredDevice {
   photo?: string | null;
   /** Satellite linkage route: Ngaren-assisted support, or self-linkage online. */
   linkage?: 'support' | 'self';
+  /**
+   * BLE tags (ELA Blue COIN / PUCK, Oct 2026). The MAC is STATIC (confirmed by
+   * ELA), so it is the durable identity bound to the animal's AAN.
+   */
+  bleMac?: string;
+  /** How the tag identifies itself over the air (see lib/bleFrame). */
+  frameFormat?: 'ela_id' | 'ngaren_custom' | 'name_aan';
+  /** Advertising period in seconds — drives battery life (ELA curves). */
+  advIntervalSec?: number;
+  /** Transmission power, dBm (0 or +4 on Blue COIN). */
+  txPowerDbm?: number;
 }
 
 export interface Location {

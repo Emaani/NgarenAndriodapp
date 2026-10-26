@@ -13,6 +13,8 @@ import { addAbsenceReports, saveStockTakeResult, StockTakeAbsence } from '@/data
 import { addLocalEvent } from '@/data/localEvents';
 import { persistImage } from '@/lib/photos';
 import { ageFromDate, formatDateTime } from '@/lib/date';
+import { normalizeBleMac } from '@/lib/bleFrame';
+import { isBleDeviceType } from '@/lib/bleResolve';
 import { Animal } from '@/data/types';
 import { useT } from '@/i18n';
 import { AnimalPhoto, AppText, BottomSheet, Button, DetailRow, GradientHeader, Icon, IconChip, IconName, Screen } from '@/ui';
@@ -317,16 +319,30 @@ export default function StockTake() {
     }
   };
 
-  // BLE: associate every animal whose tag is broadcasting (has a linked, active
-  // device) as present in one pass — the "acceptance" step of a BLE round.
-  const associateBleTags = () =>
+  // BLE: only animals bound to a BLE tag's STATIC MAC can be heard in a BLE
+  // round (ELA, Oct 2026) — a satellite serial must never count as a BLE read.
+  // Marks those animals present in one pass (the round's "acceptance" step).
+  const bleAnimalIds = useMemo(() => {
+    const ids = new Set<number>();
+    for (const a of allAnimals) {
+      const hasMac = (a.devices ?? []).some((d) => !!normalizeBleMac(d.bleMac ?? (isBleDeviceType(d.type) ? d.serial : null)));
+      if (hasMac) ids.add(a.id);
+    }
+    return ids;
+  }, [allAnimals]);
+  const associateBleTags = () => {
+    if (bleAnimalIds.size === 0) {
+      Alert.alert(t('stock.bleNoneTitle'), t('stock.bleNoneBody'));
+      return;
+    }
     setMarks((prev) => {
       const next = { ...prev };
       for (const a of allAnimals) {
-        if (a.deviceSerial && a.status === 'active' && next[a.id] === 'pending') next[a.id] = 'present';
+        if (bleAnimalIds.has(a.id) && a.status === 'active' && next[a.id] === 'pending') next[a.id] = 'present';
       }
       return next;
     });
+  };
 
   // QR: mark the next uncounted animal present, simulating scanning one tag.
   const scanNextTag = () => {
