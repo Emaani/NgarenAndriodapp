@@ -27,6 +27,7 @@ import {
   deviceModel,
   isBleModel,
   methodForDevices,
+  projectedBatteryYears,
 } from '@/lib/tagging';
 import { normalizeBleMac } from '@/lib/bleFrame';
 import { buildMacIndex } from '@/lib/bleResolve';
@@ -180,7 +181,7 @@ export default function RegisterAnimal() {
   // BLE tag configuration (ELA Blue COIN / PUCK — static MAC identity).
   const [dMac, setDMac] = useState('');
   const [dFrame, setDFrame] = useState<NonNullable<RegisteredDevice['frameFormat']>>('ngaren_custom');
-  const [dInterval, setDInterval] = useState('2');
+  const [dInterval, setDInterval] = useState('5');
   const [dPower, setDPower] = useState('0');
 
   // (e) T&Cs
@@ -341,7 +342,7 @@ export default function RegisterAnimal() {
     setDLinkage('');
     setDMac('');
     setDFrame('ngaren_custom');
-    setDInterval('2');
+    setDInterval('5');
     setDPower('0');
     setDeviceSheet(false);
   };
@@ -741,7 +742,7 @@ export default function RegisterAnimal() {
                   </AppText>
                   {d.bleMac ? (
                     <AppText variant="caption" color={colors.onSurfaceVariant}>
-                      MAC {d.bleMac} · {d.advIntervalSec ?? 2}s · {d.txPowerDbm ? `+${d.txPowerDbm}` : '0'} dBm · {BLE_FRAME_FORMATS.find((f) => f.value === d.frameFormat)?.label ?? 'ELA ID'}
+                      MAC {d.bleMac} · {d.advIntervalSec ?? 5}s · {d.txPowerDbm ? `+${d.txPowerDbm}` : '0'} dBm · {BLE_FRAME_FORMATS.find((f) => f.value === d.frameFormat)?.label ?? 'ELA ID'}
                     </AppText>
                   ) : null}
                 </View>
@@ -870,10 +871,19 @@ export default function RegisterAnimal() {
                 <PickerField label={t('reg.blePower')} value={dPower} options={BLE_TX_POWER_OPTIONS} onSelect={setDPower} />
               </View>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, marginTop: -spacing.xs, marginBottom: spacing.md }}>
-              <Icon name="battery-heart-variant" size={14} color={colors.onSurfaceVariant} />
-              <AppText variant="caption" color={colors.onSurfaceVariant} style={{ flex: 1 }}>{t('reg.bleBatteryNote')}</AppText>
-            </View>
+            {/* Projected battery life at a sustained +40 °C (ELA, Oct 27 2026). */}
+            {(() => {
+              const years = projectedBatteryYears(dType, Number(dPower), Number(dInterval));
+              const short = years != null && years < 5;
+              return (
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, marginTop: -spacing.xs, marginBottom: spacing.md }}>
+                  <Icon name="battery-heart-variant" size={14} color={short ? colors.warning : colors.onSurfaceVariant} />
+                  <AppText variant="caption" color={short ? colors.warning : colors.onSurfaceVariant} style={{ flex: 1 }}>
+                    {years != null ? t('reg.bleBatteryProjected', { years }) : t('reg.bleBatteryNote')}
+                  </AppText>
+                </View>
+              );
+            })()}
           </>
         ) : (
           <TextField label={t('reg.serial')} required value={dSerial} onChangeText={setDSerial} placeholder={t('reg.serialPlaceholder')} />

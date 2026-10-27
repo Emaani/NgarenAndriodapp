@@ -19,12 +19,18 @@ describe('buildMacIndex', () => {
 });
 
 describe('resolveDetection', () => {
-  it('resolves via the custom frame and reads its telemetry', () => {
+  it('resolves via the custom frame, with battery from the scan response', () => {
     const r = resolveDetection(
-      { mac: 'aa:bb:cc:dd:ee:01', manufacturerData: encodeNgarenFrame({ aan: 'UG-1026-K7Q2MX', battery: 12, lowBattery: true, counter: 7 }), seenAt: now },
+      {
+        mac: 'aa:bb:cc:dd:ee:01',
+        manufacturerData: encodeNgarenFrame({ aan: 'UG-1026-K7Q2MX', variant: 'mov', counter: 7, motionCount: 4 }),
+        batteryMv: 2950,
+        lowBatteryAlert: true,
+        seenAt: now,
+      },
       index,
     );
-    expect(r).toMatchObject({ aan: 'UG-1026-K7Q2MX', via: 'frame', mismatch: false, battery: 12, lowBattery: true, counter: 7 });
+    expect(r).toMatchObject({ aan: 'UG-1026-K7Q2MX', via: 'frame', mismatch: false, variant: 'mov', motionCount: 4, counter: 7, batteryMv: 2950, lowBattery: true });
   });
 
   it('falls back to the NFC-written name, then the static MAC', () => {

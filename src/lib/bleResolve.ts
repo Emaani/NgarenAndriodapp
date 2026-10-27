@@ -14,13 +14,20 @@
  * scanner feeds it (Android phone scan or fixed gateway).
  */
 import { RegisteredDevice } from '../data/types';
-import { aanFromAdvName, findNgarenFrame, normalizeBleMac } from './bleFrame';
+import { aanFromAdvName, findNgarenFrame, normalizeBleMac, TagVariant } from './bleFrame';
 
 export interface BleDetection {
   mac: string;
   name?: string | null;
   /** Raw Manufacturer Specific Data (with or without company id). */
   manufacturerData?: Uint8Array | null;
+  /**
+   * Battery from ELA's SCAN RESPONSE, in mV — only present when the tag's
+   * "Battery voltage presence" parameter is on and the reader scans actively.
+   */
+  batteryMv?: number | null;
+  /** ELA's low-battery alert (≤15%), also carried in the scan response. */
+  lowBatteryAlert?: boolean;
   rssi?: number | null;
   seenAt: string;
 }
@@ -33,10 +40,11 @@ export interface BleResolution {
   via: BleIdentityRoute | null;
   /** Self-reported AAN disagrees with the AAN registered to this MAC. */
   mismatch: boolean;
-  battery: number | null;
+  variant: TagVariant | null;
+  batteryMv: number | null;
   lowBattery: boolean;
-  motionDetected: boolean;
   counter: number | null;
+  motionCount: number | null;
   temperature: number | null;
   rssi: number | null;
   seenAt: string;
@@ -77,10 +85,11 @@ export function resolveDetection(d: BleDetection, macIndex: Map<string, string>)
     aan: registered ?? selfReported ?? null,
     via,
     mismatch: !!registered && !!selfReported && registered !== selfReported,
-    battery: frame?.battery ?? null,
-    lowBattery: frame?.lowBattery ?? false,
-    motionDetected: frame?.motionDetected ?? false,
+    variant: frame?.variant ?? null,
+    batteryMv: d.batteryMv ?? null,
+    lowBattery: !!d.lowBatteryAlert,
     counter: frame?.counter ?? null,
+    motionCount: frame?.motionCount ?? null,
     temperature: frame?.temperature ?? null,
     rssi: d.rssi ?? null,
     seenAt: d.seenAt,

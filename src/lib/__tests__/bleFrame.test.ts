@@ -11,11 +11,15 @@ import {
 } from '@/lib/bleFrame';
 import { generateNgarenCode } from '@/lib/ngaren';
 
-// Reference vector — computed independently (Python) and quoted verbatim in the
-// frame spec sent to ELA R&D, so the app and the spec can't drift apart.
+// Reference vectors (spec NGR-BLE-001 v1.1) — computed independently (Python)
+// and quoted verbatim in the spec + payload examples sent to ELA R&D, so the
+// app and the spec can't drift apart.
 const REF_AAN = 'UG-1026-K7Q2MX';
 const REF_PACKED = '01 A3 53 3D C5 4E 80';
-const REF_FRAME = '4E 12 01 A3 53 3D C5 4E 80 57 04 D2 03 1F';
+const REF_ID = '4E 10 01 A3 53 3D C5 4E 80 04 D2 80 00';
+const REF_MOV = '4E 11 01 A3 53 3D C5 4E 80 04 D2 00 03';
+const REF_T = '4E 12 01 A3 53 3D C5 4E 80 04 D2 0E F1';
+const REF_T_NEG_NO_COUNTER = '4E 12 01 A3 53 3D C5 4E 80 FF FF FD DA';
 
 describe('AAN bit-packing', () => {
   it('packs the reference AAN into the documented 7 bytes', () => {
@@ -39,44 +43,38 @@ describe('AAN bit-packing', () => {
   });
 });
 
-describe('Ngaren custom frame', () => {
-  const input = { aan: REF_AAN, motionDetected: true, battery: 87, counter: 1234, motionCount: 3, temperature: 31 };
-
-  it('encodes the documented reference frame', () => {
-    expect(toHex(encodeNgarenFrame(input))).toBe(REF_FRAME);
+describe('Ngaren custom frame (v1.1)', () => {
+  it('encodes the documented ID / MOV / T reference frames', () => {
+    expect(toHex(encodeNgarenFrame({ aan: REF_AAN, variant: 'id', counter: 1234 }))).toBe(REF_ID);
+    expect(toHex(encodeNgarenFrame({ aan: REF_AAN, variant: 'mov', counter: 1234, motionCount: 3 }))).toBe(REF_MOV);
+    expect(toHex(encodeNgarenFrame({ aan: REF_AAN, variant: 't', counter: 1234, temperature: 38.25 }))).toBe(REF_T);
+    expect(toHex(encodeNgarenFrame({ aan: REF_AAN, variant: 't', temperature: -5.5 }))).toBe(REF_T_NEG_NO_COUNTER);
   });
 
-  it('decodes what it encodes', () => {
-    expect(decodeNgarenFrame(encodeNgarenFrame(input))).toEqual({
-      version: 1,
-      aan: REF_AAN,
-      lowBattery: false,
-      motionDetected: true,
-      battery: 87,
-      counter: 1234,
-      motionCount: 3,
-      temperature: 31,
-    });
+  it('decodes each variant back to its reading', () => {
+    const id = decodeNgarenFrame(encodeNgarenFrame({ aan: REF_AAN, counter: 1234 }));
+    expect(id).toEqual({ version: 1, variant: 'id', aan: REF_AAN, counter: 1234, motionCount: null, temperature: null });
+    const mov = decodeNgarenFrame(encodeNgarenFrame({ aan: REF_AAN, variant: 'mov', counter: 7, motionCount: 3 }))!;
+    expect(mov).toMatchObject({ variant: 'mov', motionCount: 3, temperature: null });
+    const t = decodeNgarenFrame(encodeNgarenFrame({ aan: REF_AAN, variant: 't', temperature: -5.5 }))!;
+    expect(t).toMatchObject({ variant: 't', temperature: -5.5, motionCount: null, counter: null });
   });
 
-  it('encodes negative temperatures and "not supported" sentinels', () => {
-    const f = decodeNgarenFrame(encodeNgarenFrame({ aan: REF_AAN, temperature: -5 }))!;
-    expect(f.temperature).toBe(-5);
-    expect(f.battery).toBeNull();
-    expect(f.motionCount).toBeNull();
-    const bare = decodeNgarenFrame(encodeNgarenFrame({ aan: REF_AAN }))!;
-    expect(bare.temperature).toBeNull();
+  it('rejects a reading the tag variant cannot produce (no motion + temperature on one tag)', () => {
+    expect(() => encodeNgarenFrame({ aan: REF_AAN, variant: 'mov', temperature: 30 })).toThrow();
+    expect(() => encodeNgarenFrame({ aan: REF_AAN, variant: 't', motionCount: 2 })).toThrow();
+    expect(() => encodeNgarenFrame({ aan: REF_AAN, motionCount: 2 })).toThrow();
   });
 
   it('finds the frame with or without the 2-byte company id prefix', () => {
-    const frame = encodeNgarenFrame(input);
+    const frame = encodeNgarenFrame({ aan: REF_AAN, counter: 1234 });
     const withCompany = new Uint8Array([0x34, 0x12, ...frame]);
     expect(findNgarenFrame(frame)?.aan).toBe(REF_AAN);
     expect(findNgarenFrame(withCompany)?.aan).toBe(REF_AAN);
   });
 
   it('ignores foreign frames', () => {
-    expect(decodeNgarenFrame(new Uint8Array(14))).toBeNull();
+    expect(decodeNgarenFrame(new Uint8Array(13))).toBeNull();
     expect(findNgarenFrame(new Uint8Array([1, 2, 3]))).toBeNull();
   });
 });

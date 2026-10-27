@@ -1656,6 +1656,7 @@ const en: Dict = {
   'reg.bleInterval': 'Advertising period',
   'reg.blePower': 'Transmit power',
   'reg.bleBatteryNote': 'Battery life is capped at 5 years by the cell. Shorter periods and +4 dBm reduce it.',
+  'reg.bleBatteryProjected': 'Projected battery life at a sustained +40 °C: about {years} years (ELA estimate; the cell caps it at 5).',
   'stock.bleNoneTitle': 'No Bluetooth tags registered',
   'stock.bleNoneBody': 'None of these animals has a Bluetooth tag bound to its AAN. Register the tag’s MAC address on the animal first.',
 };
