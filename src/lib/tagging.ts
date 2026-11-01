@@ -6,11 +6,12 @@
  * no-device day-1 path; the others are future hardware/satellite integrations.
  */
 import { IconName } from '@/ui';
+import { isBleDeviceType } from './bleResolve';
 
 export type TaggingMethod = 'satellite' | 'bluetooth' | 'qr' | 'manual';
 
 export const TAGGING_META: Record<TaggingMethod, { label: string; short: string; icon: IconName }> = {
-  satellite: { label: 'Satellite tag (Ceres Tag)', short: 'Satellite', icon: 'satellite-variant' },
+  satellite: { label: 'Satellite tag', short: 'Satellite', icon: 'satellite-variant' },
   bluetooth: { label: 'Bluetooth (BLE) tag', short: 'Bluetooth', icon: 'bluetooth' },
   qr: { label: 'QR-code ear tag', short: 'QR tag', icon: 'qrcode' },
   manual: { label: 'Manual / visual tag (no device)', short: 'Ordinary', icon: 'eye-outline' },
@@ -41,12 +42,45 @@ export const DEVICE_MODELS: { value: string; method: TaggingMethod; satellite: b
   { value: 'ELA Blue COIN T', method: 'bluetooth', satellite: false },
   { value: 'ELA Blue PUCK ID', method: 'bluetooth', satellite: false },
   { value: 'Bluetooth', method: 'bluetooth', satellite: false },
+  { value: 'Visual ear tag', method: 'manual', satellite: false },
 ];
-
-export const DEVICE_MODEL_OPTIONS = DEVICE_MODELS.map((m) => ({ label: m.value, value: m.value }));
 
 export function deviceModel(type: string) {
   return DEVICE_MODELS.find((m) => m.value === type);
+}
+
+/**
+ * Satellite and Bluetooth are separate integrations (Oct 28 2026): the farmer
+ * chooses one identification type per animal, and that type decides which
+ * devices can be added and how the dashboard behaves for the animal.
+ */
+export type IdentificationType = 'physical' | 'satellite' | 'bluetooth';
+
+const METHOD_FOR_ID_TYPE: Record<IdentificationType, TaggingMethod> = {
+  physical: 'manual',
+  satellite: 'satellite',
+  bluetooth: 'bluetooth',
+};
+
+export function deviceOptionsFor(idType: IdentificationType | '') {
+  const method = idType ? METHOD_FOR_ID_TYPE[idType] : null;
+  return DEVICE_MODELS.filter((m) => !method || m.method === method).map((m) => ({ label: m.value, value: m.value }));
+}
+
+/** False only for a known model of another type; older model names are kept. */
+export function deviceFitsIdType(type: string, idType: IdentificationType | ''): boolean {
+  const model = deviceModel(type);
+  return !model || !idType || model.method === METHOD_FOR_ID_TYPE[idType];
+}
+
+/** Bluetooth animals have no live feed: the app shows their last confirmation. */
+export function isBluetoothAnimal(a: {
+  identificationType?: string | null;
+  taggingMethod?: string | null;
+  devices?: { type: string }[] | null;
+}): boolean {
+  if (a.identificationType) return a.identificationType === 'bluetooth';
+  return a.taggingMethod === 'bluetooth' || (a.devices ?? []).some((d) => isBleDeviceType(d.type));
 }
 
 /** True for BLE models — these are identified by their static MAC. */
@@ -83,9 +117,9 @@ export function projectedBatteryYears(type: string, txPowerDbm: number, interval
 
 /**
  * BLE tag configuration (ELA BAF). Only ID tags at 0 dBm / 5 s reach the
- * 5-year target at +40 °C; 5 s is therefore the default. With BLE range in the
- * hundreds of metres, a reader standing in the kraal for ~15 s still catches
- * every tag at 5 s, so walk-by speed doesn't need the 2 s period.
+ * 5-year target at +40 °C; 5 s is therefore the default. A 15 s scan hears
+ * about three adverts from every tag in range at 5 s, so a stock-take doesn't
+ * need the 2 s period. Read range is still to be confirmed by ELA.
  */
 export const BLE_FRAME_FORMATS: { value: 'ela_id' | 'ngaren_custom' | 'name_aan'; label: string }[] = [
   { value: 'ngaren_custom', label: 'Ngaren custom frame (AAN in payload)' },

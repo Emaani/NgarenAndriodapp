@@ -61,6 +61,8 @@ export interface Animal {
   farmerApproved?: boolean;
   /** Physical farm address where the animal is based (Address Line 1/2, City, Country). */
   physicalAddress?: string;
+  /** The same address as captured, so it can be reused for other animals. */
+  address?: { line1?: string; line2?: string; city?: string; country?: string };
   /** Google geospatial coordinates of the animal's base — optional, mandatory for satellite tags. */
   coordinates?: { lat: number; lng: number };
   /** One or more tagging devices associated to this AAN. */

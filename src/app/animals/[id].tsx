@@ -2,14 +2,12 @@ import { Alert, Image, Pressable, ScrollView, View } from 'react-native';
 import * as MailComposer from 'expo-mail-composer';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import {
-  animals as animalsFallback,
-  calloutRequests as calloutFallback,
-} from '@/data/mock';
+import { animals as animalsFallback } from '@/data/mock';
 import { getCalloutRequests } from '@/data/api';
 import { getCeresBehaviour } from '@/data/ceresBehaviour';
 import { getHerdAnimalById, deleteHerdAnimal } from '@/data/herd';
 import { getLocalAnimalById, deleteLocalAnimal } from '@/data/localAnimals';
+import { getTagConfirmations } from '@/data/tagConfirmations';
 import { logAuditEvent } from '@/data/localAuditEvents';
 import { addLocalNotification } from '@/data/localNotifications';
 import { sendLocalNotification } from '@/services/push';
@@ -18,7 +16,8 @@ import { NGAREN_SUPPORT_EMAIL } from '@/lib/contact';
 import { HEALTH_TYPE_LABELS, getLocalHealthRecords } from '@/data/localHealth';
 import { useResource } from '@/data/hooks';
 import { ageFromDate, formatDate } from '@/lib/date';
-import { taggingMeta } from '@/lib/tagging';
+import { confirmationKey, confirmationSummary } from '@/lib/tagConfirmation';
+import { isBluetoothAnimal, taggingMeta } from '@/lib/tagging';
 import { useAuth } from '@/services/auth';
 import { useT, useTStatus } from '@/i18n';
 import { ActionChip, AnimalPhoto, AppText, Button, ChartCard, DetailRow, EmptyState, GradientHeader, Icon, Screen } from '@/ui';
@@ -47,9 +46,10 @@ export default function AnimalDetail() {
     );
     return getCeresBehaviour(keys);
   }, []);
-  const { data: callouts } = useResource(() => getCalloutRequests(), calloutFallback);
+  const { data: callouts } = useResource(() => getCalloutRequests(), []);
   // All local health records; filtered to this animal below once it resolves.
   const { data: allHealth } = useResource(() => getLocalHealthRecords(), []);
+  const { data: confirmations } = useResource(getTagConfirmations, {});
   // A Ceres Tag device reports on every series at once, so if every series is
   // empty it means this animal has no synced telemetry yet (unlinked device,
   // device not yet synced, or too new) rather than one chart failing alone.
@@ -67,6 +67,10 @@ export default function AnimalDetail() {
   // Services consumed — derived from what the animal record actually carries.
   const hasTag = !!animal.deviceSerial;
   const tagActive = hasTag && animal.status === 'active';
+  // Bluetooth tags have no live feed, so these animals show their last
+  // confirmation in place of telemetry, alerts and the tracking map.
+  const isBluetooth = isBluetoothAnimal(animal);
+  const confirmation = confirmations[confirmationKey(animal)];
   // Vet visits booked against this animal (matched by name or tag).
   const needle = (animal.name ?? animal.tag).toLowerCase();
   const vetVisits = callouts.filter(
@@ -208,9 +212,13 @@ export default function AnimalDetail() {
         <View style={[{ backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.md }, shadow[1]]}>
           <DetailRow label={t('ad.tagAssociated')} value={animal.deviceSerial ?? t('ad.none')} />
           <DetailRow label={t('ad.tagStatus')} value={hasTag ? (tagActive ? tStatus('active') : tStatus('inactive')) : t('ad.notConnected')} />
-          <DetailRow label={t('ad.telemetry')} value={hasBehaviourData ? t('ad.syncing') : hasTag ? t('ad.awaitingSync') : t('ad.noDevice')} />
-          <DetailRow label={t('ad.vetVisits')} value={vetVisits === 0 ? t('ad.noneBooked') : String(vetVisits)} />
-          <DetailRow label={t('ad.alertsMonitoring')} value={tagActive ? t('ad.on') : t('ad.off')} last />
+          {isBluetooth ? (
+            <DetailRow label={t('ad.lastConfirmed')} value={confirmation ? confirmationSummary(confirmation, t) : t('ad.notConfirmed')} />
+          ) : (
+            <DetailRow label={t('ad.telemetry')} value={hasBehaviourData ? t('ad.syncing') : hasTag ? t('ad.awaitingSync') : t('ad.noDevice')} />
+          )}
+          <DetailRow label={t('ad.vetVisits')} value={vetVisits === 0 ? t('ad.noneBooked') : String(vetVisits)} last={isBluetooth} />
+          {isBluetooth ? null : <DetailRow label={t('ad.alertsMonitoring')} value={tagActive ? t('ad.on') : t('ad.off')} last />}
         </View>
 
         {/* Associated devices (AAN can carry more than one). */}
@@ -296,23 +304,29 @@ export default function AnimalDetail() {
 
         <View style={{ gap: spacing.sm, marginBottom: spacing.lg }}>
           <Button label={t('ad.scorecard')} icon="file-document-outline" onPress={() => router.push(`/health-scorecard?id=${animal.id}` as never)} />
-          <Button label={t('ad.trackMap')} icon="map-marker-radius" variant="outline" onPress={() => router.push('/(tabs)/track')} />
+          {isBluetooth ? null : (
+            <Button label={t('ad.trackMap')} icon="map-marker-radius" variant="outline" onPress={() => router.push('/(tabs)/track')} />
+          )}
           <Button label={t('health.requestVet')} icon="stethoscope" variant="outline" onPress={() => router.push('/find-vet')} />
         </View>
 
-        <AppText variant="title" style={{ marginBottom: spacing.md }}>
-          {t('ad.ceresActivity')}
-        </AppText>
-        {!behaviourLoading && !hasBehaviourData ? (
-          <EmptyState
-            icon="chart-line"
-            title={t('ad.noCeresTitle')}
-            subtitle={t('ad.noCeresSub')}
-            actionLabel={t('ad.goDevices')}
-            onAction={() => router.push('/devices')}
-          />
-        ) : (
-          behaviour.map((series) => <ChartCard key={series.label} series={series} />)
+        {isBluetooth ? null : (
+          <>
+            <AppText variant="title" style={{ marginBottom: spacing.md }}>
+              {t('ad.ceresActivity')}
+            </AppText>
+            {!behaviourLoading && !hasBehaviourData ? (
+              <EmptyState
+                icon="chart-line"
+                title={t('ad.noCeresTitle')}
+                subtitle={t('ad.noCeresSub')}
+                actionLabel={t('ad.goDevices')}
+                onAction={() => router.push('/devices')}
+              />
+            ) : (
+              behaviour.map((series) => <ChartCard key={series.label} series={series} />)
+            )}
+          </>
         )}
 
         {/* Delete animal — Farmer/Admin only (Oct 2026). */}

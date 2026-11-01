@@ -1,7 +1,6 @@
 import { Pressable, View } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { calloutRequests as calloutFallback } from '@/data/mock';
 import { getCalloutRequests } from '@/data/api';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
@@ -25,7 +24,7 @@ export default function VetRequests() {
   const t = useT();
   const tStatus = useTStatus();
   const { loading, isAuthenticated } = useAuth();
-  const { data: requests } = useResource(() => getCalloutRequests(), calloutFallback);
+  const { data: requests } = useResource(() => getCalloutRequests(), []);
 
   if (loading) return null;
   if (!isAuthenticated) return <Redirect href="/login" />;

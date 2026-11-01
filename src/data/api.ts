@@ -40,7 +40,8 @@
  * resolves against src/data/mock.ts, so the UI is fully functional offline and
  * goes live the moment the env vars are set — no screen code changes needed.
  */
-import { config, isBackendConfigured } from '../config';
+import { config, isBackendConfigured, isSupabaseConfigured } from '../config';
+import { getCalloutsFromSupabase, submitCalloutToSupabase, updateCalloutInSupabase } from './callouts';
 import { formatDateTime } from '../lib/date';
 import { getLocalNotifications } from './localNotifications';
 import * as mock from './mock';
@@ -599,7 +600,14 @@ export async function registerPushToken(
 
 export interface CalloutRequestPayload {
   vetId?: number;
+  /** The vet chosen in Find a Vet, kept on the booking by name. */
+  vetName?: string;
+  /** Who is booking, kept on the booking for vets (see data/callouts). */
+  farmerName?: string;
   animal: string;
+  animalTag?: string;
+  animalSex?: string;
+  animalBreed?: string;
   locationName: string;
   urgency: CalloutUrgency;
   notes?: string;
@@ -629,13 +637,13 @@ export interface CalloutRequestPayload {
   accessAnimals?: string[];
 }
 
-/** Fetch the vet's incoming call-out requests. Falls back to mock offline. */
+/** Fetch call-out requests, from the platform or else Supabase. Mock only with neither. */
 export async function getCalloutRequests(
   pageNumber = 0,
   pageSize = 50,
 ): Promise<CalloutRequest[]> {
   if (!isBackendConfigured()) {
-    return mock.calloutRequests;
+    return isSupabaseConfigured() ? getCalloutsFromSupabase() : mock.calloutRequests;
   }
   const data = await request<Paginated<CalloutRequest>>(
     `/api/ngaren/callouts?pageNumber=${pageNumber}&pageSize=${pageSize}`,
@@ -645,7 +653,10 @@ export async function getCalloutRequests(
 
 /** Submit a new call-out request (farmer side). No-op in mock mode. */
 export async function submitCalloutRequest(payload: CalloutRequestPayload): Promise<void> {
-  if (!isBackendConfigured()) return;
+  if (!isBackendConfigured()) {
+    if (isSupabaseConfigured()) await submitCalloutToSupabase(payload);
+    return;
+  }
   await request<void>('/api/ngaren/callouts', {
     method: 'POST',
     body: JSON.stringify(payload),
@@ -654,7 +665,10 @@ export async function submitCalloutRequest(payload: CalloutRequestPayload): Prom
 
 /** Update a call-out's status (vet accepts / declines / completes). No-op in mock mode. */
 export async function updateCalloutStatus(id: number, status: CalloutStatus): Promise<void> {
-  if (!isBackendConfigured()) return;
+  if (!isBackendConfigured()) {
+    if (isSupabaseConfigured()) await updateCalloutInSupabase(id, status);
+    return;
+  }
   await request<void>(`/api/ngaren/callouts/${id}`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),

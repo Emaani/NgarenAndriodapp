@@ -11,19 +11,22 @@
 import { supabase } from '../services/supabase';
 import { isSupabaseConfigured } from '../config';
 import { reportDataFailure, reportDataSuccess } from '../services/dataHealth';
+import { uuidToId } from '../lib/ids';
 import { getAnimals } from './api';
 import { getLocalAnimalById, getLocalAnimals, updateLocalAnimal } from './localAnimals';
 import { Animal } from './types';
 
-/** Stable numeric id from a lineage uuid (48 bits - safe integer, collision-safe at farm scale). */
-function uuidToId(uuid: string): number {
-  const hex = uuid.replace(/[^0-9a-f]/gi, '').slice(0, 12) || '0';
-  return parseInt(hex, 16);
-}
+// A registered BLE tag's serial is its MAC in this form. Requiring the colons
+// keeps a numeric satellite ESN from ever being mistaken for one.
+const COLON_MAC = /^([0-9A-F]{2}:){5}[0-9A-F]{2}$/;
 
-function mapLineage(r: Record<string, unknown>): Animal {
+export function mapLineage(r: Record<string, unknown>): Animal {
   const breedName = (r.animal_breed as string) ?? '-';
+  const tagId = r.animal_tag_id as string | null | undefined;
   return {
+    ...(tagId && COLON_MAC.test(tagId)
+      ? { devices: [{ type: 'Bluetooth', serial: tagId, bleMac: tagId }], taggingMethod: 'bluetooth' }
+      : {}),
     id: uuidToId(String(r.id)),
     tag: (r.visual_tag_number as string) ?? (r.animal_tag_id as string) ?? (r.animal_id as string) ?? '-',
     name: (r.animal_name as string) ?? undefined,
@@ -40,6 +43,28 @@ function mapLineage(r: Record<string, unknown>): Animal {
     sireTag: (r.sire_name as string) ?? (r.sire_id as string) ?? undefined,
     photos: r.photo_url ? [r.photo_url as string] : undefined,
     approvalStatus: (r.lifecycle_status as string) === 'complete' ? 'approved' : 'pending',
+  };
+}
+
+/**
+ * animal_lineage has no column for these, so a synced animal keeps them from its
+ * on-device record. Without this it would lose its devices and identification
+ * type, and a Bluetooth animal would stop being one once it synced.
+ */
+export function withLocalDetails(remote: Animal, local: Animal | undefined): Animal {
+  if (!local) return remote;
+  return {
+    ...remote,
+    devices: local.devices ?? remote.devices,
+    taggingMethod: local.taggingMethod ?? remote.taggingMethod,
+    identificationType: local.identificationType,
+    sex: local.sex,
+    purpose: local.purpose,
+    color: local.color,
+    physicalAddress: local.physicalAddress,
+    address: local.address,
+    coordinates: local.coordinates,
+    locationId: local.locationId,
   };
 }
 
@@ -62,7 +87,11 @@ export async function getHerd(): Promise<Animal[]> {
       return local;
     }
     reportDataSuccess();
-    const remote = data.map(mapLineage);
+    const localByCode = new Map(local.filter((a) => a.ngarenCode).map((a) => [a.ngarenCode, a]));
+    const remote = data.map((row) => {
+      const animal = mapLineage(row);
+      return withLocalDetails(animal, localByCode.get(animal.ngarenCode));
+    });
     const remoteCodes = new Set(remote.map((a) => a.ngarenCode).filter(Boolean));
     const localUnsynced = local.filter((a) => !a.ngarenCode || !remoteCodes.has(a.ngarenCode));
     return [...localUnsynced, ...remote];

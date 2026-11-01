@@ -4,12 +4,11 @@ import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import {
-  breeds as breedsFallback,
-  locations as locationsFallback,
-} from '@/data/mock';
+import { breeds as breedsFallback } from '@/data/mock';
+import { isBackendConfigured } from '@/config';
 import { getBreeds, getLocations, registerAnimal } from '@/data/api';
-import { addLocalAnimal } from '@/data/localAnimals';
+import { getFarmLocation, saveFarmLocation } from '@/data/farmLocation';
+import { addLocalAnimal, getLocalAnimals } from '@/data/localAnimals';
 import { getDraft, saveDraft, deleteDraft } from '@/data/localRegistrationDrafts';
 import { addSupportRequest } from '@/data/supportRequests';
 import { sendLocalNotification } from '@/services/push';
@@ -23,14 +22,18 @@ import {
   BLE_FRAME_FORMATS,
   BLE_INTERVAL_OPTIONS,
   BLE_TX_POWER_OPTIONS,
-  DEVICE_MODEL_OPTIONS,
+  deviceFitsIdType,
   deviceModel,
+  deviceOptionsFor,
+  IdentificationType,
   isBleModel,
   methodForDevices,
   projectedBatteryYears,
 } from '@/lib/tagging';
 import { normalizeBleMac } from '@/lib/bleFrame';
-import { buildMacIndex } from '@/lib/bleResolve';
+import { buildMacIndex, nearestTags, NearbyTag, noteNearbyTag } from '@/lib/bleResolve';
+import { scanForTags, stopBleScan } from '@/services/bleScanner';
+import { accountPlace, hasPlaceDetails, placeChoices, PlaceDetails, SavedPlace } from '@/lib/savedPlaces';
 import { useResource } from '@/data/hooks';
 import { useT } from '@/i18n';
 import {
@@ -50,10 +53,13 @@ import {
 const COMMON_COLOURS = ['Brown', 'Black', 'White', 'Brown & white', 'Black & white', 'Tan', 'Grey', 'Red'];
 const UNKNOWN = '';
 const EXTERNAL = '__external__';
+const NEW_PLACE = '__new_place__';
+// Two adverts from a tag on the default 5 s period.
+const TAG_SCAN_MS = 11000;
 
 // Identification mechanism — mandatory in step 2 (Oct 2026 spec). `label` holds
 // an i18n key translated at render.
-type IdType = 'physical' | 'satellite' | 'bluetooth';
+type IdType = IdentificationType;
 const ID_TYPES: { value: IdType; label: string; icon: 'camera-outline' | 'satellite-variant' | 'bluetooth' }[] = [
   { value: 'physical', label: 'reg.idPhysical', icon: 'camera-outline' },
   { value: 'satellite', label: 'reg.idSatellite', icon: 'satellite-variant' },
@@ -132,8 +138,11 @@ export default function RegisterAnimal() {
     getBreeds,
     breedsFallback.map((name) => ({ key: name.toLowerCase(), name })),
   );
-  const { data: locations } = useResource(() => getLocations(), locationsFallback);
+  // Paddocks only exist on the platform: no demo names on real animal records.
+  const { data: paddocks } = useResource(() => (isBackendConfigured() ? getLocations() : Promise.resolve([])), []);
   const { data: herd } = useResource(getHerd, []);
+  const { data: localHerd } = useResource(getLocalAnimals, []);
+  const { data: farmLocation } = useResource<PlaceDetails | null>(() => getFarmLocation(user?.id), null);
 
   // Wizard position (1..STEP_COUNT). Each step is validated before Next unlocks.
   const [step, setStep] = useState(1);
@@ -163,6 +172,10 @@ export default function RegisterAnimal() {
 
   // (c) Farm / location — standardized address + optional geospatial pin.
   const [locationId, setLocationId] = useState('');
+  const [locationName, setLocationName] = useState('');
+  const [placeChoice, setPlaceChoice] = useState('');
+  // null = not touched: offered ticked until a farm location has been saved.
+  const [saveAsFarm, setSaveAsFarm] = useState<boolean | null>(null);
   const [addr1, setAddr1] = useState('');
   const [addr2, setAddr2] = useState('');
   const [city, setCity] = useState('');
@@ -183,6 +196,8 @@ export default function RegisterAnimal() {
   const [dFrame, setDFrame] = useState<NonNullable<RegisteredDevice['frameFormat']>>('ngaren_custom');
   const [dInterval, setDInterval] = useState('5');
   const [dPower, setDPower] = useState('0');
+  const [tagScanning, setTagScanning] = useState(false);
+  const [nearbyTags, setNearbyTags] = useState<NearbyTag[]>([]);
 
   // (e) T&Cs
   const [tcsAccepted, setTcsAccepted] = useState(false);
@@ -193,7 +208,26 @@ export default function RegisterAnimal() {
   const autoApprove = canManageTeam;
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const breedOptions = useMemo(() => breeds.map((b) => ({ label: b.name, value: b.key })), [breeds]);
-  const locationOptions = useMemo(() => locations.map((l) => ({ label: l.name, value: String(l.id) })), [locations]);
+  // The farmer's own location only: a vet or admin registers for someone else.
+  const isFarmer = appRole === 'farmer';
+  const places = useMemo(
+    () =>
+      placeChoices({
+        account: isFarmer ? accountPlace(farmLocation, user?.farmName) : null,
+        animals: [...localHerd, ...herd],
+        paddocks,
+      }),
+    [isFarmer, farmLocation, user?.farmName, localHerd, herd, paddocks],
+  );
+  const placeLabel = (p: SavedPlace) => {
+    if (p.source === 'account') return t('reg.place.account', { name: p.label });
+    return p.source === 'herd' ? t('reg.place.herd', { name: p.label, count: p.animalCount }) : p.label;
+  };
+  const placeOptions = useMemo(
+    () => [...places.map((p) => ({ label: placeLabel(p), value: p.key })), { label: t('reg.place.new'), value: NEW_PLACE }],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [places, t],
+  );
   // Lineage pickers enforce sex (Oct 2026): the Dam list excludes known males and
   // the Sire list excludes known females, so a male can never be captured as the
   // dam (and vice-versa). Unknown-sex animals appear in both.
@@ -230,6 +264,25 @@ export default function RegisterAnimal() {
     if (!draftMac) return false;
     return buildMacIndex(herd).has(draftMac) || devices.some((d) => normalizeBleMac(d.bleMac) === draftMac);
   }, [draftMac, herd, devices]);
+  useEffect(() => stopBleScan, []);
+
+  // Read the MAC off the air: a 17-character address is easy to mistype.
+  const scanNearbyTags = async () => {
+    const found = new Map<string, NearbyTag>();
+    setNearbyTags([]);
+    setTagScanning(true);
+    const failure = await scanForTags(TAG_SCAN_MS, (detection) => noteNearbyTag(found, detection));
+    setTagScanning(false);
+    if (failure) {
+      Alert.alert(t('stock.bleErrTitle'), t(`stock.bleErr.${failure}`));
+      return;
+    }
+    const inUse = new Set([...buildMacIndex(herd).keys(), ...devices.flatMap((d) => (d.bleMac ? [d.bleMac] : []))]);
+    const tags = nearestTags(found, inUse);
+    setNearbyTags(tags);
+    if (tags.length === 0) notify(t('reg.bleScanNone'));
+  };
+
   const canAddDevice = draftIsBle
     ? !!dType && !!draftMac && !macTaken
     : !!dType && !!dSerial.trim() && (!draftIsSatellite || !!dLinkage);
@@ -242,6 +295,38 @@ export default function RegisterAnimal() {
   );
 
   const generateAan = () => setAan(generateNgarenCode(countryCode));
+
+  // The AAN carries the country, so start from where this farmer already is.
+  const usualCountry = places[0]?.country;
+  useEffect(() => {
+    if (usualCountry && !aan && !draftParam) setCountry(usualCountry);
+  }, [usualCountry, aan, draftParam]);
+
+  // A saved location fills the whole step, so it's only captured once.
+  const choosePlace = (value: string) => {
+    const place = places.find((p) => p.key === value);
+    setPlaceChoice(value);
+    setLocationId(place?.locationId != null ? String(place.locationId) : '');
+    setLocationName(place?.name ?? '');
+    setAddr1(place?.line1 ?? '');
+    setAddr2(place?.line2 ?? '');
+    setCity(place?.city ?? '');
+    if (place?.country) setCountry(place.country);
+    setCoords(place?.coords ?? null);
+  };
+
+  const capturedPlace: PlaceDetails = {
+    name: locationName.trim() || undefined,
+    line1: addr1.trim() || undefined,
+    line2: addr2.trim() || undefined,
+    city: city.trim() || undefined,
+    country: country.trim() || undefined,
+    coords: coords ?? undefined,
+    locationId: locationId ? Number(locationId) : undefined,
+  };
+  const offerSaveAsFarm =
+    isFarmer && hasPlaceDetails(capturedPlace) && places.find((p) => p.key === placeChoice)?.source !== 'account';
+  const willSaveAsFarm = offerSaveAsFarm && (saveAsFarm ?? !farmLocation);
 
   // ---- Registration in Progress: auto-save + resume (spec 3.1.1) ----
   const [draftHydrated, setDraftHydrated] = useState(false);
@@ -263,6 +348,7 @@ export default function RegisterAnimal() {
     sireExternal,
     photos: [photoFront, photoLeft, photoRight, photoBack],
     locationId,
+    locationName,
     addr1,
     addr2,
     city,
@@ -298,13 +384,14 @@ export default function RegisterAnimal() {
         setPhotoLeft(ph[1] ?? null);
         setPhotoRight(ph[2] ?? null);
         setPhotoBack(ph[3] ?? null);
-        setLocationId(d.locationId ?? '');
+        setLocationId(isBackendConfigured() ? d.locationId ?? '' : '');
+        setLocationName(d.locationName ?? '');
         setAddr1(d.addr1 ?? '');
         setAddr2(d.addr2 ?? '');
         setCity(d.city ?? '');
         setCountry(d.country ?? 'Uganda');
         setCoords(d.coords ?? null);
-        setDevices(d.devices ?? []);
+        setDevices((d.devices ?? []).filter((device) => deviceFitsIdType(device.type, d.idType ?? '')));
         setNotes(d.notes ?? '');
         setStep(2);
       }
@@ -320,7 +407,18 @@ export default function RegisterAnimal() {
     if (!aan) return;
     void saveDraft(collectDraft());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aan, idType, sex, purpose, tag, name, color, breedKey, dob, damChoice, damExternal, sireChoice, sireExternal, photoFront, photoLeft, photoRight, photoBack, locationId, addr1, addr2, city, country, coords, devices, notes]);
+  }, [aan, idType, sex, purpose, tag, name, color, breedKey, dob, damChoice, damExternal, sireChoice, sireExternal, photoFront, photoLeft, photoRight, photoBack, locationId, locationName, addr1, addr2, city, country, coords, devices, notes]);
+
+  // Satellite and Bluetooth are separate integrations, so switching the
+  // identification type drops any device of the previous type.
+  const selectIdType = (value: IdType) => {
+    setIdType(value);
+    setDType('');
+    if (devices.some((d) => !deviceFitsIdType(d.type, value))) {
+      setDevices((prev) => prev.filter((d) => deviceFitsIdType(d.type, value)));
+      notify(t('reg.devicesRemoved'));
+    }
+  };
 
   const addDevice = () => {
     const base: RegisteredDevice = {
@@ -344,6 +442,7 @@ export default function RegisterAnimal() {
     setDFrame('ngaren_custom');
     setDInterval('5');
     setDPower('0');
+    setNearbyTags([]);
     setDeviceSheet(false);
   };
 
@@ -471,22 +570,26 @@ export default function RegisterAnimal() {
     setSubmitting(true);
     try {
       const breedName = breedOptions.find((b) => b.value === breedKey)?.label ?? 'Unknown';
-      const locationName = locationOptions.find((l) => l.value === locationId)?.label;
       // Use the AAN generated on step 1 (fall back defensively).
       const code = aan || generateNgarenCode(countryCode);
+      // A visual ear tag is not a connected device, so it never gets telemetry.
+      const connectedDevice = devices.find((d) => deviceModel(d.type)?.method !== 'manual');
       const newAnimal: Animal = {
         id: Date.now(),
-        tag: tag.trim(),
+        // The farmer reference is optional; lists fall back on the tag, so it
+        // must never be blank.
+        tag: tag.trim() || code,
         name: name.trim() || undefined,
         breed: { key: breedKey || 'unknown', name: breedName },
-        locationId: locationId ? Number(locationId) : undefined,
-        locationName,
+        locationId: capturedPlace.locationId,
+        locationName: capturedPlace.name,
         physicalAddress: [addr1.trim(), addr2.trim(), city.trim(), country.trim()].filter(Boolean).join(', ') || undefined,
+        address: { line1: capturedPlace.line1, line2: capturedPlace.line2, city: capturedPlace.city, country: capturedPlace.country },
         coordinates: coords ?? undefined,
         dateOfBirth: dob || '',
         status: 'active',
         description: notes.trim() || undefined,
-        deviceSerial: devices[0]?.serial ?? null,
+        deviceSerial: connectedDevice?.serial ?? null,
         devices: devices.length ? devices : undefined,
         damTag: resolveParent(damChoice, damExternal),
         sireTag: resolveParent(sireChoice, sireExternal),
@@ -509,12 +612,13 @@ export default function RegisterAnimal() {
         farmerApproved: autoApprove || appRole === 'farmer',
       };
       await addLocalAnimal(newAnimal);
+      if (willSaveAsFarm) await saveFarmLocation(user?.id, capturedPlace);
       // The draft is now a real record — clear it from "Registration in Progress".
       await deleteDraft(code);
       await enqueueAnimalSync({ animal: newAnimal, userId: user?.id, photoUris: photos, aan: code });
       void processSyncQueue();
       registerAnimal({
-        tag,
+        tag: newAnimal.tag,
         breedKey: breedKey || undefined,
         locationId: locationId ? Number(locationId) : undefined,
         dateOfBirth: dob || null,
@@ -572,6 +676,21 @@ export default function RegisterAnimal() {
               </View>
               <Icon name="chevron-right" size={20} color={colors.onSurfaceVariant} />
             </Pressable>
+
+            {/* Excel template to follow; individual registration comes first. */}
+            <Pressable
+              onPress={() => Alert.alert(t('reg.bulkTitle'), t('reg.bulkBody'))}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderColor: colors.divider, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.sm }}>
+              <Icon name="file-upload-outline" size={20} color={colors.onSurfaceVariant} />
+              <View style={{ flex: 1 }}>
+                <AppText variant="body" style={{ fontWeight: '600' }}>
+                  {t('reg.bulkTitle')}
+                </AppText>
+                <AppText variant="caption" color={colors.onSurfaceVariant}>
+                  {t('reg.bulkSub')}
+                </AppText>
+              </View>
+            </Pressable>
           </>
         )}
 
@@ -593,7 +712,7 @@ export default function RegisterAnimal() {
                 return (
                   <Pressable
                     key={it.value}
-                    onPress={() => setIdType(it.value)}
+                    onPress={() => selectIdType(it.value)}
                     style={{ flex: 1, alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.md, borderRadius: radius.md, backgroundColor: active ? colors.primary : colors.surface, borderWidth: active ? 2 : 1, borderColor: active ? colors.primary : colors.divider }}>
                     <Icon name={it.icon} size={22} color={active ? '#fff' : colors.onSurfaceVariant} />
                     <AppText variant="caption" color={active ? '#fff' : colors.onSurfaceVariant} style={{ fontWeight: '600', textAlign: 'center' }}>
@@ -674,8 +793,22 @@ export default function RegisterAnimal() {
             <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.md }}>
               {t('reg.locationSub')}
             </AppText>
-            {/* Paddock is optional (Oct 2026 spec). */}
-            <PickerField label={t('reg.location')} value={locationId} placeholder={t('reg.locationPlaceholder')} options={locationOptions} onSelect={setLocationId} />
+            {places.length > 0 ? (
+              <>
+                <PickerField label={t('reg.place.pick')} value={placeChoice} placeholder={t('reg.place.placeholder')} options={placeOptions} onSelect={choosePlace} />
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, marginTop: -spacing.sm, marginBottom: spacing.md }}>
+                  <Icon name="map-marker-check-outline" size={14} color={colors.onSurfaceVariant} />
+                  <AppText variant="caption" color={colors.onSurfaceVariant} style={{ flex: 1 }}>{t('reg.place.hint')}</AppText>
+                </View>
+              </>
+            ) : null}
+            {/* The location is optional (Oct 2026 spec). */}
+            <TextField
+              label={t('reg.locationName')}
+              value={locationName}
+              onChangeText={(v) => { setLocationName(v); setLocationId(''); }}
+              placeholder={t('reg.locationNamePlaceholder')}
+            />
             <TextField label={t('reg.addr1')} value={addr1} onChangeText={setAddr1} placeholder={t('reg.addr1Placeholder')} />
             <TextField label={t('reg.addr2')} value={addr2} onChangeText={setAddr2} placeholder={t('reg.addr2Placeholder')} />
 
@@ -692,7 +825,7 @@ export default function RegisterAnimal() {
               <AppText variant="caption" color={colors.onSurfaceVariant}>{t('reg.countryAuto', { country })}</AppText>
             </View>
             {(CITIES_BY_COUNTRY[country]?.length ?? 0) > 0 ? (
-              <PickerField label={t('reg.city')} value={city} placeholder={t('reg.cityPlaceholder')} options={CITIES_BY_COUNTRY[country].map((c) => ({ label: c, value: c }))} onSelect={setCity} />
+              <PickerField label={t('reg.city')} value={city} placeholder={t('reg.cityPlaceholder')} options={[...new Set([...CITIES_BY_COUNTRY[country], ...(city ? [city] : [])])].map((c) => ({ label: c, value: c }))} onSelect={setCity} />
             ) : (
               <TextField label={t('reg.city')} value={city} onChangeText={setCity} placeholder={t('reg.cityPlaceholder')} />
             )}
@@ -718,6 +851,16 @@ export default function RegisterAnimal() {
             <AppText variant="caption" color={colors.onSurfaceVariant}>
               {t('reg.geoHintOpt')}
             </AppText>
+            {offerSaveAsFarm ? (
+              <Pressable
+                onPress={() => setSaveAsFarm(!willSaveAsFarm)}
+                style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginTop: spacing.md }}>
+                <Icon name={willSaveAsFarm ? 'checkbox-marked' : 'checkbox-blank-outline'} size={22} color={willSaveAsFarm ? colors.primary : colors.onSurfaceVariant} />
+                <AppText variant="body" color={colors.onSurface} style={{ flex: 1 }}>
+                  {t('reg.place.saveFarm')}
+                </AppText>
+              </Pressable>
+            ) : null}
           </>
         )}
 
@@ -727,6 +870,7 @@ export default function RegisterAnimal() {
             <AppText variant="title">{t('reg.deviceTitle')}</AppText>
             <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.md }}>
               {t('reg.deviceSub')}
+              {idType ? `\n${t(`reg.deviceScope.${idType}`)}` : ''}
             </AppText>
             {devices.map((d, i) => (
               <View key={i} style={[{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.divider }, shadow[1]]}>
@@ -777,7 +921,7 @@ export default function RegisterAnimal() {
               <AppText variant="caption" color={colors.onSurfaceVariant}>{t('reg.aanLabel')}</AppText>
               <AppText variant="bodyLarge" color={colors.primary} style={{ fontWeight: '700' }}>{aan || '—'}</AppText>
               <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginTop: spacing.xs }}>
-                {[tag.trim(), breedOptions.find((b) => b.value === breedKey)?.label, locationOptions.find((l) => l.value === locationId)?.label].filter(Boolean).join(' · ')}
+                {[tag.trim(), breedOptions.find((b) => b.value === breedKey)?.label, capturedPlace.name ?? capturedPlace.line1 ?? capturedPlace.city].filter(Boolean).join(' · ')}
               </AppText>
               <AppText variant="caption" color={colors.onSurfaceVariant}>
                 {t('reg.step.device')}: {devices.length} · {t('reg.photoId')}: {photos.length}
@@ -851,10 +995,35 @@ export default function RegisterAnimal() {
 
       {/* Device capture sheet */}
       <BottomSheet visible={deviceSheet} onClose={() => setDeviceSheet(false)} title={t('reg.deviceSheet')}>
-        <PickerField label={t('reg.deviceType')} required value={dType} placeholder={t('reg.deviceTypePlaceholder')} options={DEVICE_MODEL_OPTIONS} onSelect={setDType} />
+        <PickerField label={t('reg.deviceType')} required value={dType} placeholder={t('reg.deviceTypePlaceholder')} options={deviceOptionsFor(idType)} onSelect={setDType} />
         {draftIsBle ? (
           <>
             {/* Static MAC = the tag's durable identity (ELA confirmed). */}
+            <Button
+              label={tagScanning ? t('reg.bleScanning') : t('reg.bleScan')}
+              icon="bluetooth"
+              variant="outline"
+              loading={tagScanning}
+              onPress={scanNearbyTags}
+              style={{ marginBottom: spacing.sm }}
+            />
+            {nearbyTags.length > 0 ? (
+              <>
+                <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.xs }}>{t('reg.bleScanHint')}</AppText>
+                {nearbyTags.map((tag) => (
+                  <Pressable
+                    key={tag.mac}
+                    onPress={() => { setDMac(tag.mac); setNearbyTags([]); }}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderColor: colors.divider, borderRadius: radius.md, padding: spacing.sm, marginBottom: spacing.xs }}>
+                    <Icon name="bluetooth" size={16} color={colors.primary} />
+                    <View style={{ flex: 1 }}>
+                      <AppText variant="body" style={{ fontWeight: '600' }}>{tag.mac}</AppText>
+                      <AppText variant="caption" color={colors.onSurfaceVariant}>{[tag.name, `${tag.rssi} dBm`].filter(Boolean).join(' · ')}</AppText>
+                    </View>
+                  </Pressable>
+                ))}
+              </>
+            ) : null}
             <TextField label={t('reg.bleMac')} required value={dMac} onChangeText={setDMac} placeholder="AA:BB:CC:DD:EE:FF" />
             {dMac.trim() && !draftMac ? (
               <AppText variant="caption" color={colors.error} style={{ marginTop: -spacing.sm, marginBottom: spacing.sm }}>{t('reg.bleMacInvalid')}</AppText>

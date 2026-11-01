@@ -20,7 +20,7 @@
       "predictiveBackGestureEnabled": false,
       "softwareKeyboardLayoutMode": "pan",
       "package": "com.emaanidev.ngarenconnectmobile",
-      "versionCode": 59
+      "versionCode": 60
     },
     "web": {
       "output": "static",
@@ -65,7 +65,8 @@
         }
       ],
       "expo-secure-store",
-      "expo-mail-composer"
+      "expo-mail-composer",
+      "react-native-ble-plx"
     ],
     "experiments": {
       "typedRoutes": true,

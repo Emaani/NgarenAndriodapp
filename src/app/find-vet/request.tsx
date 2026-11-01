@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Linking, Pressable, View } from 'react-native';
+import { Alert, Linking, Pressable, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { animals as animalsFallback, vets } from '@/data/mock';
@@ -33,7 +33,7 @@ export default function RequestCallout() {
   const { vetId, date, emergency, purpose: purposeParam } = useLocalSearchParams<{ vetId?: string; date?: string; emergency?: string; purpose?: string }>();
   const vet = vetId ? vets.find((v) => v.id === Number(vetId)) : undefined;
   const isEmergency = emergency === '1';
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const { data: animals } = useResource(getHerd, animalsFallback);
   // Admins can book on a farmer's behalf (Sep 3 2026 standup).
   const { data: farmers } = useResource(getFarmerPortfolio, []);
@@ -184,7 +184,12 @@ export default function RequestCallout() {
       const linkNote = meetingLink ? `[Meeting link: ${meetingLink}] ` : '';
       await submitCalloutRequest({
         vetId: vet?.id,
+        vetName: vet?.name,
+        farmerName: onBehalfFarmerName ?? user?.fullName ?? user?.email ?? undefined,
         animal: animalLabel,
+        animalTag: animal?.ngarenCode ?? animal?.tag,
+        animalSex: animal?.sex,
+        animalBreed: animal?.breed.name,
         locationName: locationName || 'Farm',
         urgency: urgency as CalloutUrgency,
         notes: `${purposeNote}${linkNote}${onBehalfNote}${scopeNote}${slotNote}${notes}`.trim() || undefined,
@@ -204,10 +209,11 @@ export default function RequestCallout() {
         `${urgency} request for ${animalLabel}${vet ? ` to ${vet.name}` : ''}. We'll notify you when a vet responds.`,
         { type: 'VET_REQUEST' },
       );
-    } catch {
-      // Best-effort in mock mode; the farmer is still routed home.
-    } finally {
       router.replace('/(tabs)/home');
+    } catch {
+      // Keep the form: the booking wasn't saved, so the farmer can retry.
+      setSubmitting(false);
+      Alert.alert(t('fv.sendFailedTitle'), t('fv.sendFailedBody'));
     }
   };
 

@@ -5,7 +5,6 @@ import { colors, radius, shadow, spacing } from '@/theme';
 import { animals as animalsFallback, devices as devicesFallback } from '@/data/mock';
 import { getDevices, getCalloutRequests } from '@/data/api';
 import { getHerd } from '@/data/herd';
-import { calloutRequests as calloutFallback } from '@/data/mock';
 import { getBreedingRecords, getHealthRecords } from '@/data/clinical';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
@@ -35,7 +34,7 @@ export default function Reports() {
   const { data: devices } = useResource(() => getDevices(), devicesFallback);
   const { data: health } = useResource(getHealthRecords, []);
   const { data: breeding } = useResource(getBreedingRecords, []);
-  const { data: callouts } = useResource(() => getCalloutRequests(), calloutFallback);
+  const { data: callouts } = useResource(() => getCalloutRequests(), []);
   const [busy, setBusy] = useState<ReportKind | null>(null);
 
   if (loading) return null;

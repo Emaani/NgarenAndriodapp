@@ -96,6 +96,52 @@ export function resolveDetection(d: BleDetection, macIndex: Map<string, string>)
   };
 }
 
+export interface NearbyTag {
+  mac: string;
+  name: string | null;
+  rssi: number;
+}
+
+/** Record a sighting, keeping each tag's strongest signal and any name it sent. */
+export function noteNearbyTag(found: Map<string, NearbyTag>, d: BleDetection) {
+  const mac = normalizeBleMac(d.mac);
+  if (!mac) return;
+  const previous = found.get(mac);
+  found.set(mac, {
+    mac,
+    name: d.name ?? previous?.name ?? null,
+    rssi: Math.max(d.rssi ?? -127, previous?.rssi ?? -127),
+  });
+}
+
+/** Closest tags first, so a tag held to the reader tops the list. */
+export function nearestTags(found: Map<string, NearbyTag>, taken: Set<string>, limit = 6): NearbyTag[] {
+  return [...found.values()]
+    .filter((tag) => !taken.has(tag.mac))
+    .sort((a, b) => b.rssi - a.rssi)
+    .slice(0, limit);
+}
+
+export type HerdMatch =
+  | { kind: 'match'; animalId: number }
+  /** The tag self-reports a different AAN than the one its MAC is bound to. */
+  | { kind: 'mismatch' }
+  /** A Ngaren-programmed tag that doesn't belong to this herd. */
+  | { kind: 'foreign' }
+  /** Any other Bluetooth device in range (phones, speakers...). */
+  | { kind: 'ignored' };
+
+/**
+ * Decide what a resolved read means for the herd being counted. A mismatch is
+ * never counted as present: the tag may have been moved to another animal.
+ */
+export function matchToHerd(r: BleResolution, animalIdByAan: Map<string, number>): HerdMatch {
+  if (r.mismatch) return { kind: 'mismatch' };
+  if (!r.aan) return { kind: 'ignored' };
+  const animalId = animalIdByAan.get(r.aan);
+  return animalId != null ? { kind: 'match', animalId } : { kind: 'foreign' };
+}
+
 /**
  * De-duplicate reads across phones/gateways. A frame is new when its
  * (mac, counter) pair hasn't been seen; reads without a counter (standard ELA

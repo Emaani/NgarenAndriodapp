@@ -181,10 +181,9 @@ export async function getCalendarEvents(): Promise<CalendarEvent[]> {
     });
 
     reportDataSuccess();
-    if (events.length === 0) return MOCK_CALENDAR;
     return events.sort((a, b) => a.date.localeCompare(b.date));
   } catch (e) {
     reportDataFailure('calendar', e);
-    return MOCK_CALENDAR;
+    return [];
   }
 }

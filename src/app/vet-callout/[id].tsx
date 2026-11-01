@@ -3,7 +3,6 @@ import { View } from 'react-native';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { calloutRequests as calloutFallback } from '@/data/mock';
 import { getCalloutRequests, updateCalloutStatus } from '@/data/api';
 import { addFollowUp, FollowUpKind } from '@/data/followUps';
 import { addLocalNotification } from '@/data/localNotifications';
@@ -52,7 +51,7 @@ export default function VetCallout() {
   const tStatus = useTStatus();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { loading, isAuthenticated, canVet, user } = useAuth();
-  const { data: requests } = useResource(() => getCalloutRequests(), calloutFallback);
+  const { data: requests, loading: loadingRequests } = useResource(() => getCalloutRequests(), []);
 
   const req: CalloutRequest | undefined = requests.find((r) => r.id === Number(id));
   const [status, setStatus] = useState<CalloutStatus | null>(null);
@@ -88,6 +87,7 @@ export default function VetCallout() {
   if (loading) return null;
   if (!isAuthenticated) return <Redirect href="/login" />;
   if (!canVet) return <Redirect href="/(tabs)/home" />;
+  if (!req && loadingRequests) return <View style={{ flex: 1, backgroundColor: colors.background }} />;
 
   if (!req) {
     return (
@@ -118,8 +118,11 @@ export default function VetCallout() {
 
   const setAndSync = (next: CalloutStatus, toast: string) => {
     setStatus(next);
-    updateCalloutStatus(req.id, next).catch(() => undefined);
     notify(toast);
+    updateCalloutStatus(req.id, next).catch(() => {
+      setStatus(null);
+      notify(tr('vet.statusFailed'));
+    });
     if (next === 'accepted') {
       void sendLocalNotification(tr('vc.notifTitle'), tr('vc.notifBody', { farmer: req.farmerName, animal: req.animal }), { type: 'VET_CALLOUT' });
     }
@@ -169,7 +172,9 @@ export default function VetCallout() {
               {revealed ? req.farmerName : tr('vc.farmerHidden')}
             </AppText>
             <AppText variant="caption" color={colors.onSurfaceVariant}>
-              {revealed ? tr('vc.revealedMeta', { loc: req.locationName, km: req.distanceKm, time: req.requestedAt }) : tr('vc.hiddenMeta', { km: req.distanceKm, time: req.requestedAt })}
+              {req.distanceKm
+                ? revealed ? tr('vc.revealedMeta', { loc: req.locationName, km: req.distanceKm, time: req.requestedAt }) : tr('vc.hiddenMeta', { km: req.distanceKm, time: req.requestedAt })
+                : `${revealed ? req.locationName : tr('vc.locHiddenNoKm')} · ${req.requestedAt}`}
             </AppText>
           </View>
           <ActionChip label={tStatus(current)} variant={statusVariant(current)} />
@@ -184,7 +189,7 @@ export default function VetCallout() {
           <DetailRow label={tr('vrq.priority')} value={tr(`urgency.${req.urgency.toLowerCase()}`)} />
           <DetailRow label="SLA" value={req.urgency === 'Emergency' ? tr('vc.sla4') : tr('vc.sla48')} />
           <DetailRow label={tr('vc.farmer')} value={revealed ? req.farmerName : tr('vc.hiddenUntil')} />
-          <DetailRow label={tr('ad.location')} value={revealed ? `${req.locationName} · ${req.distanceKm} km` : tr('vc.locHidden', { km: req.distanceKm })} last={!req.notes} />
+          <DetailRow label={tr('ad.location')} value={revealed ? [req.locationName, req.distanceKm ? `${req.distanceKm} km` : ''].filter(Boolean).join(' · ') : req.distanceKm ? tr('vc.locHidden', { km: req.distanceKm }) : tr('vc.locHiddenNoKm')} last={!req.notes} />
           {req.notes ? <DetailRow label={tr('ad.notes')} value={req.notes} last /> : null}
         </View>
 

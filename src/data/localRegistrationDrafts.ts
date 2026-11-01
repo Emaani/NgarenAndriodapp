@@ -26,6 +26,7 @@ export interface RegistrationDraft {
   sireExternal?: string;
   photos?: (string | null)[];
   locationId?: string;
+  locationName?: string;
   addr1?: string;
   addr2?: string;
   city?: string;

@@ -5,8 +5,11 @@ import { colors, radius, shadow, spacing } from '@/theme';
 import { animals as animalsFallback } from '@/data/mock';
 import { getHerd } from '@/data/herd';
 import { useResource } from '@/data/hooks';
+import { getTagConfirmations } from '@/data/tagConfirmations';
 import { useAuth } from '@/services/auth';
 import { ageFromDate } from '@/lib/date';
+import { confirmationKey, confirmationSummary } from '@/lib/tagConfirmation';
+import { isBluetoothAnimal } from '@/lib/tagging';
 import { Animal } from '@/data/types';
 import { useT } from '@/i18n';
 import { AnimalPhoto, AppText, EmptyState, GradientHeader, Icon, IconName, Screen } from '@/ui';
@@ -19,7 +22,8 @@ function classify(a: Animal): DeviceType | null {
   const serial = (a.deviceSerial ?? '').toLowerCase();
   const method = (a.taggingMethod ?? '').toLowerCase();
   const id = a.identificationType;
-  if (type.includes('bluetooth') || method === 'bluetooth' || id === 'bluetooth') return 'Bluetooth';
+  if (isBluetoothAnimal(a)) return 'Bluetooth';
+  if (id === 'physical' || method === 'manual') return null;
   if (type.includes('gsat') || serial.startsWith('gst') || serial.startsWith('gsat')) return 'GSAT';
   if (type.includes('ceres') || serial.startsWith('crs') || method === 'satellite' || id === 'satellite') return 'Ceres';
   if (a.deviceSerial) return 'Ceres';
@@ -42,6 +46,7 @@ export default function AnimalDevices() {
   const t = useT();
   const { loading, isAuthenticated } = useAuth();
   const { data: herd } = useResource(getHerd, animalsFallback);
+  const { data: confirmations } = useResource(getTagConfirmations, {});
 
   const groups = useMemo(() => {
     const g: Record<DeviceType, Animal[]> = { Ceres: [], GSAT: [], Bluetooth: [] };
@@ -76,7 +81,9 @@ export default function AnimalDevices() {
                   <AppText variant="title" style={{ flex: 1 }}>{type}</AppText>
                   <AppText variant="body" color={colors.onSurfaceVariant} style={{ fontWeight: '700' }}>{list.length}</AppText>
                 </View>
-                {list.map((a) => (
+                {list.map((a) => {
+                  const confirmation = confirmations[confirmationKey(a)];
+                  return (
                   <Pressable
                     key={a.id}
                     onPress={() => router.push(`/animals/${a.id}` as never)}
@@ -90,10 +97,17 @@ export default function AnimalDevices() {
                       <AppText variant="caption" color={colors.onSurfaceVariant}>
                         {(a.accountNumber ?? a.ngarenCode ?? a.tag)} · {a.breed.name} · {ageFromDate(a.dateOfBirth)}
                       </AppText>
+                      {/* Bluetooth has no live feed: show the last confirmation. */}
+                      {type === 'Bluetooth' ? (
+                        <AppText variant="caption" color={colors.onSurfaceVariant}>
+                          {confirmation ? t('adev.lastConfirmed', { summary: confirmationSummary(confirmation, t) }) : t('adev.notConfirmed')}
+                        </AppText>
+                      ) : null}
                     </View>
                     <Icon name="chevron-right" size={18} color={colors.onSurfaceVariant} />
                   </Pressable>
-                ))}
+                  );
+                })}
               </View>
             );
           })

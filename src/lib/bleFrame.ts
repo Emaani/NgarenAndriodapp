@@ -216,6 +216,30 @@ export function isValidBleMac(mac: string | null | undefined): boolean {
 }
 
 /** Hex string (`4E 10 …`) for logs and the spec's worked example. */
+const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+/** Decode base64 (how BLE stacks hand over Manufacturer Specific Data). */
+export function bytesFromBase64(input: string | null | undefined): Uint8Array | null {
+  const clean = (input ?? '').replace(/=+$/, '');
+  if (!clean || clean.length % 4 === 1) return null;
+  const out = new Uint8Array(Math.floor((clean.length * 3) / 4));
+  let buffer = 0;
+  let bits = 0;
+  let written = 0;
+  for (const ch of clean) {
+    const value = BASE64_ALPHABET.indexOf(ch);
+    if (value < 0) return null;
+    buffer = (buffer << 6) | value;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      out[written++] = (buffer >> bits) & 0xff;
+      buffer &= (1 << bits) - 1;
+    }
+  }
+  return out;
+}
+
 export function toHex(bytes: Uint8Array): string {
   return [...bytes].map((b) => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
 }

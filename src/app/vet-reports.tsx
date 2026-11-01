@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { calloutRequests as calloutFallback } from '@/data/mock';
 import { getCalloutRequests } from '@/data/api';
 import { getMyVetImpact } from '@/data/vetProfiles';
 import { getReportAudit, logReportExport, ReportAuditEntry } from '@/data/reportAudit';
@@ -43,7 +42,7 @@ export default function VetReports() {
   const t = useT();
   const { loading, isAuthenticated, canVet, isAdmin, user } = useAuth();
   const { data: impact } = useResource(getMyVetImpact, EMPTY_IMPACT);
-  const { data: callouts } = useResource(() => getCalloutRequests(), calloutFallback);
+  const { data: callouts } = useResource(() => getCalloutRequests(), []);
   const { data: audit, reload: reloadAudit } = useResource(getReportAudit, []);
   const [busy, setBusy] = useState<string | null>(null);
 

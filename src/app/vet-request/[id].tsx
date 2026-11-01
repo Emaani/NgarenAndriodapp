@@ -1,7 +1,6 @@
 import { View } from 'react-native';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { calloutRequests as calloutFallback } from '@/data/mock';
 import { getCalloutRequests } from '@/data/api';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
@@ -50,13 +49,14 @@ export default function VetRequestDetail() {
   const tStatus = useTStatus();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { loading, isAuthenticated } = useAuth();
-  const { data: requests } = useResource(() => getCalloutRequests(), calloutFallback);
+  const { data: requests, loading: loadingRequests } = useResource(() => getCalloutRequests(), []);
 
   if (loading) return null;
   if (!isAuthenticated) return <Redirect href="/login" />;
 
   const req: CalloutRequest | undefined = requests.find((r) => r.id === Number(id));
 
+  if (!req && loadingRequests) return <View style={{ flex: 1, backgroundColor: colors.background }} />;
   if (!req) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -99,7 +99,7 @@ export default function VetRequestDetail() {
           <DetailRow label={t('vrq.priority')} value={t(`urgency.${req.urgency.toLowerCase()}`)} />
           <DetailRow label="SLA" value={req.urgency === 'Emergency' ? t('fv.slaEmergency') : t('fv.slaRoutine')} />
           <DetailRow label={t('ad.location')} value={req.locationName} />
-          <DetailRow label={t('vrq.distance')} value={`${req.distanceKm} km`} />
+          {req.distanceKm ? <DetailRow label={t('vrq.distance')} value={`${req.distanceKm} km`} /> : null}
           <DetailRow label={t('vrq.requested')} value={req.requestedAt} />
           <DetailRow label={t('vrq.requestedBy')} value={req.farmerName} last={!req.notes} />
           {req.notes ? <DetailRow label={t('ad.notes')} value={req.notes} last /> : null}

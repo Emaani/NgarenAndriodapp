@@ -1,16 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Linking, Pressable, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Redirect, useRouter } from 'expo-router';
+import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { CalloutRequest, CalloutStatus, CalloutUrgency, VetImpact } from '@/data/types';
 import { getCalloutRequests, updateCalloutStatus } from '@/data/api';
 import { getMyVetImpact } from '@/data/vetProfiles';
+import { getVetProfile } from '@/data/vetSelfProfile';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { roleTheme } from '@/lib/roles';
 import { formatDate } from '@/lib/date';
+import { notify } from '@/lib/toast';
 import { useT, useTStatus } from '@/i18n';
 import { ActionChip, ActionGrid, AppText, Button, GridAction, Icon, IconChip, IconName, NavBanner, NotificationBell, Screen, SyncStatus, VetImpactDashboard, VetSchedule } from '@/ui';
 
@@ -46,7 +48,8 @@ const QUICK_ACTIONS: GridAction[] = [
   { label: 'action.manageRecords', icon: 'clipboard-account-outline', route: '/vet-manage-animals', tint: '#6D874F' },
   { label: 'action.newScorecard', icon: 'clipboard-plus-outline', route: '/health-scorecard', tint: '#2563EB' },
   { label: 'action.stockTake', icon: 'clipboard-list-outline', route: '/stock-take', tint: '#F59E0B' },
-  { label: 'action.logVisit', icon: 'clipboard-edit-outline', route: '/log-visit', tint: '#16A34A' },
+  { label: 'action.followUps', icon: 'calendar-clock-outline', route: '/follow-ups', tint: '#16A34A' },
+  { label: 'action.myVetProfile', icon: 'account-badge-outline', route: '/vet-credentials', tint: '#0891B2' },
 ];
 
 // Reports (Oct 2026 Q&A): the vet's intelligence centre — replaces the generic
@@ -175,7 +178,9 @@ function RequestCard({
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
         <Icon name={revealed ? 'map-marker' : 'map-marker-off-outline'} size={16} color={colors.onSurfaceVariant} />
         <AppText variant="body" color={colors.onSurfaceVariant}>
-          {revealed ? `${req.locationName} · ${req.distanceKm} km away` : `~${req.distanceKm} km away · location shown on accept`}
+          {revealed
+            ? [req.locationName, req.distanceKm ? `${req.distanceKm} km away` : ''].filter(Boolean).join(' · ')
+            : [req.distanceKm ? `~${req.distanceKm} km away` : '', 'location shown on accept'].filter(Boolean).join(' · ')}
         </AppText>
       </View>
 
@@ -229,12 +234,18 @@ export default function VetDashboard() {
   const [requests, setRequests] = useState<CalloutRequest[]>([]);
   const [filter, setFilter] = useState<Filter>('pending');
   const { data: impact } = useResource(getMyVetImpact, EMPTY_IMPACT);
+  const { data: myProfile, loading: profileLoading } = useResource(
+    () => (user?.id ? getVetProfile(user.id) : Promise.resolve(undefined)),
+    undefined,
+  );
 
-  useEffect(() => {
+  // Reload on every return here: new bookings arrive and details change status.
+  const loadRequests = useCallback(() => {
     getCalloutRequests()
       .then(setRequests)
       .catch(() => setRequests([]));
   }, []);
+  useFocusEffect(loadRequests);
 
   const counts = useMemo(
     () => ({
@@ -266,7 +277,10 @@ export default function VetDashboard() {
 
   const setStatus = (id: number, status: CalloutStatus) => {
     setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
-    updateCalloutStatus(id, status).catch(() => {});
+    updateCalloutStatus(id, status).catch(() => {
+      notify(t('vet.statusFailed'));
+      loadRequests();
+    });
   };
 
   return (
@@ -338,6 +352,19 @@ export default function VetDashboard() {
         <View style={{ marginBottom: spacing.md }}>
           <SyncStatus />
         </View>
+
+        {/* Vet self-enlisting (spec 1): prompt until Ngaren approves the profile. */}
+        {!profileLoading && myProfile?.status !== 'approved' && (
+          <NavBanner
+            variant="alert"
+            tint={myProfile?.status === 'pending' ? '#F59E0B' : '#0891B2'}
+            icon={myProfile?.status === 'pending' ? 'clock-outline' : 'account-badge-outline'}
+            title={myProfile?.status === 'pending' ? t('home.banner.vetPending') : t('home.banner.vetEnlist')}
+            subtitle={myProfile?.status === 'rejected' ? (myProfile.rejectionReason ?? t('home.banner.vetEnlistSub')) : t('home.banner.vetEnlistSub')}
+            onPress={() => router.push('/vet-credentials' as never)}
+            style={{ marginBottom: spacing.lg }}
+          />
+        )}
 
         {/* Quick actions (Oct 2026 standup): animal registration + service entry
             points on the vet side, with clear navigation. */}

@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Image, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import { Redirect, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { animals as animalsFallback } from '@/data/mock';
@@ -11,16 +12,38 @@ import { useAuth } from '@/services/auth';
 import { sendLocalNotification } from '@/services/push';
 import { addAbsenceReports, saveStockTakeResult, StockTakeAbsence } from '@/data/localStockTake';
 import { addLocalEvent } from '@/data/localEvents';
+import { addTagConfirmations } from '@/data/tagConfirmations';
 import { persistImage } from '@/lib/photos';
 import { ageFromDate, formatDateTime } from '@/lib/date';
 import { normalizeBleMac } from '@/lib/bleFrame';
-import { isBleDeviceType } from '@/lib/bleResolve';
+import { buildMacIndex, isBleDeviceType, matchToHerd, resolveDetection } from '@/lib/bleResolve';
+import { confirmationKey, TagConfirmation } from '@/lib/tagConfirmation';
+import { isBluetoothAnimal } from '@/lib/tagging';
+import { scanForTags, stopBleScan } from '@/services/bleScanner';
 import { Animal } from '@/data/types';
 import { useT } from '@/i18n';
 import { AnimalPhoto, AppText, BottomSheet, Button, DetailRow, GradientHeader, Icon, IconChip, IconName, Screen } from '@/ui';
 
 /** The AAN / reference identifier used to list an animal in reports. */
-const aanOf = (a: Animal): string => a.ngarenCode ?? a.accountNumber ?? a.tag;
+const aanOf = confirmationKey;
+
+// Three adverts from every tag in range at the default 5 s period.
+const BLE_SCAN_SECONDS = 15;
+const GPS_WAIT_MS = 5000;
+
+/** Where the round happened, if a fix comes quickly. Never blocks the submit. */
+async function quickPosition(): Promise<{ lat: number; lng: number } | null> {
+  try {
+    if (!(await Location.getForegroundPermissionsAsync()).granted) return null;
+    const pos = await Promise.race([
+      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), GPS_WAIT_MS)),
+    ]);
+    return pos ? { lat: pos.coords.latitude, lng: pos.coords.longitude } : null;
+  } catch {
+    return null;
+  }
+}
 
 type Mark = 'pending' | 'present' | 'missing';
 type Phase = 'method' | 'count' | 'summary';
@@ -99,6 +122,7 @@ function AnimalRow({
   photoMode,
   photoUri,
   onCapture,
+  heard,
 }: {
   animal: Animal;
   mark: Mark;
@@ -106,6 +130,7 @@ function AnimalRow({
   photoMode?: boolean;
   photoUri?: string;
   onCapture?: () => void;
+  heard?: boolean;
 }) {
   const t = useT();
   return (
@@ -131,6 +156,14 @@ function AnimalRow({
           <AppText variant="caption" color={colors.onSurfaceVariant}>
             {animal.tag} · {animal.locationName ?? '—'}
           </AppText>
+          {heard ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+              <Icon name="bluetooth" size={13} color={colors.primary} />
+              <AppText variant="caption" color={colors.primary}>
+                {t('stock.bleHeard')}
+              </AppText>
+            </View>
+          ) : null}
         </View>
         {mark === 'present' && <Icon name="check-circle" size={22} color={colors.success} />}
         {mark === 'missing' && <Icon name="alert-circle" size={22} color={colors.error} />}
@@ -192,6 +225,10 @@ export default function StockTake() {
   const [confirmAnimal, setConfirmAnimal] = useState<Animal | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // BLE scan: seconds left (null = idle) and the animals the radio really heard.
+  const [scanLeft, setScanLeft] = useState<number | null>(null);
+  const [heard, setHeard] = useState<Record<number, { rssi: number | null }>>({});
+  const heardRef = useRef(new Set<number>());
 
   // Add any newly-loaded animals to the count sheet as pending.
   useEffect(() => {
@@ -290,6 +327,24 @@ export default function StockTake() {
         reportedBy,
       }));
       await addAbsenceReports(absenceReports);
+      // A Bluetooth animal's dashboard shows its last confirmation. QR rounds are
+      // left out until the QR scan reads a real tag.
+      const confirmed = method === 'qr' ? [] : allAnimals.filter((a) => isBluetoothAnimal(a) && marks[a.id] === 'present');
+      if (confirmed.length > 0) {
+        const pos = await quickPosition();
+        await addTagConfirmations(
+          confirmed.map((a): TagConfirmation => ({
+            animalKey: confirmationKey(a),
+            at: nowIso,
+            by: reportedBy,
+            via: strict ? 'photo' : heard[a.id] ? 'ble' : 'manual',
+            locationName: a.locationName ?? null,
+            lat: pos?.lat,
+            lng: pos?.lng,
+            rssi: heard[a.id]?.rssi ?? null,
+          })),
+        );
+      }
       // Log the stock-take on the shared calendar so it is visible and managed
       // consistently across profiles (farmer + vet) — Oct 2026 Q&A.
       const hhmm = nowIso.slice(11, 16);
@@ -321,7 +376,6 @@ export default function StockTake() {
 
   // BLE: only animals bound to a BLE tag's STATIC MAC can be heard in a BLE
   // round (ELA, Oct 2026) — a satellite serial must never count as a BLE read.
-  // Marks those animals present in one pass (the round's "acceptance" step).
   const bleAnimalIds = useMemo(() => {
     const ids = new Set<number>();
     for (const a of allAnimals) {
@@ -330,18 +384,43 @@ export default function StockTake() {
     }
     return ids;
   }, [allAnimals]);
-  const associateBleTags = () => {
+  useEffect(() => stopBleScan, []);
+
+  // An animal is marked present only when the radio hears its tag; animals that
+  // stay silent are left for the person counting to mark.
+  const scanBleTags = async () => {
     if (bleAnimalIds.size === 0) {
       Alert.alert(t('stock.bleNoneTitle'), t('stock.bleNoneBody'));
       return;
     }
-    setMarks((prev) => {
-      const next = { ...prev };
-      for (const a of allAnimals) {
-        if (bleAnimalIds.has(a.id) && a.status === 'active' && next[a.id] === 'pending') next[a.id] = 'present';
-      }
-      return next;
+    const macIndex = buildMacIndex(allAnimals);
+    const animalIdByAan = new Map(allAnimals.filter((a) => a.ngarenCode).map((a) => [a.ngarenCode as string, a.id]));
+    const mismatches = new Set<string>();
+    const foreign = new Set<string>();
+    setScanLeft(BLE_SCAN_SECONDS);
+    const countdown = setInterval(() => setScanLeft((s) => (s != null && s > 1 ? s - 1 : s)), 1000);
+    const failure = await scanForTags(BLE_SCAN_SECONDS * 1000, (detection) => {
+      const read = resolveDetection(detection, macIndex);
+      const match = matchToHerd(read, animalIdByAan);
+      if (match.kind === 'mismatch') mismatches.add(read.mac);
+      if (match.kind === 'foreign') foreign.add(read.mac);
+      if (match.kind !== 'match' || heardRef.current.has(match.animalId)) return;
+      heardRef.current.add(match.animalId);
+      setHeard((prev) => ({ ...prev, [match.animalId]: { rssi: read.rssi } }));
+      setMark(match.animalId, 'present');
     });
+    clearInterval(countdown);
+    setScanLeft(null);
+    if (failure) {
+      Alert.alert(t('stock.bleErrTitle'), t(`stock.bleErr.${failure}`));
+      return;
+    }
+    const notes = [
+      t('stock.bleDoneBody', { heard: heardRef.current.size, total: bleAnimalIds.size }),
+      mismatches.size > 0 ? t('stock.bleDoneMismatch', { count: mismatches.size }) : '',
+      foreign.size > 0 ? t('stock.bleDoneForeign', { count: foreign.size }) : '',
+    ];
+    Alert.alert(t('stock.bleDoneTitle'), notes.filter(Boolean).join('\n\n'));
   };
 
   // QR: mark the next uncounted animal present, simulating scanning one tag.
@@ -543,9 +622,16 @@ export default function StockTake() {
           <Icon name="pencil-outline" size={13} color={colors.onSurfaceVariant} />
         </Pressable>
 
-        {method === 'bluetooth' && (
-          <Button label={t('stock.scanBle')} icon="bluetooth" variant="outline" onPress={associateBleTags} />
-        )}
+        {method === 'bluetooth' && (scanLeft == null ? (
+          <Button label={t('stock.scanBle')} icon="bluetooth" variant="outline" onPress={scanBleTags} />
+        ) : (
+          <>
+            <AppText variant="body" color={colors.primary} style={{ fontWeight: '600', textAlign: 'center' }}>
+              {t('stock.bleScanning', { seconds: scanLeft, heard: Object.keys(heard).length })}
+            </AppText>
+            <Button label={t('stock.bleStop')} icon="stop" variant="outline" onPress={stopBleScan} />
+          </>
+        ))}
         {method === 'qr' && (
           <Button label={t('stock.scanQr')} icon="qrcode-scan" variant="outline" onPress={scanNextTag} />
         )}
@@ -569,6 +655,7 @@ export default function StockTake() {
             photoMode={method === 'manual_visual'}
             photoUri={photos[a.id]}
             onCapture={() => setConfirmAnimal(a)}
+            heard={method === 'bluetooth' && !!heard[a.id]}
           />
         ))}
       </Screen>
