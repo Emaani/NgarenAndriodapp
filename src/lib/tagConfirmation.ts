@@ -10,8 +10,8 @@ export interface TagConfirmation {
   /** ISO datetime of the confirmation. */
   at: string;
   by: string;
-  /** `ble` = heard by the radio; `manual`/`photo` = confirmed by a person. */
-  via: 'ble' | 'manual' | 'photo';
+  /** `ble` = heard by the radio; `qr` = label scanned; `manual`/`photo` = confirmed by a person. */
+  via: 'ble' | 'qr' | 'manual' | 'photo';
   locationName?: string | null;
   lat?: number;
   lng?: number;

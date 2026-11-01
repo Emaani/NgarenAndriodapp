@@ -92,7 +92,7 @@ export default function VetProfileScreen() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <GradientHeader
         title={t('vp.title')}
-        subtitle={t('vp.distanceAway', { km: vet.distanceKm })}
+        subtitle={vet.distanceKm > 0 ? t('vp.distanceAway', { km: vet.distanceKm }) : vet.specialty}
         showBack
         right={
           <Pressable onPress={onTogglePrimary} hitSlop={8} accessibilityLabel={primary ? 'Remove trusted vet' : 'Save trusted vet'}>

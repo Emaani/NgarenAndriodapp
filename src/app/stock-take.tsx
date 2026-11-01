@@ -5,12 +5,12 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { Redirect, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { animals as animalsFallback } from '@/data/mock';
+import { QrTagScanner } from '@/components/QrTagScanner';
 import { getHerd } from '@/data/herd';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { sendLocalNotification } from '@/services/push';
-import { addAbsenceReports, saveStockTakeResult, StockTakeAbsence } from '@/data/localStockTake';
+import { addAbsenceReports, getAbsenceReports, saveStockTakeResult, StockTakeAbsence } from '@/data/localStockTake';
 import { addLocalEvent } from '@/data/localEvents';
 import { addTagConfirmations } from '@/data/tagConfirmations';
 import { persistImage } from '@/lib/photos';
@@ -19,6 +19,7 @@ import { normalizeBleMac } from '@/lib/bleFrame';
 import { buildMacIndex, isBleDeviceType, matchToHerd, resolveDetection } from '@/lib/bleResolve';
 import { confirmationKey, TagConfirmation } from '@/lib/tagConfirmation';
 import { isBluetoothAnimal } from '@/lib/tagging';
+import { matchQrToHerd } from '@/lib/tagQr';
 import { scanForTags, stopBleScan } from '@/services/bleScanner';
 import { Animal } from '@/data/types';
 import { useT } from '@/i18n';
@@ -30,6 +31,7 @@ const aanOf = confirmationKey;
 // Three adverts from every tag in range at the default 5 s period.
 const BLE_SCAN_SECONDS = 15;
 const GPS_WAIT_MS = 5000;
+const RECENT_ABSENCES = 10;
 
 /** Where the round happened, if a fix comes quickly. Never blocks the submit. */
 async function quickPosition(): Promise<{ lat: number; lng: number } | null> {
@@ -211,10 +213,9 @@ export default function StockTake() {
   const t = useT();
   const insets = useSafeAreaInsets();
   const { can, canVet, user } = useAuth();
-  const { data: allAnimals } = useResource(getHerd, animalsFallback);
-  const [marks, setMarks] = useState<Record<number, Mark>>(() =>
-    Object.fromEntries(animalsFallback.map((a) => [a.id, 'pending' as Mark])),
-  );
+  const { data: allAnimals } = useResource(getHerd, []);
+  const { data: absences } = useResource(getAbsenceReports, []);
+  const [marks, setMarks] = useState<Record<number, Mark>>({});
   const [phase, setPhase] = useState<Phase>('method');
   const [method, setMethod] = useState<StockMethod>('manual_visual');
   // Confirmation photos captured in photo mode, keyed by animal id.
@@ -229,6 +230,10 @@ export default function StockTake() {
   const [scanLeft, setScanLeft] = useState<number | null>(null);
   const [heard, setHeard] = useState<Record<number, { rssi: number | null }>>({});
   const heardRef = useRef(new Set<number>());
+  // QR: the scanner, what the last code matched, and the animals really scanned.
+  const [qrOpen, setQrOpen] = useState(false);
+  const [qrNote, setQrNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const qrScanned = useRef(new Set<number>());
 
   // Add any newly-loaded animals to the count sheet as pending.
   useEffect(() => {
@@ -327,9 +332,8 @@ export default function StockTake() {
         reportedBy,
       }));
       await addAbsenceReports(absenceReports);
-      // A Bluetooth animal's dashboard shows its last confirmation. QR rounds are
-      // left out until the QR scan reads a real tag.
-      const confirmed = method === 'qr' ? [] : allAnimals.filter((a) => isBluetoothAnimal(a) && marks[a.id] === 'present');
+      // A Bluetooth animal's dashboard shows its last confirmation.
+      const confirmed = allAnimals.filter((a) => isBluetoothAnimal(a) && marks[a.id] === 'present');
       if (confirmed.length > 0) {
         const pos = await quickPosition();
         await addTagConfirmations(
@@ -337,7 +341,7 @@ export default function StockTake() {
             animalKey: confirmationKey(a),
             at: nowIso,
             by: reportedBy,
-            via: strict ? 'photo' : heard[a.id] ? 'ble' : 'manual',
+            via: strict ? 'photo' : qrScanned.current.has(a.id) ? 'qr' : heard[a.id] ? 'ble' : 'manual',
             locationName: a.locationName ?? null,
             lat: pos?.lat,
             lng: pos?.lng,
@@ -423,10 +427,16 @@ export default function StockTake() {
     Alert.alert(t('stock.bleDoneTitle'), notes.filter(Boolean).join('\n\n'));
   };
 
-  // QR: mark the next uncounted animal present, simulating scanning one tag.
-  const scanNextTag = () => {
-    const nextPending = allAnimals.find((a) => (marks[a.id] ?? 'pending') === 'pending');
-    if (nextPending) setMark(nextPending.id, 'present');
+  // QR: only the animal whose label was scanned is marked present.
+  const onQrCode = (code: string) => {
+    const animal = matchQrToHerd(code, allAnimals);
+    if (!animal) {
+      setQrNote({ ok: false, text: t('stock.qrUnknown') });
+      return;
+    }
+    qrScanned.current.add(animal.id);
+    setMark(animal.id, 'present');
+    setQrNote({ ok: true, text: t('stock.qrMatched', { name: animal.name ?? animal.tag }) });
   };
 
   const activeMethod = METHODS.find((m) => m.value === method)!;
@@ -484,6 +494,24 @@ export default function StockTake() {
               </Pressable>
             );
           })}
+          {/* Follow-up reports from earlier rounds: AAN, date and who reported it. */}
+          {absences.length > 0 ? (
+            <View style={{ marginTop: spacing.md, gap: spacing.xs }}>
+              <AppText variant="caption" color={colors.onSurfaceVariant} style={{ textTransform: 'uppercase' }}>
+                {t('stock.absentReports', { count: absences.length })}
+              </AppText>
+              {absences.slice(0, RECENT_ABSENCES).map((a) => (
+                <View key={a.id} style={{ backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.sm }}>
+                  <AppText variant="body" style={{ fontWeight: '600' }}>
+                    {a.animalLabel}
+                  </AppText>
+                  <AppText variant="caption" color={colors.onSurfaceVariant}>
+                    {t('stock.absenceAan', { aan: a.aan })} · {t('stock.absenceMeta', { date: formatDateTime(a.date), by: a.reportedBy })}
+                  </AppText>
+                </View>
+              ))}
+            </View>
+          ) : null}
         </Screen>
         {/* Sticky, safe-area-aware footer so "Start count" is always reachable
             and never hidden below the phone edge (Oct 20 2026 spec). */}
@@ -570,12 +598,14 @@ export default function StockTake() {
 
           {/* Submission requires a live facial ID of the registered user; absent
               animals escalate on submit (Oct 2026 Q&A). */}
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, marginTop: spacing.md, marginBottom: spacing.sm }}>
-            <Icon name="face-recognition" size={15} color={colors.primary} />
-            <AppText variant="caption" color={colors.onSurfaceVariant} style={{ flex: 1 }}>
-              {missingCount > 0 ? t('stock.submitNoteEscalate', { count: missingCount }) : t('stock.submitNote')}
-            </AppText>
-          </View>
+          {strict ? null : (
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, marginTop: spacing.md, marginBottom: spacing.sm }}>
+              <Icon name="face-recognition" size={15} color={colors.primary} />
+              <AppText variant="caption" color={colors.onSurfaceVariant} style={{ flex: 1 }}>
+                {missingCount > 0 ? t('stock.submitNoteEscalate', { count: missingCount }) : t('stock.submitNote')}
+              </AppText>
+            </View>
+          )}
           <Button
             label={t('stock.submit')}
             icon="face-recognition"
@@ -610,6 +640,8 @@ export default function StockTake() {
         </View>
       </GradientHeader>
 
+      {qrOpen ? <QrTagScanner note={qrNote} onCode={onQrCode} onClose={() => setQrOpen(false)} /> : null}
+
       {/* Method banner + the method's primary scan/associate action. */}
       <View style={{ paddingHorizontal: spacing.md, paddingTop: spacing.md, gap: spacing.sm }}>
         <Pressable
@@ -633,7 +665,7 @@ export default function StockTake() {
           </>
         ))}
         {method === 'qr' && (
-          <Button label={t('stock.scanQr')} icon="qrcode-scan" variant="outline" onPress={scanNextTag} />
+          <Button label={t('stock.scanQr')} icon="qrcode-scan" variant="outline" onPress={() => { setQrNote(null); setQrOpen(true); }} />
         )}
         {method === 'manual_visual' && (
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, backgroundColor: colors.warningTint, borderRadius: radius.md, padding: spacing.sm }}>

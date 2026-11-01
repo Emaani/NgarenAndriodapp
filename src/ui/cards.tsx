@@ -78,10 +78,10 @@ export function LocationCard({
         <View style={{ flex: 1, gap: 2 }}>
           <AppText variant="title">{location.name}</AppText>
           <AppText variant="body" color={colors.onSurfaceVariant}>
-            Address: {location.address}
+            {location.address ? `Address: ${location.address}` : ''}
           </AppText>
           <AppText variant="caption" color={colors.onSurfaceVariant}>
-            Size: {location.sizeHa} ha · {location.animalCount} animals
+            {location.sizeHa > 0 ? `Size: ${location.sizeHa} ha · ` : ''}{location.animalCount} animals
           </AppText>
         </View>
         <Overflow onPress={onMenu} />
@@ -114,15 +114,17 @@ export function DeviceCard({
           <AppText variant="title">{device.serial}</AppText>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
             <AppText variant="body" color={colors.onSurfaceVariant}>
-              Ceres Tag {device.model}
+              {device.brand === 'Ceres Tag' ? `Ceres Tag ${device.model}` : device.model}
             </AppText>
             {device.temperatureC !== null && (
               <ActionChip label={`${device.temperatureC}°`} variant={tempVariant(device.temperatureC)} dot={false} />
             )}
           </View>
-          <AppText variant="caption" color={colors.onSurfaceVariant}>
-            Activated: {formatDate(device.activatedAt)}
-          </AppText>
+          {device.activatedAt ? (
+            <AppText variant="caption" color={colors.onSurfaceVariant}>
+              Activated: {formatDate(device.activatedAt)}
+            </AppText>
+          ) : null}
           {device.linkedAnimalTag ? (
             <Line icon="cow" text={`Linked to ${device.linkedAnimalTag}`} color={colors.success} />
           ) : (
@@ -175,9 +177,15 @@ export function UserCard({ user, onDelete }: { user: User; onDelete: () => void 
   );
 }
 
+const NOTIFICATION_LOOK: Record<AppNotification['category'], { icon: string; tint: string }> = {
+  device: { icon: 'flash', tint: colors.warning },
+  boundary: { icon: 'fence', tint: colors.error },
+  booking: { icon: 'stethoscope', tint: colors.primary },
+  account: { icon: 'information-outline', tint: colors.onSurfaceVariant },
+};
+
 export function NotificationItem({ item }: { item: AppNotification }) {
-  const icon = item.category === 'device' ? 'flash' : 'fence';
-  const tint = item.category === 'device' ? colors.warning : colors.error;
+  const { icon, tint } = NOTIFICATION_LOOK[item.category];
   return (
     <Card style={{ marginBottom: spacing.mdMinus }}>
       <View style={{ flexDirection: 'row', gap: spacing.mdMinus }}>

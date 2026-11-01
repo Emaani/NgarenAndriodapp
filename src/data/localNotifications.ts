@@ -19,6 +19,15 @@ export async function getLocalNotifications(): Promise<AppNotification[]> {
   }
 }
 
+export async function markLocalNotificationsRead(): Promise<void> {
+  try {
+    const all = await getLocalNotifications();
+    if (all.some((n) => n.unread)) await AsyncStorage.setItem(KEY, JSON.stringify(all.map((n) => ({ ...n, unread: false }))));
+  } catch {
+    // best-effort
+  }
+}
+
 export async function addLocalNotification(input: {
   category?: NotificationCategory;
   title: string;

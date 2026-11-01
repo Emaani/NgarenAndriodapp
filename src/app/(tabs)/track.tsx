@@ -3,7 +3,7 @@ import { Alert, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { geofences as geofencesData, locations as locationsFallback, markers as markersFallback } from '@/data/mock';
+import { geofences as geofencesData } from '@/data/mock';
 import { getAnimalLocations, getLocations } from '@/data/api';
 import { AnimalFenceStatus, evaluateGeofences } from '@/data/geofencing';
 import { useResource } from '@/data/hooks';
@@ -47,9 +47,9 @@ export default function TrackScreen() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [fenceOpen, setFenceOpen] = useState(false);
   const [locating, setLocating] = useState(false);
-  const { data: locations } = useResource(() => getLocations(), locationsFallback);
-  const { data: markers } = useResource(() => getAnimalLocations(), markersFallback);
-  const [checked, setChecked] = useState<number[]>(locationsFallback.map((l) => l.id));
+  const { data: locations } = useResource(() => getLocations(), []);
+  const { data: markers } = useResource(() => getAnimalLocations(), []);
+  const [checked, setChecked] = useState<number[]>([]);
 
   // Keep the location filter in sync as live locations arrive.
   useEffect(() => {

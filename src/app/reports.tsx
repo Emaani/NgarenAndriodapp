@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
 import { Redirect } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { animals as animalsFallback, devices as devicesFallback } from '@/data/mock';
 import { getDevices, getCalloutRequests } from '@/data/api';
 import { getHerd } from '@/data/herd';
 import { getBreedingRecords, getHealthRecords } from '@/data/clinical';
@@ -30,8 +29,8 @@ import { AppText, GradientHeader, Icon, IconChip, Screen } from '@/ui';
 export default function Reports() {
   const t = useT();
   const { loading, isAuthenticated, isAdmin, canVet, user } = useAuth();
-  const { data: animals } = useResource(getHerd, animalsFallback);
-  const { data: devices } = useResource(() => getDevices(), devicesFallback);
+  const { data: animals } = useResource(getHerd, []);
+  const { data: devices } = useResource(() => getDevices(), []);
   const { data: health } = useResource(getHealthRecords, []);
   const { data: breeding } = useResource(getBreedingRecords, []);
   const { data: callouts } = useResource(() => getCalloutRequests(), []);

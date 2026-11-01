@@ -3,7 +3,7 @@ import { Alert, View } from 'react-native';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { animals as animalsFallback, breeds as breedsFallback, locations as locationsFallback } from '@/data/mock';
+import { breeds as breedsFallback } from '@/data/mock';
 import { getBreeds, getLocations } from '@/data/api';
 import { getHerd } from '@/data/herd';
 import { addAmendment, AnimalAmendment, FieldChange } from '@/data/localAmendments';
@@ -30,9 +30,9 @@ export default function VetEditAnimal() {
   const { id, farmer } = useLocalSearchParams<{ id?: string; farmer?: string }>();
   const { loading, isAuthenticated, canVet, user } = useAuth();
 
-  const { data: herd } = useResource(getHerd, animalsFallback);
+  const { data: herd } = useResource(getHerd, []);
   const { data: breeds } = useResource(getBreeds, breedsFallback.map((n) => ({ key: n.toLowerCase(), name: n })));
-  const { data: locations } = useResource(() => getLocations(), locationsFallback);
+  const { data: locations } = useResource(() => getLocations(), []);
 
   const animal: Animal | undefined = useMemo(() => herd.find((a) => a.id === Number(id)), [herd, id]);
 

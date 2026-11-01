@@ -3,7 +3,7 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 );
 jest.mock('../../services/supabase', () => ({ supabase: {} }));
 
-import { calloutToRow, requestedAgo, rowToCallout, statusFromRow, takenByAnotherVet } from '../callouts';
+import { alertText, calloutToRow, requestedAgo, rowToCallout, statusFromRow, takenByAnotherVet } from '../callouts';
 
 const booking = {
   vetName: 'Dr. Sarah Namukasa',
@@ -123,6 +123,16 @@ describe('what the vet sees', () => {
 
   it('leaves no note when only tags were written', () => {
     expect(rowToCallout({ ...row, issue_description: '[Purpose: Advice]' }, undefined).notes).toBeUndefined();
+  });
+});
+
+describe('alertText', () => {
+  it('leaves only the farmer’s own words in the vet’s alert', () => {
+    expect(alertText('[Purpose: Animal health] [Access: 1 animal] [Meeting link: https://meet.jit.si/x] Not grazing.')).toBe('Not grazing.');
+  });
+
+  it('keeps brackets a farmer typed that are not tags', () => {
+    expect(alertText('Limping [left leg]')).toBe('Limping [left leg]');
   });
 });
 

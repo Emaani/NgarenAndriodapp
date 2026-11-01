@@ -4,6 +4,7 @@ import { Redirect, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { getCalloutRequests } from '@/data/api';
 import { getMyVetImpact } from '@/data/vetProfiles';
+import { getAbsenceReports } from '@/data/localStockTake';
 import { getReportAudit, logReportExport, ReportAuditEntry } from '@/data/reportAudit';
 import { addDocument } from '@/data/documents';
 import { useResource } from '@/data/hooks';
@@ -44,6 +45,7 @@ export default function VetReports() {
   const { data: impact } = useResource(getMyVetImpact, EMPTY_IMPACT);
   const { data: callouts } = useResource(() => getCalloutRequests(), []);
   const { data: audit, reload: reloadAudit } = useResource(getReportAudit, []);
+  const { data: absences } = useResource(getAbsenceReports, []);
   const [busy, setBusy] = useState<string | null>(null);
 
   // Build every practice report as structured data so it can be rendered to
@@ -114,8 +116,16 @@ export default function VetReports() {
           ['Disease', o.disease],
         ],
       },
+      {
+        id: 'absences',
+        name: t('vr.rAbsentName'),
+        description: t('vr.rAbsentDesc'),
+        icon: 'clipboard-alert-outline',
+        headers: ['AAN', 'Animal', 'Location', 'Reported', 'Reported by'],
+        rows: absences.map((a) => [a.aan, a.animalLabel, a.locationName ?? '', formatDateTime(a.date), a.reportedBy]),
+      },
     ];
-  }, [callouts, impact, t]);
+  }, [absences, callouts, impact, t]);
 
   if (loading) return null;
   if (!isAuthenticated) return <Redirect href="/login" />;

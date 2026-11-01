@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { Pressable, View } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { animals as animalsFallback } from '@/data/mock';
 import { getHerd } from '@/data/herd';
 import { useResource } from '@/data/hooks';
 import { getTagConfirmations } from '@/data/tagConfirmations';
@@ -45,7 +44,7 @@ export default function AnimalDevices() {
   const router = useRouter();
   const t = useT();
   const { loading, isAuthenticated } = useAuth();
-  const { data: herd } = useResource(getHerd, animalsFallback);
+  const { data: herd } = useResource(getHerd, []);
   const { data: confirmations } = useResource(getTagConfirmations, {});
 
   const groups = useMemo(() => {

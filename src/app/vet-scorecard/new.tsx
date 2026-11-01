@@ -3,7 +3,6 @@ import { Alert, Pressable, View } from 'react-native';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { animals as animalsFallback } from '@/data/mock';
 import { getHerd } from '@/data/herd';
 import {
   addScorecard,
@@ -28,6 +27,7 @@ import {
   deleteScorecardDraft,
   getScorecardDraft,
   makeDraftId,
+  getOpenScorecardDraft,
   saveScorecardDraft,
 } from '@/data/scorecardDrafts';
 import { addLocalEvent } from '@/data/localEvents';
@@ -148,7 +148,7 @@ export default function NewScorecard() {
   const tr = useT();
   const { key, label, callout, draft: draftParam } = useLocalSearchParams<{ key?: string; label?: string; callout?: string; draft?: string }>();
   const { loading, isAuthenticated, canVet, user } = useAuth();
-  const { data: herd } = useResource(getHerd, animalsFallback);
+  const { data: herd, loading: herdLoading } = useResource(getHerd, []);
 
   const animal: Animal | undefined = useMemo(() => {
     if (!key) return undefined;
@@ -161,7 +161,10 @@ export default function NewScorecard() {
   const isFemale = (animal?.description ?? '').toLowerCase().includes('female') || (animal as { sex?: string })?.sex === 'female';
 
   // Stable draft id (one per visit). A resumed draft keeps its id.
-  const [draftId] = useState<string>(() => draftParam ?? makeDraftId(user?.id, animalKey));
+  const [draftId, setDraftId] = useState<string>(() => draftParam ?? makeDraftId(user?.id, animalKey));
+  // Autosave waits for the resume check, and for the first real edit.
+  const [resumeChecked, setResumeChecked] = useState(false);
+  const untouched = useRef(true);
 
   // Extensible clinical catalogs (spec 3.3/3.4) — loaded + mutated in place.
   const [parasiteCat, setParasiteCat] = useState<CatalogType[]>([]);
@@ -234,12 +237,15 @@ export default function NewScorecard() {
     };
   }, []);
 
-  // Hydrate from an in-progress draft (resume).
+  // Hydrate from an in-progress draft (resume). The animal is resolved from the
+  // herd first, because that decides the key a draft was saved under.
   useEffect(() => {
-    if (!draftParam || hydrated.current) return;
+    if (loading || herdLoading || hydrated.current) return;
     hydrated.current = true;
-    void getScorecardDraft(draftParam).then((d) => {
+    void (draftParam ? getScorecardDraft(draftParam) : getOpenScorecardDraft(user?.id, animalKey)).then((d) => {
+      setResumeChecked(true);
       if (!d) return;
+      setDraftId(d.id);
       if (d.vitals) {
         setBcs(d.vitals.bcs ?? 3.5);
         setTemp(d.vitals.temperature != null ? String(d.vitals.temperature) : '');
@@ -261,7 +267,7 @@ export default function NewScorecard() {
       setFlagRecheck(d.flagRecheck ?? false);
       setPhoto(d.photo ?? null);
     });
-  }, [draftParam, isFemale]);
+  }, [draftParam, isFemale, loading, herdLoading, user?.id, animalKey]);
 
   const tempNum = temp.trim() ? Number(temp) : null;
   // Diagnosis tags (for status + legacy display) derived from the captures.
@@ -282,7 +288,11 @@ export default function NewScorecard() {
 
   // Debounced autosave — the scorecard is always recoverable as a draft (3.7).
   useEffect(() => {
-    if (loading || !isAuthenticated || !canVet) return;
+    if (loading || !isAuthenticated || !canVet || !resumeChecked) return;
+    if (untouched.current) {
+      untouched.current = false;
+      return;
+    }
     const id = setTimeout(() => {
       void saveScorecardDraft({
         id: draftId,
@@ -313,7 +323,7 @@ export default function NewScorecard() {
     }, 700);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bcs, temp, weight, heart, resp, age, diagnostics, vaccinations, vaxFrom, vaxTo, vaxNote, groomRatings, pregApplies, inCalf, calvingDue, notes, flagRecheck, photo]);
+  }, [resumeChecked, bcs, temp, weight, heart, resp, age, diagnostics, vaccinations, vaxFrom, vaxTo, vaxNote, groomRatings, pregApplies, inCalf, calvingDue, notes, flagRecheck, photo]);
 
   if (loading) return null;
   if (!isAuthenticated) return <Redirect href="/login" />;

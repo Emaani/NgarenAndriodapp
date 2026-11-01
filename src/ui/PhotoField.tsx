@@ -29,7 +29,9 @@ export function PhotoField({
       Alert.alert('Camera permission needed', 'Enable camera access to take a photo.');
       return;
     }
-    const res = await ImagePicker.launchCameraAsync({ quality: 0.6, allowsEditing: true });
+    // Live evidence stays as shot: a crop step between the camera and the app also
+    // reads as cancelled if the person backs out of it.
+    const res = await ImagePicker.launchCameraAsync({ quality: 0.6, allowsEditing: !liveOnly });
     // Persist to the document directory so the Photo ID survives cache clearing.
     if (!res.canceled && res.assets?.[0]) onChange(persistImage(res.assets[0].uri));
   };

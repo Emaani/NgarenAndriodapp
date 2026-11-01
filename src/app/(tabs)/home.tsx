@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { summary as summaryFallback, isTagActive, devices as devicesFallback, locations as locationsFallback } from '@/data/mock';
+import { summaryFromHerd } from '@/lib/herdFleet';
 import { getSummary, getCalloutRequests, getDevices, getLocations } from '@/data/api';
 import { getLocalAnimals } from '@/data/localAnimals';
 import { getLastStockTake } from '@/data/localStockTake';
@@ -14,7 +14,7 @@ import { getFarmerPortfolio, portfolioTotals } from '@/data/portfolio';
 import { getEnlistedVets } from '@/data/vetEnlistments';
 import { getVetProfile } from '@/data/vetSelfProfile';
 import { getPendingFollowUps } from '@/data/followUps';
-import { vets as seededVets } from '@/data/mock';
+import { getVetDirectory } from '@/data/vetDirectory';
 import { VET_METRICS_FALLBACK, getVetMetrics } from '@/data/vet';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
@@ -184,7 +184,7 @@ export default function Home() {
   const t = useT();
   const { user, appRole, can, canManageTeam } = useAuth();
   const displayName = user?.fullName?.trim() || user?.email?.split('@')[0] || 'Ngaren user';
-  const { data: summary } = useResource(getSummary, summaryFallback);
+  const { data: summary } = useResource(getSummary, summaryFromHerd([]));
   const { data: portfolio } = useResource(getFarmerPortfolio, []);
   const { data: vetMetrics } = useResource(getVetMetrics, VET_METRICS_FALLBACK);
   const { data: localAnimals } = useResource(getLocalAnimals, []);
@@ -193,11 +193,12 @@ export default function Home() {
   // Devices & locations power the farmer header + tag KPIs so those counters
   // match the screens they drill into (Devices list, Farm Map) — no more
   // "Locations: 12" on the dashboard vs 4 on the map.
-  const { data: devices } = useResource(getDevices, devicesFallback);
-  const { data: locationList } = useResource(getLocations, locationsFallback);
+  const { data: devices } = useResource(() => getDevices(), []);
+  const { data: locationList } = useResource(() => getLocations(), []);
   const { data: enlistedVets } = useResource(getEnlistedVets, []);
-  // Enlisted service providers = seeded demo providers + admin-enlisted ones.
-  const providerCount = seededVets.length + enlistedVets.length;
+  // Enlisted service providers = the vet directory + admin-enlisted ones.
+  const { data: directoryVets } = useResource(getVetDirectory, []);
+  const providerCount = directoryVets.length + enlistedVets.length;
   // The logged-in vet's own enlisting status (spec 1): drives the activation
   // banner so an unapproved vet is prompted to complete / await approval.
   const { data: myVetProfile } = useResource(() => (user?.id ? getVetProfile(user.id) : Promise.resolve(undefined)), undefined);

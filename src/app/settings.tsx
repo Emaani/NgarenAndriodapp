@@ -4,7 +4,7 @@ import Constants from 'expo-constants';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { useAuth } from '@/services/auth';
 import { useT } from '@/i18n';
-import { AppText, GradientHeader, Icon, IconName, Screen } from '@/ui';
+import { AppText, GradientHeader, Icon, IconName, LanguageCard, Screen } from '@/ui';
 
 const NGAREN_SUPPORT_TEL = '256706760000';
 
@@ -108,6 +108,7 @@ export default function Settings() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <GradientHeader title={t('profile.row.settings')} subtitle={t(`console.${appRole}`)} showBack />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
+        <LanguageCard />
         <Section title={t('settings.section.preferences')} rows={preferences} />
         <Section title={t('settings.section.billing')} rows={billing} />
         <Section title={t('settings.section.support')} rows={support} />

@@ -142,10 +142,12 @@ export interface UserRole {
   note?: string;
 }
 
-export type NotificationCategory = 'device' | 'boundary';
+export type NotificationCategory = 'device' | 'boundary' | 'booking' | 'account';
 
 export interface AppNotification {
   id: number;
+  /** The row's id in Supabase `notifications`; on-device notifications have none. */
+  remoteId?: string;
   category: NotificationCategory;
   title: string;
   message: string;
@@ -350,6 +352,8 @@ export interface AnimalMarker {
 
 export interface Vet {
   id: number;
+  /** The vet's account, when listed from the live directory; bookings go straight to them. */
+  userId?: string;
   name: string;
   clinic: string;
   specialty: string;

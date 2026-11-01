@@ -30,6 +30,7 @@ export function mapLineage(r: Record<string, unknown>): Animal {
     id: uuidToId(String(r.id)),
     tag: (r.visual_tag_number as string) ?? (r.animal_tag_id as string) ?? (r.animal_id as string) ?? '-',
     name: (r.animal_name as string) ?? undefined,
+    ...(/^(male|female)$/i.test(String(r.sex)) ? { sex: String(r.sex).toLowerCase() as Animal['sex'] } : {}),
     accountNumber: (r.account_number as string) ?? undefined,
     farmerId: (r.farmer_id as string) ?? undefined,
     animalSequence: r.animal_sequence == null ? undefined : Number(r.animal_sequence),
@@ -58,7 +59,7 @@ export function withLocalDetails(remote: Animal, local: Animal | undefined): Ani
     devices: local.devices ?? remote.devices,
     taggingMethod: local.taggingMethod ?? remote.taggingMethod,
     identificationType: local.identificationType,
-    sex: local.sex,
+    sex: local.sex ?? remote.sex,
     purpose: local.purpose,
     color: local.color,
     physicalAddress: local.physicalAddress,
@@ -78,7 +79,7 @@ export async function getHerd(): Promise<Animal[]> {
   try {
     const { data, error } = await supabase
       .from('animal_lineage')
-      .select('id, animal_id, animal_name, animal_tag_id, visual_tag_number, animal_breed, birth_date, dam_name, dam_id, sire_name, sire_id, photo_url, farm_name, lifecycle_status, farmer_id, animal_sequence, account_number')
+      .select('id, animal_id, animal_name, sex, animal_tag_id, visual_tag_number, animal_breed, birth_date, dam_name, dam_id, sire_name, sire_id, photo_url, farm_name, lifecycle_status, farmer_id, animal_sequence, account_number')
       .order('created_at', { ascending: false });
     if (error || !data) {
       // Production (Supabase configured): NEVER silently substitute mock data.
@@ -167,7 +168,7 @@ export async function syncAnimalToLineage(
       visual_tag_number: animal.tag,
       animal_breed: animal.breed.name,
       birth_date: animal.dateOfBirth || null,
-      sex: 'unknown',
+      sex: animal.sex ?? 'unknown',
       photo_url: remotePhoto ?? null,
       assigned_farmer_id: userId,
       farmer_id: userId,

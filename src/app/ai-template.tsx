@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { animals as animalsFallback } from '@/data/mock';
 import { getHerd } from '@/data/herd';
 import { addAiRecord } from '@/data/aiRecords';
 import { addCatalogType, CatalogKind, getCatalogNames } from '@/data/clinicalCatalog';
@@ -70,7 +69,7 @@ export default function AiTemplate() {
   const t = useT();
   const { key, label, callout } = useLocalSearchParams<{ key?: string; label?: string; callout?: string }>();
   const { loading, isAuthenticated, canVet, user } = useAuth();
-  const { data: herd } = useResource(getHerd, animalsFallback);
+  const { data: herd } = useResource(getHerd, []);
 
   const animal: Animal | undefined = useMemo(() => {
     if (!key) return undefined;

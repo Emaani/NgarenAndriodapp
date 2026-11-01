@@ -42,6 +42,9 @@
  */
 import { config, isBackendConfigured, isSupabaseConfigured } from '../config';
 import { getCalloutsFromSupabase, submitCalloutToSupabase, updateCalloutInSupabase } from './callouts';
+import { getHerd } from './herd';
+import { devicesFromHerd, locationKind, locationsFromHerd, summaryFromHerd } from '../lib/herdFleet';
+import { getRemoteNotifications } from './notifications';
 import { formatDateTime } from '../lib/date';
 import { getLocalNotifications } from './localNotifications';
 import * as mock from './mock';
@@ -141,7 +144,7 @@ export function mapSummary(s: SummaryData): DashboardSummary {
 
 /** Fetch the Live Stock Command Center summary. Falls back to mock offline. */
 export async function getSummary(): Promise<DashboardSummary> {
-  if (!isBackendConfigured()) return mock.summary;
+  if (!isBackendConfigured()) return isSupabaseConfigured() ? summaryFromHerd(await getHerd()) : mock.summary;
   const data = await request<SummaryData>('/api/ngaren/summary');
   return mapSummary(data);
 }
@@ -360,7 +363,8 @@ export async function getAnimalLocations(
   pageSize = 100,
   locationIds?: number[],
 ): Promise<AnimalMarker[]> {
-  if (!isBackendConfigured()) return mock.markers;
+  // The satellite feed comes from the platform; an empty map beats made-up animals.
+  if (!isBackendConfigured()) return isSupabaseConfigured() ? [] : mock.markers;
   const endDate = new Date();
   const startDate = new Date();
   startDate.setDate(endDate.getDate() - 7);
@@ -402,7 +406,7 @@ export async function getDevices(
   pageSize = 50,
   allDevices = true,
 ): Promise<Device[]> {
-  if (!isBackendConfigured()) return mock.devices;
+  if (!isBackendConfigured()) return isSupabaseConfigured() ? devicesFromHerd(await getHerd()) : mock.devices;
   const data = await request<PageResponse<BackendDevice>>(
     `/api/ngaren/devices?pageNumber=${pageNumber}&pageSize=${pageSize}&allDevices=${allDevices}`,
   );
@@ -411,7 +415,7 @@ export async function getDevices(
 
 /** Fetch a single device by id. Falls back to mock offline. */
 export async function getDeviceById(id: number): Promise<Device | undefined> {
-  if (!isBackendConfigured()) return mock.devices.find((d) => d.id === id);
+  if (!isBackendConfigured()) return (await getDevices()).find((d) => d.id === id);
   const data = await request<BackendDevice>(`/api/ngaren/devices/${id}`);
   return mapDevice(data);
 }
@@ -464,12 +468,6 @@ export async function syncDevices(): Promise<void> {
 
 /** Maps a backend location onto the UI Location type the cards render. */
 export function mapLocation(l: LocationResponsePayload): Location {
-  const name = (l.name ?? '').toLowerCase();
-  const kind: Location['kind'] = name.includes('water')
-    ? 'water'
-    : name.includes('yard')
-      ? 'yard'
-      : 'paddock';
   return {
     id: l.id,
     name: l.name,
@@ -478,13 +476,13 @@ export function mapLocation(l: LocationResponsePayload): Location {
     // The list endpoint doesn't carry a per-location animal count; the map and
     // detail screens resolve that from the track/animals data when live.
     animalCount: 0,
-    kind,
+    kind: locationKind(l.name ?? ''),
   };
 }
 
 /** Fetch a page of locations. Falls back to mock data offline. */
 export async function getLocations(pageNumber = 0, pageSize = 50): Promise<Location[]> {
-  if (!isBackendConfigured()) return mock.locations;
+  if (!isBackendConfigured()) return isSupabaseConfigured() ? locationsFromHerd(await getHerd()) : mock.locations;
   const data = await request<PageResponse<LocationResponsePayload>>(
     `/api/ngaren/locations?pageNumber=${pageNumber}&pageSize=${pageSize}`,
   );
@@ -537,7 +535,7 @@ export async function getNotifications(
   // admin) are merged on top of whatever the backend/mock returns.
   const local = await getLocalNotifications();
   if (!isBackendConfigured()) {
-    return [...local, ...mock.notifications];
+    return [...local, ...(isSupabaseConfigured() ? await getRemoteNotifications(pageSize) : mock.notifications)];
   }
   const data = await request<PageResponse<BackendNotification>>(
     `/api/notifications?pageNumber=${pageNumber}&pageSize=${pageSize}`,
@@ -602,6 +600,8 @@ export interface CalloutRequestPayload {
   vetId?: number;
   /** The vet chosen in Find a Vet, kept on the booking by name. */
   vetName?: string;
+  /** Set when the chosen vet is a real account. */
+  vetUserId?: string;
   /** Who is booking, kept on the booking for vets (see data/callouts). */
   farmerName?: string;
   animal: string;

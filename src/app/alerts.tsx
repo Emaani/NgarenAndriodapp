@@ -1,7 +1,6 @@
 import { View } from 'react-native';
 import { Redirect } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { notifications as notificationsFallback } from '@/data/mock';
 import { getNotifications } from '@/data/api';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
@@ -16,7 +15,8 @@ import { ActionChip, AppText, EmptyState, GradientHeader, Icon, IconChip, Screen
 export default function Alerts() {
   const t = useT();
   const { isAdmin, loading, isAuthenticated } = useAuth();
-  const { data: alerts } = useResource(() => getNotifications(0, 100), notificationsFallback);
+  const { data: all } = useResource(() => getNotifications(0, 100), []);
+  const alerts = all.filter((a) => a.category === 'boundary' || a.category === 'device');
 
   if (loading) return null;
   if (!isAuthenticated) return <Redirect href="/login" />;

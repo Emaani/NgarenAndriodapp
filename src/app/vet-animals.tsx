@@ -3,7 +3,6 @@ import { ActivityIndicator, RefreshControl, View } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { FlashList } from '@shopify/flash-list';
 import { colors, spacing } from '@/theme';
-import { animals as animalsFallback } from '@/data/mock';
 import { getHerd } from '@/data/herd';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
@@ -23,7 +22,7 @@ export default function VetAnimals() {
   const t = useT();
   const { canVet, isAuthenticated, loading: authLoading } = useAuth();
   const [query, setQuery] = useState('');
-  const { data: allAnimals, loading, reload } = useResource(getHerd, animalsFallback);
+  const { data: allAnimals, loading, reload } = useResource(getHerd, []);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase();

@@ -27,6 +27,7 @@ export { StatusBanner } from './StatusBanner';
 export { NavBanner } from './NavBanner';
 export { ActionGrid, type GridAction } from './ActionGrid';
 export { AnimalPhoto } from './AnimalPhoto';
+export { LanguageCard } from './LanguageCard';
 export { NotificationBell } from './NotificationBell';
 export { Input } from './Input';
 export { DonutChart } from './charts/DonutChart';

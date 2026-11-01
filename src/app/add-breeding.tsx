@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { colors, radius, spacing } from '@/theme';
-import { animals as animalsFallback } from '@/data/mock';
 import { getHerd } from '@/data/herd';
 import { addLocalBreedingRecord, expectedCalving } from '@/data/localBreeding';
 import { useResource } from '@/data/hooks';
@@ -28,7 +27,7 @@ export default function AddBreeding() {
   const router = useRouter();
   const t = useT();
   const { loading, isAuthenticated } = useAuth();
-  const { data: herd } = useResource(getHerd, animalsFallback);
+  const { data: herd } = useResource(getHerd, []);
 
   const [damId, setDamId] = useState('');
   const [sire, setSire] = useState('');

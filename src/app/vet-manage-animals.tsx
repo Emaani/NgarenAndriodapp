@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { animals as animalsFallback } from '@/data/mock';
 import { getHerd } from '@/data/herd';
 import { getDrafts } from '@/data/localRegistrationDrafts';
 import { getAmendments } from '@/data/localAmendments';
@@ -43,7 +42,7 @@ export default function VetManageAnimals() {
   const router = useRouter();
   const t = useT();
   const { loading, isAuthenticated, canVet } = useAuth();
-  const { data: herd } = useResource(getHerd, animalsFallback);
+  const { data: herd } = useResource(getHerd, []);
   const { data: drafts } = useResource(getDrafts, []);
   const { data: amendments } = useResource(getAmendments, []);
   const [tab, setTab] = useState<Tab>('progress');

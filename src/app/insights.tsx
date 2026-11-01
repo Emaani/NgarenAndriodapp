@@ -1,7 +1,7 @@
 import { View } from 'react-native';
 import { Redirect } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { summary as summaryFallback } from '@/data/mock';
+import { summaryFromHerd } from '@/lib/herdFleet';
 import { getSummary } from '@/data/api';
 import { getCeresBehaviour } from '@/data/ceresBehaviour';
 import { useResource } from '@/data/hooks';
@@ -56,7 +56,7 @@ function SectionCard({ title, subtitle, children }: { title: string; subtitle?: 
 export default function Insights() {
   const t = useT();
   const { isAdmin, loading, isAuthenticated } = useAuth();
-  const { data: summary } = useResource(getSummary, summaryFallback);
+  const { data: summary } = useResource(getSummary, summaryFromHerd([]));
   // Herd-wide live Ceres behaviour (no tag filter). Empty when no telemetry.
   const { data: behaviour, loading: behaviourLoading } = useResource(() => getCeresBehaviour(), []);
 

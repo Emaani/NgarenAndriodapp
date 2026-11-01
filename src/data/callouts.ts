@@ -83,12 +83,15 @@ function readDetail(text: unknown, label: string): string | undefined {
 // Shown elsewhere on the booking, so the farmer's own note doesn't repeat them.
 const REPEATED_TAGS = /\[(Purpose|Slot): [^\]]*\]\s*/g;
 
-/** The row to insert. The vet is left open: Find a Vet isn't tied to accounts yet. */
+/** The vet's alert is a one-line summary; the booking itself keeps every tag. */
+export const alertText = (notes: string) => notes.replace(/\[[A-Za-z ]+: [^\]]*\]\s*/g, '').trim();
+
+/** The row to insert. The vet stays open unless the farmer chose a real account. */
 export function calloutToRow(p: CalloutRequestPayload, requesterId: string) {
   const description = p.notes?.trim() || p.service || 'Vet visit requested';
   return {
     requester_id: requesterId,
-    preferred_vet_id: null,
+    preferred_vet_id: p.vetUserId ?? null,
     preferred_date: p.scheduledFor ?? null,
     urgency: urgencyToRow(p.urgency),
     issue_category: p.service?.split(',')[0]?.trim() || 'Consultation',
@@ -189,11 +192,12 @@ export async function submitCalloutToSupabase(payload: CalloutRequestPayload): P
     .invoke('notify-vet', {
       body: {
         request_id: data?.id,
+        preferred_vet_id: row.preferred_vet_id,
         animal_name: row.animal_name,
         animal_tag: row.animal_tag,
         issue_category: row.issue_category,
         urgency: row.urgency,
-        issue_description: row.issue_description,
+        issue_description: alertText(row.issue_description),
       },
     })
     .catch(() => undefined);

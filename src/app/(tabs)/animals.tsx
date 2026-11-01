@@ -3,7 +3,6 @@ import { ActivityIndicator, Pressable, RefreshControl, View } from 'react-native
 import { useRouter } from 'expo-router';
 import { FlashList } from '@shopify/flash-list';
 import { colors, radius, spacing } from '@/theme';
-import { animals as animalsFallback } from '@/data/mock';
 import { getHerd } from '@/data/herd';
 import { failedSyncCount, pendingSyncCount, processSyncQueue, syncNow } from '@/data/syncQueue';
 import { useResource } from '@/data/hooks';
@@ -15,7 +14,7 @@ export default function AnimalsTab() {
   const t = useT();
   const [query, setQuery] = useState('');
   // Live herd from Supabase animal_lineage, with locally-onboarded animals on top.
-  const { data: allAnimals, loading, reload } = useResource(getHerd, animalsFallback);
+  const { data: allAnimals, loading, reload } = useResource(getHerd, []);
 
   // Show how many registrations are still waiting to sync to Supabase, and keep
   // nudging the queue while this screen is open.

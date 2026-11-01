@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Alert, Linking, Pressable, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { animals as animalsFallback, vets } from '@/data/mock';
+import { findVet } from '@/data/vetDirectory';
 import { submitCalloutRequest } from '@/data/api';
 import { getHerd } from '@/data/herd';
 import { getFarmerPortfolio } from '@/data/portfolio';
@@ -31,10 +31,10 @@ export default function RequestCallout() {
   const router = useRouter();
   const t = useT();
   const { vetId, date, emergency, purpose: purposeParam } = useLocalSearchParams<{ vetId?: string; date?: string; emergency?: string; purpose?: string }>();
-  const vet = vetId ? vets.find((v) => v.id === Number(vetId)) : undefined;
+  const { data: vet } = useResource(() => (vetId ? findVet(Number(vetId)) : Promise.resolve(undefined)), undefined);
   const isEmergency = emergency === '1';
   const { isAdmin, user } = useAuth();
-  const { data: animals } = useResource(getHerd, animalsFallback);
+  const { data: animals } = useResource(getHerd, []);
   // Admins can book on a farmer's behalf (Sep 3 2026 standup).
   const { data: farmers } = useResource(getFarmerPortfolio, []);
 
@@ -185,6 +185,7 @@ export default function RequestCallout() {
       await submitCalloutRequest({
         vetId: vet?.id,
         vetName: vet?.name,
+        vetUserId: vet?.userId,
         farmerName: onBehalfFarmerName ?? user?.fullName ?? user?.email ?? undefined,
         animal: animalLabel,
         animalTag: animal?.ngarenCode ?? animal?.tag,
@@ -266,7 +267,7 @@ export default function RequestCallout() {
                 {vet.name}
               </AppText>
               <AppText variant="body" color={colors.onSurfaceVariant}>
-                {vet.clinic} · {vet.distanceKm} km · {vet.rating}★
+                {[vet.clinic, vet.distanceKm > 0 ? `${vet.distanceKm} km` : '', `${vet.rating}★`].filter(Boolean).join(' · ')}
               </AppText>
             </View>
           </View>

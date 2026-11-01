@@ -658,7 +658,17 @@ export default function RegisterAnimal() {
               </AppText>
             </View>
             {!aan ? (
-              <Button label={t('reg.aanGenerate')} icon="identifier" onPress={generateAan} />
+              <>
+                {/* The AAN carries the country and can't change once it's generated. */}
+                <PickerField
+                  label={t('reg.countryCode')}
+                  value={countryCode}
+                  placeholder={t('reg.countryCodePlaceholder')}
+                  options={Object.entries(COUNTRY_CODES).map(([code, nm]) => ({ label: `${nm} (${code})`, value: code }))}
+                  onSelect={(code) => { setCountry(COUNTRY_CODES[code] ?? country); setCity(''); }}
+                />
+                <Button label={t('reg.aanGenerate')} icon="identifier" onPress={generateAan} />
+              </>
             ) : null}
 
             {/* Alternative: let Ngaren onboard on the farmer's behalf. */}

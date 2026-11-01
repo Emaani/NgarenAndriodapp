@@ -65,6 +65,11 @@ export async function getScorecardDraft(id: string): Promise<ScorecardDraft | un
   return (await getScorecardDrafts()).find((d) => d.id === id);
 }
 
+/** This vet's unfinished scorecard for an animal, so reopening it carries on. */
+export async function getOpenScorecardDraft(vetId: string | null | undefined, animalKey: string): Promise<ScorecardDraft | undefined> {
+  return (await getScorecardDrafts()).find((d) => d.animalKey === animalKey && (d.vetId ?? null) === (vetId ?? null));
+}
+
 export async function saveScorecardDraft(
   draft: Omit<ScorecardDraft, 'createdAt' | 'updatedAt'> & Partial<Pick<ScorecardDraft, 'createdAt'>>,
 ): Promise<void> {

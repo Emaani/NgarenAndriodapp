@@ -2,7 +2,6 @@ import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, ScrollView, View } from 'react-native';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { animals as animalsFallback } from '@/data/mock';
 import { getHerd } from '@/data/herd';
 import { getLocalHealthRecords, HEALTH_TYPE_LABELS } from '@/data/localHealth';
 import { getVetVisits } from '@/data/vetVisits';
@@ -78,7 +77,7 @@ export default function HealthScoreCard() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [hasTelemetry, setHasTelemetry] = useState(false);
 
-  const { data: herd } = useResource(getHerd, animalsFallback);
+  const { data: herd } = useResource(getHerd, []);
   const { data: allHealth } = useResource(getLocalHealthRecords, []);
   const { data: allVisits } = useResource(getVetVisits, []);
   const { data: allScorecards } = useResource(loadScorecards, []);

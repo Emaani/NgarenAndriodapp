@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radius, spacing } from '@/theme';
-import { devices as devicesFallback, isTagActive } from '@/data/mock';
+import { isTagActive } from '@/data/mock';
 import { getDevices, syncDevices } from '@/data/api';
 import { useResource } from '@/data/hooks';
 import { useT } from '@/i18n';
@@ -11,9 +11,9 @@ import { AppText, Button, EmptyState, GradientHeader, DeviceCard, Screen } from 
 type TagFilter = 'all' | 'active' | 'inactive';
 
 /**
- * My Devices / Tags — the Ceres Tag devices on the account. Reads from the
- * shared data layer via getDevices(): mock offline, GET /api/ngaren/devices when
- * the backend env vars are set. Supports a ?filter=active|inactive deep link so
+ * My Devices / Tags — the tags on the account's animals. Reads from the shared
+ * data layer via getDevices(): the herd's own records on Supabase, GET
+ * /api/ngaren/devices when the backend env vars are set. Supports a ?filter=active|inactive deep link so
  * the dashboard's Active/Inactive tag tiles drill straight into the right list;
  * tapping a tag opens its full detail.
  */
@@ -24,7 +24,7 @@ export default function Devices() {
   const initialFilter: TagFilter = filterParam === 'active' || filterParam === 'inactive' ? filterParam : 'all';
   const [filter, setFilter] = useState<TagFilter>(initialFilter);
 
-  const { data: devices, reload: reloadDevices } = useResource(() => getDevices(), devicesFallback);
+  const { data: devices, reload: reloadDevices } = useResource(() => getDevices(), []);
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [syncFailed, setSyncFailed] = useState(false);

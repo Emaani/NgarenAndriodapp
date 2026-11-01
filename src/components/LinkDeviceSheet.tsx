@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { colors, radius, spacing } from '@/theme';
-import { animals as animalsFallback } from '@/data/mock';
-import { getAnimals, linkDeviceToAnimal } from '@/data/api';
+import { linkDeviceToAnimal } from '@/data/api';
+import { getHerd } from '@/data/herd';
 import { useResource } from '@/data/hooks';
 import { Device } from '@/data/types';
 import { AppText, BottomSheet, Button, SearchBar } from '@/ui';
@@ -11,7 +11,7 @@ import { AppText, BottomSheet, Button, SearchBar } from '@/ui';
 export function LinkDeviceSheet({ device, onClose }: { device: Device | null; onClose: () => void }) {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<number | null>(null);
-  const { data: animals } = useResource(() => getAnimals(), animalsFallback);
+  const { data: animals } = useResource(getHerd, []);
   const matches = animals.filter((a) => a.tag.toLowerCase().includes(query.toLowerCase()));
 
   const onLink = async () => {

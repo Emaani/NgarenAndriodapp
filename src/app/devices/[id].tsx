@@ -1,7 +1,6 @@
 import { View } from 'react-native';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { devices as devicesFallback } from '@/data/mock';
 import { getDeviceById } from '@/data/api';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
@@ -21,8 +20,7 @@ export default function TagDetail() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { loading, isAuthenticated } = useAuth();
   const numericId = Number(id);
-  const fallback = devicesFallback.find((d) => d.id === numericId);
-  const { data: device } = useResource(() => getDeviceById(numericId), fallback);
+  const { data: device } = useResource(() => getDeviceById(numericId), undefined);
 
   if (loading) return null;
   if (!isAuthenticated) return <Redirect href="/login" />;

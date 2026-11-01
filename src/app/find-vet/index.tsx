@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { vets } from '@/data/mock';
+import { getVetDirectory } from '@/data/vetDirectory';
 import { getPrimaryVetIds } from '@/data/primaryVets';
 import { getEnlistedVets } from '@/data/vetEnlistments';
 import { getProviderStatuses, ProviderStatus } from '@/data/localProviderStatus';
@@ -73,10 +73,14 @@ function VetCard({ vet, isPrimary, ctaLabel, onOpen, onRequest }: { vet: Vet; is
         </View>
         <View style={{ alignItems: 'flex-end', gap: 4 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-            <Icon name="map-marker" size={13} color={colors.onSurfaceVariant} />
-            <AppText variant="caption" color={colors.onSurfaceVariant}>
-              {vet.distanceKm} km
-            </AppText>
+            {vet.distanceKm > 0 ? (
+              <>
+                <Icon name="map-marker" size={13} color={colors.onSurfaceVariant} />
+                <AppText variant="caption" color={colors.onSurfaceVariant}>
+                  {vet.distanceKm} km
+                </AppText>
+              </>
+            ) : null}
           </View>
           <AppText variant="caption" color={vet.available ? colors.success : colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
             {vet.available ? t('common.available') : t('common.busy')}
@@ -104,6 +108,7 @@ export default function FindVet() {
   const [query, setQuery] = useState('');
   const [primaryIds, setPrimaryIds] = useState<number[]>([]);
   const [enlisted, setEnlisted] = useState<Vet[]>([]);
+  const [directory, setDirectory] = useState<Vet[]>([]);
   // Admin vetting statuses — only Active providers are bookable (FR-ADM-01).
   const [providerStatuses, setProviderStatuses] = useState<Record<number, ProviderStatus>>({});
   // Configurable "near me" radius (Sep 12 2026): default 5 km, adjustable.
@@ -117,6 +122,7 @@ export default function FindVet() {
       let active = true;
       getPrimaryVetIds().then((ids) => active && setPrimaryIds(ids));
       getEnlistedVets().then((list) => active && setEnlisted(list));
+      getVetDirectory().then((list) => active && setDirectory(list));
       getProviderStatuses().then((s) => active && setProviderStatuses(s));
       getNearbyRadiusKm().then((km) => active && setRadiusKm(km));
       getCalloutRequests()
@@ -140,8 +146,8 @@ export default function FindVet() {
   const pool = useMemo(() => {
     const enlistedIds = new Set(enlisted.map((e) => e.id));
     const statusOf = (id: number): ProviderStatus => providerStatuses[id] ?? (enlistedIds.has(id) ? 'pending' : 'active');
-    return [...enlisted, ...vets].filter((v) => statusOf(v.id) === 'active');
-  }, [enlisted, providerStatuses]);
+    return [...enlisted, ...directory].filter((v) => statusOf(v.id) === 'active');
+  }, [enlisted, directory, providerStatuses]);
 
   // Preferred vets are matched by the farmer's saved trusted list — booking is
   // tied to their calendar availability (Sep 5 2026 standup). When the farmer

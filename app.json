@@ -20,7 +20,7 @@
       "predictiveBackGestureEnabled": false,
       "softwareKeyboardLayoutMode": "pan",
       "package": "com.emaanidev.ngarenconnectmobile",
-      "versionCode": 60
+      "versionCode": 61
     },
     "web": {
       "output": "static",
@@ -55,6 +55,14 @@
         {
           "photosPermission": "Ngaren needs access to your photos to attach an animal picture.",
           "cameraPermission": "Ngaren needs camera access to photograph an animal or scan a tag."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Ngaren needs camera access to photograph an animal or scan a tag.",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
         }
       ],
       "expo-sharing",

@@ -14,7 +14,7 @@ import { makeFarmerAnonymizer } from '@/lib/anon';
 import { getCalloutRequests } from './api';
 import { getHealthRecords } from './clinical';
 import { getLocalHealthRecords } from './localHealth';
-import { vets } from './mock';
+import { findVet } from './vetDirectory';
 import { getEnlistedVetById } from './vetEnlistments';
 import { Vet, VetDayAvailability, VetImpact, VetProfile } from './types';
 
@@ -44,7 +44,8 @@ function buildAvailability(seed: number, video: boolean): VetDayAvailability[] {
 
 /** Portfolio impact for a browsed vet — internally consistent from headline stats. */
 function portfolioImpact(vet: Vet): VetImpact {
-  const totalVisits = vet.reviews;
+  // A real account has no visit history to summarise yet.
+  const totalVisits = vet.userId ? 0 : vet.reviews;
   const animalsManaged = Math.round(totalVisits * 2.6);
   const farmersServiced = Math.max(1, Math.round(totalVisits * 0.35));
   // Split visits across service types; force the split to sum to totalVisits.
@@ -66,8 +67,8 @@ function portfolioImpact(vet: Vet): VetImpact {
 }
 
 export async function getVetProfile(id: number): Promise<VetProfile | undefined> {
-  // Seeded vets first, then admin-enlisted vets (created in-app).
-  const vet: Vet | undefined = vets.find((v) => v.id === id) ?? (await getEnlistedVetById(id));
+  // The live directory first, then admin-enlisted vets (created in-app).
+  const vet: Vet | undefined = (await findVet(id)) ?? (await getEnlistedVetById(id));
   if (!vet) return undefined;
   return {
     ...vet,

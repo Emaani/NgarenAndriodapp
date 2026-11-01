@@ -3,6 +3,8 @@ import { Pressable, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { colors, radius, spacing } from '@/theme';
 import { getNotifications } from '@/data/api';
+import { markLocalNotificationsRead } from '@/data/localNotifications';
+import { markRemoteNotificationsRead } from '@/data/notifications';
 import { AppNotification, NotificationCategory } from '@/data/types';
 import { useT } from '@/i18n';
 import { AppText, EmptyState, GradientHeader, Icon, NotificationItem, Screen } from '@/ui';
@@ -11,6 +13,7 @@ type Filter = 'all' | NotificationCategory;
 
 const FILTERS: { key: Filter; labelKey: string }[] = [
   { key: 'all', labelKey: 'notif.all' },
+  { key: 'booking', labelKey: 'notif.booking' },
   { key: 'device', labelKey: 'notif.device' },
   { key: 'boundary', labelKey: 'notif.boundary' },
 ];
@@ -44,7 +47,11 @@ export default function Notifications() {
   const load = useCallback(async () => {
     setRefreshing(true);
     try {
-      setItems(await getNotifications());
+      const list = await getNotifications();
+      setItems(list);
+      // Opening the list reads them: they stay highlighted here, and the bell clears.
+      void markRemoteNotificationsRead(list);
+      void markLocalNotificationsRead();
     } catch {
       setItems([]);
     } finally {
@@ -84,7 +91,15 @@ export default function Notifications() {
         {filtered.length === 0 ? (
           <EmptyState icon="bell-off-outline" title={t('notif.emptyTitle')} subtitle={t('notif.emptySub')} />
         ) : (
-          filtered.map((n) => <NotificationItem key={n.id} item={n} />)
+          filtered.map((n) =>
+            n.category === 'booking' ? (
+              <Pressable key={n.id} onPress={() => router.push('/vet-requests' as never)}>
+                <NotificationItem item={n} />
+              </Pressable>
+            ) : (
+              <NotificationItem key={n.id} item={n} />
+            ),
+          )
         )}
       </Screen>
     </View>
