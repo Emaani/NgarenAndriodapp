@@ -28,6 +28,7 @@ import {
   IdentificationType,
   isBleModel,
   methodForDevices,
+  openFieldRangeM,
   projectedBatteryYears,
 } from '@/lib/tagging';
 import { normalizeBleMac } from '@/lib/bleFrame';
@@ -1059,6 +1060,19 @@ export default function RegisterAnimal() {
                   <Icon name="battery-heart-variant" size={14} color={short ? colors.warning : colors.onSurfaceVariant} />
                   <AppText variant="caption" color={short ? colors.warning : colors.onSurfaceVariant} style={{ flex: 1 }}>
                     {years != null ? t('reg.bleBatteryProjected', { years }) : t('reg.bleBatteryNote')}
+                  </AppText>
+                </View>
+              );
+            })()}
+            {/* Read range: ELA measured +4 dBm in open field only (Nov 2026). */}
+            {(() => {
+              const metres = openFieldRangeM(dType);
+              if (metres == null) return null;
+              return (
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, marginTop: -spacing.sm, marginBottom: spacing.md }}>
+                  <Icon name="signal-distance-variant" size={14} color={colors.onSurfaceVariant} />
+                  <AppText variant="caption" color={colors.onSurfaceVariant} style={{ flex: 1 }}>
+                    {t(Number(dPower) === 4 ? 'reg.bleRange' : 'reg.bleRangeLow', { metres })}
                   </AppText>
                 </View>
               );

@@ -1,10 +1,12 @@
 import {
+  bleFormFactor,
   bleVariant,
   deviceFitsIdType,
   deviceOptionsFor,
   isBleModel,
   isBluetoothAnimal,
   methodForDevices,
+  openFieldRangeM,
   projectedBatteryYears,
 } from '@/lib/tagging';
 
@@ -59,5 +61,20 @@ describe('ELA BLE tag variants & battery projection', () => {
     expect(projectedBatteryYears('ELA Blue COIN MOV', 4, 2)).toBe(1.88);
     expect(projectedBatteryYears('ELA Blue COIN T', 0, 5)).toBe(3.3);
     expect(projectedBatteryYears('ELA Blue COIN ID', 0, 10)).toBeNull();
+  });
+});
+
+describe('ELA read range', () => {
+  it("returns ELA's open-field measurements at +4 dBm by form factor", () => {
+    expect(openFieldRangeM('ELA Blue PUCK ID')).toBe(500);
+    expect(openFieldRangeM('ELA Blue COIN ID')).toBe(200);
+    expect(openFieldRangeM('ELA Blue COIN MOV')).toBe(200);
+    expect(openFieldRangeM('ELA Blue COIN T')).toBe(200);
+  });
+
+  it('gives no figure for a tag ELA did not measure', () => {
+    expect(bleFormFactor('Bluetooth')).toBeNull();
+    expect(openFieldRangeM('Bluetooth')).toBeNull();
+    expect(openFieldRangeM('Ceres Gen6')).toBeNull();
   });
 });

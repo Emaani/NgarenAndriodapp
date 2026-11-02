@@ -116,10 +116,29 @@ export function projectedBatteryYears(type: string, txPowerDbm: number, interval
 }
 
 /**
+ * Open-field read range at +4 dBm, metres, as measured by ELA (Nov 2026). ELA
+ * stresses that real range depends on the surroundings, the receiver and the
+ * read rate needed, and gave no figure for 0 dBm.
+ */
+export const ELA_RANGE_M_AT_4DBM = { coin: 200, puck: 500 } as const;
+
+export function bleFormFactor(type: string): keyof typeof ELA_RANGE_M_AT_4DBM | null {
+  if (/\bPUCK\b/i.test(type)) return 'puck';
+  return /\bCOIN\b/i.test(type) ? 'coin' : null;
+}
+
+/** ELA's open-field figure for this tag, or null for a tag ELA didn't measure. */
+export function openFieldRangeM(type: string): number | null {
+  const form = bleFormFactor(type);
+  return form ? ELA_RANGE_M_AT_4DBM[form] : null;
+}
+
+/**
  * BLE tag configuration (ELA BAF). Only ID tags at 0 dBm / 5 s reach the
  * 5-year target at +40 °C; 5 s is therefore the default. A 15 s scan hears
  * about three adverts from every tag in range at 5 s, so a stock-take doesn't
- * need the 2 s period. Read range is still to be confirmed by ELA.
+ * need the 2 s period. +4 dBm buys range (see ELA_RANGE_M_AT_4DBM) at the cost
+ * of battery life.
  */
 export const BLE_FRAME_FORMATS: { value: 'ela_id' | 'ngaren_custom' | 'name_aan'; label: string }[] = [
   { value: 'ngaren_custom', label: 'Ngaren custom frame (AAN in payload)' },
@@ -132,7 +151,7 @@ export const BLE_INTERVAL_OPTIONS = [
 ];
 export const BLE_TX_POWER_OPTIONS = [
   { value: '0', label: '0 dBm — recommended' },
-  { value: '4', label: '+4 dBm — extended range' },
+  { value: '4', label: '+4 dBm — longer range (ELA: ~200 m coin, ~500 m puck, open field)' },
 ];
 
 /** Derive the animal's overall tagging method from its devices. */
