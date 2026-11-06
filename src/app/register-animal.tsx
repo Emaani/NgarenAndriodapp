@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Linking, Pressable, ScrollView, View } from 'react-native';
 import * as Location from 'expo-location';
-import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { breeds as breedsFallback } from '@/data/mock';
@@ -11,6 +10,9 @@ import { getFarmLocation, saveFarmLocation } from '@/data/farmLocation';
 import { addLocalAnimal, getLocalAnimals } from '@/data/localAnimals';
 import { getDraft, saveDraft, deleteDraft } from '@/data/localRegistrationDrafts';
 import { addSupportRequest } from '@/data/supportRequests';
+import { getAssignment, updateAssignment } from '@/data/recordAssignments';
+import { RecordAssignment } from '@/lib/recordAssignments';
+import { verifyIdentity } from '@/lib/identityCheck';
 import { sendLocalNotification } from '@/services/push';
 import { getHerd } from '@/data/herd';
 import { enqueueAnimalSync, processSyncQueue } from '@/data/syncQueue';
@@ -55,6 +57,8 @@ const COMMON_COLOURS = ['Brown', 'Black', 'White', 'Brown & white', 'Black & whi
 const UNKNOWN = '';
 const EXTERNAL = '__external__';
 const NEW_PLACE = '__new_place__';
+// A city that isn't in the list is typed in.
+const OTHER_CITY = '__other_city__';
 // Two adverts from a tag on the default 5 s period.
 const TAG_SCAN_MS = 11000;
 
@@ -133,7 +137,7 @@ function Stepper({ step, labels }: { step: number; labels: string[] }) {
 export default function RegisterAnimal() {
   const router = useRouter();
   const t = useT();
-  const { draft: draftParam } = useLocalSearchParams<{ draft?: string }>();
+  const { draft: draftParam, assigned: assignedParam } = useLocalSearchParams<{ draft?: string; assigned?: string }>();
   const { canManageTeam, user, appRole } = useAuth();
   const { data: breeds } = useResource(
     getBreeds,
@@ -183,6 +187,9 @@ export default function RegisterAnimal() {
   const [country, setCountry] = useState('Uganda');
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [locating, setLocating] = useState(false);
+  const [cityOther, setCityOther] = useState(false);
+  // A record the farmer handed to the vet / Ngaren to finish (App Review 2026-11-05).
+  const [assignment, setAssignment] = useState<RecordAssignment | null>(null);
 
   // (d) Devices
   const [devices, setDevices] = useState<RegisteredDevice[]>([]);
@@ -206,7 +213,9 @@ export default function RegisterAnimal() {
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const autoApprove = canManageTeam;
+  // The farm owner approves their own record. A vet, or Ngaren finishing a
+  // farmer's record, submits it for the farmer's approval (App Review 2026-11-05).
+  const autoApprove = canManageTeam && !assignment;
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const breedOptions = useMemo(() => breeds.map((b) => ({ label: b.name, value: b.key })), [breeds]);
   // The farmer's own location only: a vet or admin registers for someone else.
@@ -303,6 +312,15 @@ export default function RegisterAnimal() {
     if (usualCountry && !aan && !draftParam) setCountry(usualCountry);
   }, [usualCountry, aan, draftParam]);
 
+  // The farmer's saved farm location is offered first and chosen for them when
+  // the step is still blank (App Review 2026-11-05).
+  useEffect(() => {
+    if (step !== 3 || placeChoice || locationName || addr1 || city || coords) return;
+    const own = places.find((p) => p.source === 'account');
+    if (own) choosePlace(own.key);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, places]);
+
   // A saved location fills the whole step, so it's only captured once.
   const choosePlace = (value: string) => {
     const place = places.find((p) => p.key === value);
@@ -364,8 +382,21 @@ export default function RegisterAnimal() {
   useEffect(() => {
     if (!draftParam || draftHydrated) return;
     let active = true;
-    getDraft(draftParam).then((d) => {
+    (async () => {
+      const local = await getDraft(draftParam);
+      const shared = assignedParam || !local ? await getAssignment(draftParam) : undefined;
+      return { d: local ?? shared?.draft, shared };
+    })().then(({ d, shared }) => {
       if (!active) return;
+      if (shared?.kind === 'registration') {
+        setAssignment(shared);
+        // The farmer sees "Vet is completing it" from now on.
+        if (shared.status === 'submitted_to_vet' && user && user.id !== shared.farmerId) {
+          void updateAssignment(shared, 'vet_in_progress', { id: user.id, name: user.fullName ?? user.email ?? undefined })
+            .then(setAssignment)
+            .catch(() => undefined);
+        }
+      }
       if (d) {
         setAan(d.aan);
         setIdType(d.idType ?? '');
@@ -401,7 +432,9 @@ export default function RegisterAnimal() {
     return () => {
       active = false;
     };
-  }, [draftParam, draftHydrated]);
+    // user is read once, when the draft loads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftParam, draftHydrated, assignedParam]);
 
   // Auto-save every change once an AAN exists ("registration in progress").
   useEffect(() => {
@@ -491,6 +524,23 @@ export default function RegisterAnimal() {
       }
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      // Fill the country and city from where the phone is (App Review 2026-11-05).
+      try {
+        const [place] = await Location.reverseGeocodeAsync({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+        const iso = place?.isoCountryCode?.toUpperCase();
+        const found = place?.city || place?.subregion || place?.district || '';
+        if (iso && COUNTRY_CODES[iso]) {
+          setCountry(COUNTRY_CODES[iso]);
+          if (found) {
+            setCity(found);
+            setCityOther(!(CITIES_BY_COUNTRY[COUNTRY_CODES[iso]] ?? []).includes(found));
+          }
+        } else if (place?.country) {
+          notify(t('reg.geoOutside', { country: place.country }));
+        }
+      } catch {
+        // No geocoder on this device: the coordinates are still saved.
+      }
     } catch {
       Alert.alert(t('reg.locFailTitle'), t('reg.locFailBody'));
     } finally {
@@ -512,24 +562,15 @@ export default function RegisterAnimal() {
 
   const canSubmit = !!aan && !!idType && !tagTaken && tcsAccepted;
 
-  // Face ID gate — submission only succeeds after a live selfie of the user
-  // (spec 3.1.5). Returns true when verified.
+  // Face ID gate (spec 3.1.5): the device's face unlock, fingerprint or screen
+  // lock, so the app never leaves the screen (see lib/identityCheck).
   const verifyFaceId = async (): Promise<boolean> => {
     setFaceVerifying(true);
     try {
-      const perm = await ImagePicker.requestCameraPermissionsAsync();
-      if (!perm.granted) {
-        Alert.alert(t('reg.faceIdTitle'), t('reg.faceIdNeeded'));
-        return false;
-      }
-      const shot = await ImagePicker.launchCameraAsync({ quality: 0.4, cameraType: ImagePicker.CameraType.front });
-      if (shot.canceled || !shot.assets?.[0]) {
-        Alert.alert(t('reg.faceIdTitle'), t('reg.faceIdRequired'));
-        return false;
-      }
-      return true;
-    } catch {
-      Alert.alert(t('reg.faceIdTitle'), t('reg.faceIdRequired'));
+      const result = await verifyIdentity({ promptMessage: t('reg.faceIdPrompt', { aan }), cancelLabel: t('common.cancel') });
+      if (result === 'verified') return true;
+      if (result === 'no_camera_permission') Alert.alert(t('reg.faceIdTitle'), t('reg.faceIdNeeded'));
+      else if (result === 'failed') Alert.alert(t('reg.faceIdTitle'), t('reg.faceIdFailed'));
       return false;
     } finally {
       setFaceVerifying(false);
@@ -542,7 +583,7 @@ export default function RegisterAnimal() {
   const [otpEntry, setOtpEntry] = useState('');
 
   const approve = () => {
-    Alert.alert(t('reg.approveChoiceTitle'), t('reg.approveChoiceBody'), [
+    Alert.alert(autoApprove ? t('reg.approveChoiceTitle') : t('reg.submitChoiceTitle'), t('reg.approveChoiceBody'), [
       { text: t('reg.approveFaceId'), onPress: async () => { if (await verifyFaceId()) void doSubmit(); } },
       { text: t('reg.approveOtp'), onPress: () => startOtp() },
       { text: t('common.cancel'), style: 'cancel' },
@@ -610,7 +651,9 @@ export default function RegisterAnimal() {
         approvalStatus: autoApprove ? 'approved' : 'pending',
         capturedByRole: appRole,
         adminApproved: autoApprove || appRole === 'admin',
-        farmerApproved: autoApprove || appRole === 'farmer',
+        farmerApproved: autoApprove || (appRole === 'farmer' && !assignment),
+        // A record finished for a farmer belongs to that farmer.
+        farmerId: assignment?.farmerId,
       };
       await addLocalAnimal(newAnimal);
       if (willSaveAsFarm) await saveFarmLocation(user?.id, capturedPlace);
@@ -626,10 +669,17 @@ export default function RegisterAnimal() {
         description: notes.trim() || undefined,
       }).catch(() => undefined);
 
+      // Tell the farmer the record is back for approval.
+      if (assignment && user) {
+        await updateAssignment(assignment, 'submitted_for_approval', { id: user.id, name: user.fullName ?? user.email ?? undefined }).catch(() => undefined);
+      }
+
       notify(autoApprove ? t('reg.notifyCreated', { aan: code }) : t('reg.notifySubmitted', { aan: code }));
-      router.replace('/(tabs)/animals');
-    } catch {
+      router.replace(appRole === 'veterinary' ? ('/vet-manage-animals' as never) : '/(tabs)/animals');
+    } catch (e) {
       setSubmitting(false);
+      // Say why, rather than leave the button doing nothing.
+      Alert.alert(t('reg.saveFailTitle'), e instanceof Error && e.message ? e.message : t('reg.saveFailBody'));
     }
   };
 
@@ -704,6 +754,16 @@ export default function RegisterAnimal() {
             </Pressable>
           </>
         )}
+
+        {/* Who this record is being finished for. */}
+        {assignment ? (
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, backgroundColor: colors.primaryTint, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md }}>
+            <Icon name="account-arrow-left-outline" size={18} color={colors.primary} />
+            <AppText variant="caption" color={colors.primaryDark} style={{ flex: 1 }}>
+              {t('reg.assignedBanner', { farmer: assignment.farmerName, service: assignment.service })}
+            </AppText>
+          </View>
+        ) : null}
 
         {/* Step 2 — Animal information */}
         {step === 2 && (
@@ -829,16 +889,37 @@ export default function RegisterAnimal() {
               value={countryCode}
               placeholder={t('reg.countryCodePlaceholder')}
               options={Object.entries(COUNTRY_CODES).map(([code, nm]) => ({ label: `${nm} (${code})`, value: code }))}
-              onSelect={(code) => { setCountry(COUNTRY_CODES[code] ?? country); setCity(''); }}
+              onSelect={(code) => { setCountry(COUNTRY_CODES[code] ?? country); setCity(''); setCityOther(false); }}
             />
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: -spacing.sm, marginBottom: spacing.md }}>
               <Icon name="flag-outline" size={14} color={colors.onSurfaceVariant} />
               <AppText variant="caption" color={colors.onSurfaceVariant}>{t('reg.countryAuto', { country })}</AppText>
             </View>
-            {(CITIES_BY_COUNTRY[country]?.length ?? 0) > 0 ? (
-              <PickerField label={t('reg.city')} value={city} placeholder={t('reg.cityPlaceholder')} options={[...new Set([...CITIES_BY_COUNTRY[country], ...(city ? [city] : [])])].map((c) => ({ label: c, value: c }))} onSelect={setCity} />
+            {(CITIES_BY_COUNTRY[country]?.length ?? 0) > 0 && !cityOther ? (
+              <PickerField
+                label={t('reg.city')}
+                value={city}
+                placeholder={t('reg.cityPlaceholder')}
+                options={[
+                  ...[...new Set([...CITIES_BY_COUNTRY[country], ...(city ? [city] : [])])].map((c) => ({ label: c, value: c })),
+                  { label: t('reg.cityOther'), value: OTHER_CITY },
+                ]}
+                onSelect={(v) => {
+                  if (v === OTHER_CITY) {
+                    setCityOther(true);
+                    setCity('');
+                  } else setCity(v);
+                }}
+              />
             ) : (
-              <TextField label={t('reg.city')} value={city} onChangeText={setCity} placeholder={t('reg.cityPlaceholder')} />
+              <>
+                <TextField label={t('reg.city')} value={city} onChangeText={setCity} placeholder={t('reg.cityTypePlaceholder')} />
+                {(CITIES_BY_COUNTRY[country]?.length ?? 0) > 0 ? (
+                  <Pressable onPress={() => { setCityOther(false); setCity(''); }} style={{ marginTop: -spacing.sm, marginBottom: spacing.md }}>
+                    <AppText variant="caption" color={colors.primary} style={{ fontWeight: '600' }}>{t('reg.cityPickList')}</AppText>
+                  </Pressable>
+                ) : null}
+              </>
             )}
 
             <AppText variant="bodyLarge" style={{ fontWeight: '600', marginTop: spacing.xs, marginBottom: spacing.xs }}>
@@ -860,7 +941,7 @@ export default function RegisterAnimal() {
               </View>
             </Pressable>
             <AppText variant="caption" color={colors.onSurfaceVariant}>
-              {t('reg.geoHintOpt')}
+              {t('reg.geoHintAuto')}
             </AppText>
             {offerSaveAsFarm ? (
               <Pressable
@@ -958,7 +1039,7 @@ export default function RegisterAnimal() {
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, backgroundColor: colors.primaryTint, borderRadius: radius.md, padding: spacing.md }}>
               <Icon name="face-recognition" size={16} color={colors.primary} />
               <AppText variant="caption" color={colors.primaryDark} style={{ flex: 1 }}>
-                {t('reg.reviewNote')}
+                {t('reg.reviewNoteDevice')}
               </AppText>
             </View>
           </>
@@ -983,7 +1064,7 @@ export default function RegisterAnimal() {
             <Button label={t('reg.next')} icon="chevron-right" disabled={!stepValid[step]} onPress={() => setStep((s) => s + 1)} style={{ flex: 2 }} />
           ) : (
             <Button
-              label={faceVerifying ? t('reg.verifying') : t('reg.submitForApproval')}
+              label={faceVerifying ? t('reg.verifyingDevice') : autoApprove ? t('reg.approve') : t('reg.submitForApproval')}
               icon="shield-check-outline"
               loading={submitting || faceVerifying}
               disabled={!canSubmit}

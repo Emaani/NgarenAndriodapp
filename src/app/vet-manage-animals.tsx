@@ -1,13 +1,15 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { Redirect, useRouter } from 'expo-router';
+import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { getHerd } from '@/data/herd';
 import { getDrafts } from '@/data/localRegistrationDrafts';
 import { getAmendments } from '@/data/localAmendments';
+import { getAssignments } from '@/data/recordAssignments';
+import { RecordAssignment, isActive } from '@/lib/recordAssignments';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
-import { ageFromDate, formatDateTime } from '@/lib/date';
+import { ageFromDate, formatDate, formatDateTime } from '@/lib/date';
 import { Animal } from '@/data/types';
 import { useT } from '@/i18n';
 import { ActionChip, AnimalPhoto, AppText, Button, GradientHeader, Icon, IconChip, Screen, SearchBar } from '@/ui';
@@ -45,6 +47,11 @@ export default function VetManageAnimals() {
   const { data: herd } = useResource(getHerd, []);
   const { data: drafts } = useResource(getDrafts, []);
   const { data: amendments } = useResource(getAmendments, []);
+  // Records farmers handed over (App Review 2026-11-05), shared across phones.
+  const { data: assignments, reload: reloadAssignments } = useResource(getAssignments, []);
+  useFocusEffect(useCallback(() => reloadAssignments(), [reloadAssignments]));
+  const assigned = useMemo(() => assignments.filter(isActive), [assignments]);
+  const awaitingFarmer = useMemo(() => assignments.filter((a) => a.status === 'submitted_for_approval'), [assignments]);
   const [tab, setTab] = useState<Tab>('progress');
   const [query, setQuery] = useState('');
 
@@ -62,6 +69,38 @@ export default function VetManageAnimals() {
   if (loading) return null;
   if (!isAuthenticated) return <Redirect href="/login" />;
   if (!canVet) return <Redirect href="/(tabs)/home" />;
+
+  // One handed-over record: who, which AAN, what was asked, how the visit runs.
+  const AssignedRow = ({ a }: { a: RecordAssignment }) => (
+    <Pressable
+      onPress={() =>
+        router.push(
+          (a.kind === 'registration'
+            ? `/register-animal?draft=${encodeURIComponent(a.aan)}&assigned=1`
+            : `/vet-edit-animal?aan=${encodeURIComponent(a.aan)}`) as never,
+        )
+      }
+      style={({ pressed }) => [
+        { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, gap: 4, borderWidth: 1, borderColor: colors.primary, opacity: pressed ? 0.9 : 1 },
+        shadow[1],
+      ]}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+        <IconChip icon={a.kind === 'registration' ? 'file-document-edit-outline' : 'pencil-box-outline'} />
+        <View style={{ flex: 1 }}>
+          <AppText variant="bodyLarge" style={{ fontWeight: '700' }}>{a.farmerName}</AppText>
+          <AppText variant="body" color={colors.primary} style={{ fontWeight: '600' }}>{a.aan}</AppText>
+        </View>
+        <ActionChip label={a.status === 'vet_in_progress' ? t('vma.inProgress') : t('vma.new')} variant={a.status === 'vet_in_progress' ? 'info' : 'warning'} />
+        <Icon name="chevron-right" size={18} color={colors.onSurfaceVariant} />
+      </View>
+      <AppText variant="caption" color={colors.onSurfaceVariant}>
+        {t('vma.serviceLine', { service: a.kind === 'registration' ? t('vma.serviceRegister') : t('vma.serviceMaintain') })}
+      </AppText>
+      <AppText variant="caption" color={colors.onSurfaceVariant}>
+        {[a.mode ? t('vma.meetingLine', { mode: t(`fv.${a.mode}`) }) : '', a.date ? formatDate(a.date) : '', a.slot ?? ''].filter(Boolean).join(' · ')}
+      </AppText>
+    </Pressable>
+  );
 
   const AnimalEditRow = ({ a }: { a: Animal }) => (
     <View style={[{ flexDirection: 'row', alignItems: 'center', gap: spacing.mdMinus, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.divider }, shadow[1]]}>
@@ -101,12 +140,20 @@ export default function VetManageAnimals() {
       <Screen contentStyle={{ paddingTop: spacing.md, paddingBottom: spacing.xxl }}>
         <View style={{ flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.md }}>
           <TabButton value="progress" label={t('vma.tabProgress')} />
-          <TabButton value="approval" label={t('vma.tabApproval')} count={pending.length} />
+          <TabButton value="approval" label={t('vma.tabApproval')} count={pending.length + awaitingFarmer.length} />
           <TabButton value="approved" label={t('vma.tabApproved')} count={approved.length} />
         </View>
 
         {tab === 'progress' ? (
           <>
+            {/* Assigned by farmers — tap the AAN to carry on where the farmer stopped. */}
+            <SubHeader icon="account-arrow-left-outline" title={t('vma.assigned')} sub={t('vma.assignedSub')} />
+            {assigned.length === 0 ? (
+              <AppText variant="caption" color={colors.onSurfaceVariant}>{t('vma.noAssigned')}</AppText>
+            ) : (
+              assigned.map((a) => <AssignedRow key={a.aan} a={a} />)
+            )}
+
             {/* AAN Registration — resume incomplete drafts transferred by farmers. */}
             <SubHeader icon="progress-pencil" title={t('vma.aanRegistration')} sub={t('vma.aanRegistrationSub')} />
             {drafts.length === 0 ? (
@@ -150,13 +197,29 @@ export default function VetManageAnimals() {
         ) : null}
 
         {tab === 'approval' ? (
-          pending.length === 0 ? (
+          pending.length === 0 && awaitingFarmer.length === 0 ? (
             <View style={{ alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xl }}>
               <Icon name="clock-outline" size={32} color={colors.onSurfaceVariant} />
               <AppText variant="body" color={colors.onSurfaceVariant} style={{ textAlign: 'center' }}>{t('vma.noApproval')}</AppText>
             </View>
           ) : (
-            pending.map((a) => (
+            <>
+            {awaitingFarmer.map((a) => (
+              <View key={`as-${a.aan}`} style={[{ backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.divider, gap: 4 }, shadow[1]]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                  <IconChip icon="account-clock-outline" />
+                  <View style={{ flex: 1 }}>
+                    <AppText variant="bodyLarge" style={{ fontWeight: '600' }}>{a.aan}</AppText>
+                    <AppText variant="caption" color={colors.onSurfaceVariant}>{a.farmerName} · {a.kind === 'registration' ? t('vma.serviceRegister') : t('vma.serviceMaintain')}</AppText>
+                  </View>
+                  <ActionChip label={t('vma.awaitingFarmer')} variant="warning" />
+                </View>
+                <AppText variant="caption" color={colors.onSurfaceVariant}>
+                  {t('vma.submittedBy', { name: a.updatedByName ?? '—', date: formatDateTime(a.at) })}
+                </AppText>
+              </View>
+            ))}
+            {pending.map((a) => (
               <View key={a.id} style={[{ backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.divider, gap: 4 }, shadow[1]]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
                   <IconChip icon="account-clock-outline" />
@@ -170,7 +233,8 @@ export default function VetManageAnimals() {
                   {t('vma.submittedBy', { name: a.proposedBy, date: formatDateTime(a.proposedAt) })}
                 </AppText>
               </View>
-            ))
+            ))}
+            </>
           )
         ) : null}
 

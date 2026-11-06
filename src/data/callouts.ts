@@ -26,6 +26,7 @@ const DETAIL_LABEL = {
   access: 'Access',
   animals: 'Animals',
   vet: 'Preferred vet',
+  records: 'Records',
 } as const;
 
 const MODES: AppointmentMode[] = ['onsite', 'video', 'hybrid'];
@@ -71,11 +72,12 @@ function detailLines(p: CalloutRequestPayload): string {
     [DETAIL_LABEL.access, p.accessScope],
     [DETAIL_LABEL.animals, p.accessAnimals?.join(', ')],
     [DETAIL_LABEL.vet, p.vetName],
+    [DETAIL_LABEL.records, p.records?.join(', ')],
   ];
   return lines.filter(([, value]) => value).map(([label, value]) => `${label}: ${value}`).join('\n');
 }
 
-function readDetail(text: unknown, label: string): string | undefined {
+export function readDetail(text: unknown, label: string): string | undefined {
   const line = String(text ?? '').split('\n').find((l) => l.startsWith(`${label}: `));
   return line?.slice(label.length + 2).trim() || undefined;
 }
@@ -127,6 +129,7 @@ export function rowToCallout(row: Row, farmerName: string | undefined): CalloutR
     scheduledSlot: readDetail(notes, DETAIL_LABEL.slot),
     mode: mode && MODES.includes(mode) ? mode : undefined,
     service: services as CalloutService | undefined,
+    records: readDetail(notes, DETAIL_LABEL.records)?.split(',').map((r) => r.trim()).filter(Boolean),
   };
 }
 
@@ -180,8 +183,8 @@ export async function getCalloutsFromSupabase(): Promise<CalloutRequest[]> {
   }
 }
 
-/** Throws when the booking couldn't be saved, so the farmer is told. */
-export async function submitCalloutToSupabase(payload: CalloutRequestPayload): Promise<void> {
+/** Throws when the booking couldn't be saved, so the farmer is told. Returns the booking's id. */
+export async function submitCalloutToSupabase(payload: CalloutRequestPayload): Promise<string | undefined> {
   const requesterId = await currentUserId();
   if (!requesterId) throw new Error('Not signed in');
   const row = calloutToRow(payload, requesterId);
@@ -201,6 +204,7 @@ export async function submitCalloutToSupabase(payload: CalloutRequestPayload): P
       },
     })
     .catch(() => undefined);
+  return data?.id as string | undefined;
 }
 
 /**
@@ -215,4 +219,53 @@ export async function updateCalloutInSupabase(id: number, status: CalloutStatus)
   const { data, error } = await supabase.from('vet_support_requests').update(patch).eq('id', uuid).select('id');
   if (error) throw error;
   if (!data?.length) throw new Error('Booking not updated');
+}
+
+/** Accept or decline straight from the calendar, which knows the booking by its uuid. */
+export async function setBookingStatus(uuid: string, status: 'accepted' | 'declined'): Promise<void> {
+  const userId = await currentUserId();
+  const patch = status === 'accepted' ? { status, preferred_vet_id: userId } : { status };
+  const { data, error } = await supabase.from('vet_support_requests').update(patch).eq('id', uuid).select('id');
+  if (error) throw error;
+  if (!data?.length) throw new Error('Booking not updated');
+}
+
+/** The booking's Slot line set to `slot`, every other line kept. */
+export function withSlot(notes: unknown, slot: string): string {
+  const lines = String(notes ?? '').split('\n').filter((l) => l && !l.startsWith(`${DETAIL_LABEL.slot}: `));
+  return [...lines, `${DETAIL_LABEL.slot}: ${slot}`].join('\n');
+}
+
+/**
+ * A vet proposes another day or time. The booking moves to it, the reason is
+ * kept in the vet's notes, and the farmer is told (best effort).
+ */
+export async function amendBooking(uuid: string, date: string, slot: string, vetName: string): Promise<void> {
+  const { data: row, error: readErr } = await supabase
+    .from('vet_support_requests')
+    .select('requester_id, additional_notes, vet_notes, issue_category')
+    .eq('id', uuid)
+    .maybeSingle();
+  if (readErr || !row) throw readErr ?? new Error('Booking not found');
+  const note = `Moved by ${vetName} to ${date} ${slot}`;
+  const { data, error } = await supabase
+    .from('vet_support_requests')
+    .update({
+      preferred_date: date,
+      additional_notes: withSlot(row.additional_notes, slot),
+      vet_notes: [row.vet_notes, note].filter(Boolean).join('\n'),
+    })
+    .eq('id', uuid)
+    .select('id');
+  if (error) throw error;
+  if (!data?.length) throw new Error('Booking not updated');
+  await supabase
+    .from('notifications')
+    .insert({
+      user_id: row.requester_id,
+      type: 'vet_request',
+      title: 'Your vet visit was moved',
+      body: `${row.issue_category ?? 'Visit'}: ${note}.`,
+    })
+    .then(() => undefined, () => undefined);
 }

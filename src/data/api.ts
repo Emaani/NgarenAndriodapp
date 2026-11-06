@@ -637,6 +637,8 @@ export interface CalloutRequestPayload {
   accessScope?: 'this-animal' | 'all-animals' | 'selected';
   /** Animal labels the vet may access when scope is 'selected'. */
   accessAnimals?: string[];
+  /** AANs the farmer hands to the vet to complete or maintain (App Review 2026-11-05). */
+  records?: string[];
 }
 
 /** Fetch call-out requests, from the platform or else Supabase. Mock only with neither. */
@@ -653,16 +655,17 @@ export async function getCalloutRequests(
   return data.items ?? [];
 }
 
-/** Submit a new call-out request (farmer side). No-op in mock mode. */
-export async function submitCalloutRequest(payload: CalloutRequestPayload): Promise<void> {
+/** Submit a new call-out request (farmer side). Returns the booking's id when Supabase holds it. */
+export async function submitCalloutRequest(payload: CalloutRequestPayload): Promise<string | undefined> {
   if (!isBackendConfigured()) {
-    if (isSupabaseConfigured()) await submitCalloutToSupabase(payload);
-    return;
+    if (isSupabaseConfigured()) return submitCalloutToSupabase(payload);
+    return undefined;
   }
   await request<void>('/api/ngaren/callouts', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+  return undefined;
 }
 
 /** Update a call-out's status (vet accepts / declines / completes). No-op in mock mode. */

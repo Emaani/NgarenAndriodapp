@@ -74,7 +74,13 @@
       ],
       "expo-secure-store",
       "expo-mail-composer",
-      "react-native-ble-plx"
+      "react-native-ble-plx",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Ngaren uses Face ID to confirm it is you before you approve a record."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

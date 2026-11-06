@@ -448,6 +448,8 @@ export interface CalloutRequest {
   mode?: AppointmentMode;
   /** The service the farmer requested (shown + filterable on the task list). */
   service?: CalloutService;
+  /** AANs handed to the vet to complete or maintain. */
+  records?: string[];
 }
 
 /** Services a farmer can request from a service provider (Oct 2026 Q&A). */

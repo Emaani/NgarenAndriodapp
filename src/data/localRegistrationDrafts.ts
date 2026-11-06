@@ -35,6 +35,8 @@ export interface RegistrationDraft {
   devices?: RegisteredDevice[];
   notes?: string;
   startedBy?: string;
+  /** When the farmer handed it to Ngaren support or a vet to complete. */
+  assignedToVet?: string;
   createdAt: string;
   updatedAt: string;
 }

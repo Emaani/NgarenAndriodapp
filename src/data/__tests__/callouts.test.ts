@@ -3,7 +3,7 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 );
 jest.mock('../../services/supabase', () => ({ supabase: {} }));
 
-import { alertText, calloutToRow, requestedAgo, rowToCallout, statusFromRow, takenByAnotherVet } from '../callouts';
+import { alertText, calloutToRow, readDetail, requestedAgo, rowToCallout, statusFromRow, takenByAnotherVet, withSlot } from '../callouts';
 
 const booking = {
   vetName: 'Dr. Sarah Namukasa',
@@ -166,5 +166,20 @@ describe('requestedAgo', () => {
     expect(ago(24 * 3_600_000)).toBe('Yesterday');
     expect(ago(3 * 24 * 3_600_000)).toBe('3 days ago');
     expect(requestedAgo('not a date', now)).toBe('');
+  });
+});
+
+describe('records handed to the vet', () => {
+  it('carries the AANs on the booking and reads them back', () => {
+    const row = calloutToRow({ ...booking, records: ['UG-1026-XWZJ8P', 'UG-1126-K9MWP2'] }, 'farmer-1');
+    expect(readDetail(row.additional_notes, 'Records')).toBe('UG-1026-XWZJ8P, UG-1126-K9MWP2');
+    const back = rowToCallout({ ...row, id: ROW_ID, status: 'pending', created_at: new Date().toISOString() }, undefined);
+    expect(back.records).toEqual(['UG-1026-XWZJ8P', 'UG-1126-K9MWP2']);
+  });
+
+  it('moves a booking to a new slot, keeping its other details', () => {
+    const notes = 'Farmer: Enumi\nSlot: 08:00–10:00\nMode: hybrid';
+    expect(withSlot(notes, '14:00–16:00')).toBe('Farmer: Enumi\nMode: hybrid\nSlot: 14:00–16:00');
+    expect(withSlot(null, '08:00–10:00')).toBe('Slot: 08:00–10:00');
   });
 });

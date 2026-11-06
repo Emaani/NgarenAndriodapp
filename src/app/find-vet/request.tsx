@@ -6,6 +6,8 @@ import { findVet } from '@/data/vetDirectory';
 import { submitCalloutRequest } from '@/data/api';
 import { getHerd } from '@/data/herd';
 import { getFarmerPortfolio } from '@/data/portfolio';
+import { getDrafts } from '@/data/localRegistrationDrafts';
+import { assignRecordsToVet } from '@/data/recordAssignments';
 import { BOOKING_SLOTS } from '@/data/scheduleSlots';
 import { notify } from '@/lib/toast';
 import { formatDate } from '@/lib/date';
@@ -30,11 +32,12 @@ const TIME_SLOTS = BOOKING_SLOTS;
 export default function RequestCallout() {
   const router = useRouter();
   const t = useT();
-  const { vetId, date, emergency, purpose: purposeParam } = useLocalSearchParams<{ vetId?: string; date?: string; emergency?: string; purpose?: string }>();
+  const { vetId, date, emergency, purpose: purposeParam, aan: aanParam } = useLocalSearchParams<{ vetId?: string; date?: string; emergency?: string; purpose?: string; aan?: string }>();
   const { data: vet } = useResource(() => (vetId ? findVet(Number(vetId)) : Promise.resolve(undefined)), undefined);
   const isEmergency = emergency === '1';
   const { isAdmin, user } = useAuth();
   const { data: animals } = useResource(getHerd, []);
+  const { data: drafts } = useResource(getDrafts, []);
   // Admins can book on a farmer's behalf (Sep 3 2026 standup).
   const { data: farmers } = useResource(getFarmerPortfolio, []);
 
@@ -64,6 +67,11 @@ export default function RequestCallout() {
   const [noAnimalYet, setNoAnimalYet] = useState(false);
   const [tcsAccepted, setTcsAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // Records handed to the vet (App Review 2026-11-05): incomplete registrations
+  // to finish and existing records to maintain. Arriving from "Assign Ngaren"
+  // pre-ticks the AAN(s).
+  const [recordAans, setRecordAans] = useState<string[]>(() => (aanParam ? aanParam.split(',').map((a) => a.trim()).filter(Boolean) : []));
+  const toggleRecord = (aan: string) => setRecordAans((prev) => (prev.includes(aan) ? prev.filter((x) => x !== aan) : [...prev, aan]));
 
   // Preferred date for the visit. Pre-filled when the farmer arrived from a
   // vet's availability calendar; otherwise the farmer picks one here, exactly
@@ -74,8 +82,25 @@ export default function RequestCallout() {
 
   // Location is auto-derived from the selected animal's registered location — no
   // manual selection needed (Aug 29 2026 standup).
-  const locationName = animal?.locationName ?? '';
-  const animalLabel = noAnimalYet ? 'New animal — vet to register' : animal ? animal.name ?? animal.tag : '';
+  const recordsMode = purposes.includes('Registration');
+  // Drafts not yet handed over, and the farmer's own animals, by AAN.
+  const openDrafts = useMemo(() => drafts.filter((d) => !d.assignedToVet || recordAans.includes(d.aan)), [drafts, recordAans]);
+  const recordAnimals = useMemo(() => animals.filter((a) => !!a.ngarenCode && !drafts.some((d) => d.aan === a.ngarenCode)), [animals, drafts]);
+  const chosenRecords = recordsMode && !noAnimalYet ? recordAans : [];
+  const recordLabel = (aan: string) => {
+    const d = drafts.find((x) => x.aan === aan);
+    const a = animals.find((x) => x.ngarenCode === aan);
+    const name = d?.name || a?.name;
+    return name ? `${aan} · ${name}` : aan;
+  };
+
+  const firstRecordAnimal = chosenRecords.length ? animals.find((a) => a.ngarenCode === chosenRecords[0]) : undefined;
+  const locationName = animal?.locationName ?? firstRecordAnimal?.locationName ?? drafts.find((d) => d.aan === chosenRecords[0])?.locationName ?? '';
+  const animalLabel = noAnimalYet
+    ? 'New animal — vet to register'
+    : chosenRecords.length
+      ? chosenRecords.length === 1 ? recordLabel(chosenRecords[0]) : `${chosenRecords.length} records`
+      : animal ? animal.name ?? animal.tag : '';
 
   const farmerOptions = useMemo(
     () => farmers.map((f) => ({ label: f.farmerName, value: f.id })),
@@ -148,7 +173,7 @@ export default function RequestCallout() {
     }
   }, [mode]);
 
-  const permissionOk = noAnimalYet || allAnimals || permittedIds.length > 0;
+  const permissionOk = noAnimalYet || chosenRecords.length > 0 || allAnimals || permittedIds.length > 0;
   const slotOk = !scheduledFor || !!slot;
   // Purpose options (Oct 2026 spec). Stock taking is only offered for animals
   // identified Physical/Visual or Bluetooth (not satellite-tracked).
@@ -166,7 +191,7 @@ export default function RequestCallout() {
       ],
     [t, stockTakeAllowed],
   );
-  const canSubmit = (!!animal || noAnimalYet) && purposes.length > 0 && tcsAccepted && permissionOk && slotOk;
+  const canSubmit = (!!animal || noAnimalYet || chosenRecords.length > 0) && purposes.length > 0 && tcsAccepted && permissionOk && slotOk;
 
   const onSubmit = async () => {
     if (!canSubmit || submitting) return;
@@ -175,20 +200,23 @@ export default function RequestCallout() {
       const onBehalfNote = onBehalfFarmerName ? `[On behalf of ${onBehalfFarmerName}] ` : '';
       const scopeNote = noAnimalYet
         ? '[New animal — vet to register on-site] '
-        : allAnimals
+        : chosenRecords.length
+          ? `[Records: ${chosenRecords.join(', ')}] `
+          : allAnimals
           ? '[Access: all animals] '
           : `[Access: ${permittedLabels.length || 1} animal${permittedLabels.length === 1 ? '' : 's'}] `;
       const slotNote = scheduledFor && slot ? `[Slot: ${formatDate(scheduledFor)} ${slot}] ` : '';
       const purposeLabels = purposes.map((p) => purposeOptions.find((o) => o.value === p)?.label ?? p);
       const purposeNote = purposes.length ? `[Purpose: ${purposeLabels.join(', ')}] ` : '';
       const linkNote = meetingLink ? `[Meeting link: ${meetingLink}] ` : '';
-      await submitCalloutRequest({
+      const farmerName = onBehalfFarmerName ?? user?.fullName ?? user?.email ?? 'Farmer';
+      const bookingId = await submitCalloutRequest({
         vetId: vet?.id,
         vetName: vet?.name,
         vetUserId: vet?.userId,
-        farmerName: onBehalfFarmerName ?? user?.fullName ?? user?.email ?? undefined,
+        farmerName,
         animal: animalLabel,
-        animalTag: animal?.ngarenCode ?? animal?.tag,
+        animalTag: animal?.ngarenCode ?? animal?.tag ?? chosenRecords[0],
         animalSex: animal?.sex,
         animalBreed: animal?.breed.name,
         locationName: locationName || 'Farm',
@@ -199,10 +227,29 @@ export default function RequestCallout() {
         photo: photo || undefined,
         scheduledFor,
         scheduledSlot: slot || undefined,
-        accessScope: noAnimalYet ? undefined : allAnimals ? 'all-animals' : 'selected',
-        accessAnimals: !noAnimalYet && !allAnimals ? permittedLabels : undefined,
+        accessScope: noAnimalYet ? undefined : chosenRecords.length ? 'selected' : allAnimals ? 'all-animals' : 'selected',
+        accessAnimals: noAnimalYet ? undefined : chosenRecords.length ? chosenRecords.map(recordLabel) : !allAnimals ? permittedLabels : undefined,
+        records: chosenRecords.length ? chosenRecords : undefined,
       });
-      notify(t('fv.sentToast', { label: animalLabel }));
+      // Hand the records over so the vet can open them; the booking is saved
+      // either way, and the farmer is told about any that didn't go.
+      if (chosenRecords.length && user) {
+        const { failed } = await assignRecordsToVet({
+          drafts: drafts.filter((d) => chosenRecords.includes(d.aan)),
+          animals: animals.filter((a) => !!a.ngarenCode && chosenRecords.includes(a.ngarenCode) && !drafts.some((d) => d.aan === a.ngarenCode)),
+          farmer: { id: user.id, name: farmerName },
+          booking: {
+            id: bookingId,
+            service: purposes.map((p) => purposeOptions.find((o) => o.value === p)?.label ?? p).join(', '),
+            mode,
+            date: scheduledFor,
+            slot: slot || undefined,
+            meetingLink: meetingLink || undefined,
+          },
+        });
+        if (failed.length) Alert.alert(t('fv.recordsFailTitle'), t('fv.recordsFailBody', { aans: failed.join(', ') }));
+      }
+      notify(chosenRecords.length ? t('fv.recordsSentToast', { count: chosenRecords.length }) : t('fv.sentToast', { label: animalLabel }));
       // A real on-device notification so the farmer has a durable record + proof
       // notifications work (local — no backend push server needed).
       void sendLocalNotification(
@@ -210,7 +257,9 @@ export default function RequestCallout() {
         `${urgency} request for ${animalLabel}${vet ? ` to ${vet.name}` : ''}. We'll notify you when a vet responds.`,
         { type: 'VET_REQUEST' },
       );
-      router.replace('/(tabs)/home');
+      // From Manage Records, go back there to see the record marked "Submitted to vet".
+      if (chosenRecords.length) router.back();
+      else router.replace('/(tabs)/home');
     } catch {
       // Keep the form: the booking wasn't saved, so the farmer can retry.
       setSubmitting(false);
@@ -341,7 +390,47 @@ export default function RequestCallout() {
 
         {/* Animal — a selection dialog; picking auto-fills the location. Can be
             skipped entirely (Sep 7 2026): the vet registers the animal on-site. */}
-        {!noAnimalYet ? (
+        {!noAnimalYet && recordsMode ? (
+          <>
+            <AppText variant="body" style={{ fontWeight: '600', marginBottom: spacing.xs }}>
+              {t('fv.recordsLabel')} <AppText color={colors.error}>*</AppText>
+            </AppText>
+            <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>
+              {t('fv.recordsIntro')}
+            </AppText>
+            {openDrafts.length > 0 ? (
+              <AppText variant="overline" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.xs }}>{t('fv.recordsIncomplete')}</AppText>
+            ) : null}
+            {openDrafts.map((d) => {
+              const on = recordAans.includes(d.aan);
+              return (
+                <Pressable key={d.aan} onPress={() => toggleRecord(d.aan)} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs }}>
+                  <Icon name={on ? 'checkbox-marked' : 'checkbox-blank-outline'} size={20} color={on ? colors.primary : colors.onSurfaceVariant} />
+                  <AppText variant="body" color={colors.onSurface} style={{ flex: 1 }}>{recordLabel(d.aan)}</AppText>
+                  <AppText variant="caption" color={colors.warning}>{t('fv.recordIncompleteTag')}</AppText>
+                </Pressable>
+              );
+            })}
+            {recordAnimals.length > 0 ? (
+              <AppText variant="overline" color={colors.onSurfaceVariant} style={{ marginTop: spacing.sm, marginBottom: spacing.xs }}>{t('fv.recordsExisting')}</AppText>
+            ) : null}
+            {recordAnimals.map((a) => {
+              const aan = a.ngarenCode as string;
+              const on = recordAans.includes(aan);
+              return (
+                <Pressable key={aan} onPress={() => toggleRecord(aan)} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs }}>
+                  <Icon name={on ? 'checkbox-marked' : 'checkbox-blank-outline'} size={20} color={on ? colors.primary : colors.onSurfaceVariant} />
+                  <AppText variant="body" color={colors.onSurface} style={{ flex: 1 }}>{recordLabel(aan)}</AppText>
+                </Pressable>
+              );
+            })}
+            {openDrafts.length === 0 && recordAnimals.length === 0 ? (
+              <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>{t('fv.recordsNone')}</AppText>
+            ) : null}
+            <View style={{ height: spacing.sm }} />
+          </>
+        ) : null}
+        {!noAnimalYet && !recordsMode ? (
           <>
             <PickerField
               label={t('ad.animalTitle')}
@@ -449,7 +538,7 @@ export default function RequestCallout() {
 
         {/* Multi-animal permission (Sep 12 2026): grant the vet access to all
             animals, or pick specific ones. Clinical work stays per-animal. */}
-        {!noAnimalYet ? (
+        {!noAnimalYet && !recordsMode ? (
         <>
         <AppText variant="body" style={{ fontWeight: '600', marginBottom: spacing.xs }}>
           {t('fv.animalsAccess')}
@@ -495,20 +584,22 @@ export default function RequestCallout() {
           </AppText>
         </View>
         </>
-        ) : (
+        ) : noAnimalYet ? (
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, backgroundColor: colors.primaryTint, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md }}>
             <Icon name="clipboard-account-outline" size={18} color={colors.primary} />
             <AppText variant="caption" color={colors.primaryDark} style={{ flex: 1 }}>
               {t('fv.vetWillRegister')}
             </AppText>
           </View>
-        )}
+        ) : null}
 
         {/* Consent */}
         <Pressable onPress={() => setTcsAccepted((v) => !v)} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.md }}>
           <Icon name={tcsAccepted ? 'checkbox-marked' : 'checkbox-blank-outline'} size={22} color={tcsAccepted ? colors.primary : colors.onSurfaceVariant} />
           <AppText variant="body" color={colors.onSurface} style={{ flex: 1 }}>
-            {noAnimalYet
+            {chosenRecords.length
+              ? 'I accept the booking & managed-health terms & conditions, and consent to the vet completing or updating the selected records for my approval.'
+              : noAnimalYet
               ? 'I accept the booking & managed-health terms & conditions, and consent to the vet registering my animal and recording its health data during this visit.'
               : `I accept the booking & managed-health terms & conditions, and consent to ${allAnimals ? 'all my animals’' : 'the selected animals’'} records being accessible to the vet for the booked time slot only.`}
           </AppText>

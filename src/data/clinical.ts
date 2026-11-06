@@ -14,6 +14,8 @@
 import { supabase } from '../services/supabase';
 import { isSupabaseConfigured } from '../config';
 import { reportDataFailure, reportDataSuccess } from '../services/dataHealth';
+import { readDetail, statusFromRow } from './callouts';
+import type { CalloutStatus } from './types';
 
 export interface BreedingRecord {
   id: string;
@@ -55,6 +57,10 @@ export interface CalendarEvent {
   /** Optional time of day (HH:MM) for the activity. Added Oct 2026 standup. */
   time?: string;
   type: CalendarType;
+  /** A vet booking's row id, so the calendar can act on it. */
+  bookingId?: string;
+  status?: CalloutStatus;
+  slot?: string;
 }
 
 /* ------------------------------- mock data -------------------------------- */
@@ -159,12 +165,20 @@ export async function getCalendarEvents(): Promise<CalendarEvent[]> {
       supabase.from('health_records').select('*').not('follow_up_date', 'is', null),
     ]);
 
+    // A booking's subject is the farmer and the service asked for (App Review 2026-11-05).
     (visits ?? []).forEach((r: Record<string, unknown>) => {
+      const farmer = readDetail(r.additional_notes, 'Farmer');
+      const service = readDetail(r.additional_notes, 'Services') ?? (r.issue_category as string) ?? 'Consultation';
+      const slot = readDetail(r.additional_notes, 'Slot');
       events.push({
         id: `visit-${r.id}`,
-        title: `Vet Visit: ${(r.issue_category as string) ?? 'Consultation'}`,
+        title: farmer ? `${farmer} · ${service}` : `Vet Visit: ${service}`,
         date: r.preferred_date as string,
+        time: slot?.slice(0, 5),
         type: 'vet_visit',
+        bookingId: String(r.id),
+        status: statusFromRow(r.status),
+        slot,
       });
     });
 

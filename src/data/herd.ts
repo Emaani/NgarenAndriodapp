@@ -161,6 +161,8 @@ export async function syncAnimalToLineage(
     const remotePhoto =
       uploadedPhotoUrls?.[0] ?? (animal.photos ?? []).find((p) => /^https?:\/\//.test(p));
     const internalId = animal.ngarenCode ?? animal.tag;
+    // A vet finishing a farmer's record writes it to that farmer, not to the vet.
+    const owner = animal.farmerId ?? userId;
     const row = {
       animal_id: internalId,
       animal_name: animal.name ?? animal.tag,
@@ -170,8 +172,8 @@ export async function syncAnimalToLineage(
       birth_date: animal.dateOfBirth || null,
       sex: animal.sex ?? 'unknown',
       photo_url: remotePhoto ?? null,
-      assigned_farmer_id: userId,
-      farmer_id: userId,
+      assigned_farmer_id: owner,
+      farmer_id: owner,
       created_by_user: userId,
       lifecycle_status: animal.approvalStatus === 'approved' ? 'complete' : 'in_progress',
       tag_status: animal.deviceSerial ? 'assigned' : 'unassigned',

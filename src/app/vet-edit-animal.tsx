@@ -1,13 +1,16 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, View } from 'react-native';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { breeds as breedsFallback } from '@/data/mock';
 import { getBreeds, getLocations } from '@/data/api';
 import { getHerd } from '@/data/herd';
 import { addAmendment, AnimalAmendment, FieldChange } from '@/data/localAmendments';
 import { logAuditEvent } from '@/data/localAuditEvents';
+import { getAssignment, shareAmendment, updateAssignment } from '@/data/recordAssignments';
+import { RecordAssignment, animalFromSnapshot } from '@/lib/recordAssignments';
+import { verifyIdentity } from '@/lib/identityCheck';
+import { textToId } from '@/lib/ids';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { sendLocalNotification } from '@/services/push';
@@ -27,14 +30,26 @@ import { AppText, BottomSheet, Button, DatePickerField, DetailRow, GradientHeade
 export default function VetEditAnimal() {
   const router = useRouter();
   const t = useT();
-  const { id, farmer } = useLocalSearchParams<{ id?: string; farmer?: string }>();
+  const { id, farmer, aan } = useLocalSearchParams<{ id?: string; farmer?: string; aan?: string }>();
   const { loading, isAuthenticated, canVet, user } = useAuth();
 
   const { data: herd } = useResource(getHerd, []);
   const { data: breeds } = useResource(getBreeds, breedsFallback.map((n) => ({ key: n.toLowerCase(), name: n })));
   const { data: locations } = useResource(() => getLocations(), []);
 
-  const animal: Animal | undefined = useMemo(() => herd.find((a) => a.id === Number(id)), [herd, id]);
+  // A record a farmer handed over arrives by AAN (App Review 2026-11-05). The
+  // vet may not see that farmer's herd, so the hand-over carries a copy.
+  const [assignment, setAssignment] = useState<RecordAssignment | null>(null);
+  useEffect(() => {
+    if (aan) getAssignment(aan).then((a) => setAssignment(a ?? null)).catch(() => undefined);
+  }, [aan]);
+  const animal: Animal | undefined = useMemo(() => {
+    if (aan) {
+      const own = herd.find((a) => a.ngarenCode === aan);
+      return own ?? (assignment ? animalFromSnapshot(assignment, textToId(aan)) : undefined);
+    }
+    return herd.find((a) => a.id === Number(id));
+  }, [herd, id, aan, assignment]);
 
   // Editable fields — seeded from the animal once it resolves.
   const [name, setName] = useState<string | null>(null);
@@ -118,23 +133,13 @@ export default function VetEditAnimal() {
     ]);
   };
 
+  // The device's face unlock, fingerprint or screen lock (see lib/identityCheck).
   const verifyFaceId = async (): Promise<boolean> => {
-    try {
-      const perm = await ImagePicker.requestCameraPermissionsAsync();
-      if (!perm.granted) {
-        Alert.alert(t('reg.faceIdTitle'), t('reg.faceIdNeeded'));
-        return false;
-      }
-      const shot = await ImagePicker.launchCameraAsync({ quality: 0.4, cameraType: ImagePicker.CameraType.front });
-      if (shot.canceled || !shot.assets?.[0]) {
-        Alert.alert(t('reg.faceIdTitle'), t('reg.faceIdRequired'));
-        return false;
-      }
-      return true;
-    } catch {
-      Alert.alert(t('reg.faceIdTitle'), t('reg.faceIdRequired'));
-      return false;
-    }
+    const result = await verifyIdentity({ promptMessage: t('reg.faceIdPrompt', { aan: animal.ngarenCode ?? animal.tag }), cancelLabel: t('common.cancel') });
+    if (result === 'verified') return true;
+    if (result === 'no_camera_permission') Alert.alert(t('reg.faceIdTitle'), t('reg.faceIdNeeded'));
+    else if (result === 'failed') Alert.alert(t('reg.faceIdTitle'), t('reg.faceIdFailed'));
+    return false;
   };
 
   const startOtp = () => {
@@ -168,10 +173,19 @@ export default function VetEditAnimal() {
         patch,
         proposedBy: by,
         proposedAt: new Date().toISOString(),
-        farmerName: farmer ?? animal.locationName,
+        farmerName: farmer ?? assignment?.farmerName ?? animal.locationName,
         status: 'pending',
       };
       await addAmendment(amendment);
+      // Shared so the farmer's phone shows it for approval; kept locally either way.
+      let shared = true;
+      try {
+        await shareAmendment({ ...amendment, farmerId: assignment?.farmerId ?? animal.farmerId });
+        if (assignment && user) await updateAssignment(assignment, 'submitted_for_approval', { id: user.id, name: by });
+      } catch {
+        shared = false;
+      }
+      if (!shared) Alert.alert(t('ve.shareFailTitle'), t('ve.shareFailBody'));
       // Track the change per user with a date/time log (spec 2.1 note).
       void logAuditEvent({ type: 'other', title: `AAN edit submitted — ${amendment.animalLabel}`, detail: `${amendment.animalKey} · ${changes.map((c) => c.label).join(', ')}`, by });
       void sendLocalNotification(
