@@ -175,6 +175,13 @@ export interface Geofence {
   id: number;
   name: string;
   ring: { lat: number; lng: number }[];
+  /** The `geofences` row this came from; absent for the demo boundaries. */
+  uuid?: string;
+  /** keep_in (the default): animals belong inside. keep_out: they must stay out. */
+  mode?: 'keep_in' | 'keep_out';
+  color?: string;
+  /** When set, only these animals are held to this boundary (AAN, tag or row id). */
+  assignedAnimalIds?: string[];
 }
 
 export const geofences: Geofence[] = [

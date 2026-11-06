@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { colors, radius, shadow, spacing } from '@/theme';
-import { geofences as geofencesData } from '@/data/mock';
+import { getGeofences } from '@/data/geofences';
 import { getAnimalLocations, getLocations } from '@/data/api';
 import { AnimalFenceStatus, evaluateGeofences } from '@/data/geofencing';
 import { useResource } from '@/data/hooks';
@@ -49,6 +49,9 @@ export default function TrackScreen() {
   const [locating, setLocating] = useState(false);
   const { data: locations } = useResource(() => getLocations(), []);
   const { data: markers } = useResource(() => getAnimalLocations(), []);
+  const { data: fences, reload: reloadFences } = useResource(getGeofences, []);
+  // Boundaries drawn or changed in the editor show up when the map is back in view.
+  useFocusEffect(useCallback(() => reloadFences(), [reloadFences]));
   const [checked, setChecked] = useState<number[]>([]);
 
   // Keep the location filter in sync as live locations arrive.
@@ -59,10 +62,11 @@ export default function TrackScreen() {
   const toggle = (id: number) =>
     setChecked((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
 
-  // Geofences follow the location filter so hiding a farm hides its boundary.
+  // The demo paddocks follow the location filter so hiding a farm hides its
+  // boundary. Live boundaries aren't tied to those locations, so they all show.
   const visibleGeofences = useMemo(
-    () => geofencesData.filter((g) => checked.includes(g.id)),
-    [checked],
+    () => fences.filter((g) => !!g.uuid || checked.includes(g.id)),
+    [fences, checked],
   );
 
   // Containment is derived from the live GPS already on screen. The marker set
@@ -227,7 +231,9 @@ export default function TrackScreen() {
                       ? t('trk.noBoundaryArea')
                       : inside
                         ? t('trk.inside', { fence: s?.fenceName ?? t('trk.boundary') })
-                        : t('trk.outsideFence', { dist: formatDistance(s?.metersOutside ?? 0), fence: s?.fenceName ?? t('trk.boundary') })}
+                        : s?.inExclusion
+                          ? t('trk.inExclusion', { dist: formatDistance(s.metersOutside), fence: s.fenceName ?? t('trk.boundary') })
+                          : t('trk.outsideFence', { dist: formatDistance(s?.metersOutside ?? 0), fence: s?.fenceName ?? t('trk.boundary') })}
                   </AppText>
                 </View>
               );
@@ -242,7 +248,7 @@ export default function TrackScreen() {
               <Button
                 label={t('trk.providerView', { provider: selected.provider ?? t('trk.provider') })}
                 icon="satellite-variant"
-                onPress={() => router.push(`/animals/${selected.animalId}`)}
+                onPress={() => router.push(`/live-telemetry?animal=${selected.animalId}` as never)}
                 style={{ flex: 1 }}
               />
             </View>
@@ -289,7 +295,9 @@ export default function TrackScreen() {
                           {b.tag}
                         </AppText>
                         <AppText variant="caption" color={colors.onSurfaceVariant}>
-                          {t('trk.beyond', { dist: formatDistance(b.metersOutside), fence: b.fenceName ?? t('trk.theBoundary') })}
+                          {b.inExclusion
+                            ? t('trk.inExclusion', { dist: formatDistance(b.metersOutside), fence: b.fenceName ?? t('trk.theBoundary') })
+                            : t('trk.beyond', { dist: formatDistance(b.metersOutside), fence: b.fenceName ?? t('trk.theBoundary') })}
                           {b.accuracy === 'Poor' ? t('trk.lowGps') : ''}
                         </AppText>
                       </View>
@@ -336,6 +344,28 @@ export default function TrackScreen() {
               ))}
             </>
           )}
+        </View>
+        <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>
+          <Button
+            label={t('trk.manageFences')}
+            icon="vector-polygon"
+            variant="outline"
+            onPress={() => {
+              setFenceOpen(false);
+              router.push('/geofences' as never);
+            }}
+            style={{ flex: 1 }}
+          />
+          <Button
+            label={t('trk.liveFeed')}
+            icon="satellite-variant"
+            variant="outline"
+            onPress={() => {
+              setFenceOpen(false);
+              router.push('/live-telemetry' as never);
+            }}
+            style={{ flex: 1 }}
+          />
         </View>
       </BottomSheet>
 

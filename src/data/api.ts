@@ -79,6 +79,7 @@ import {
   UserRole,
   UserSetting,
 } from './types';
+import { getLiveAnimalLocations } from './liveTracking';
 
 const DEFAULT_SETTINGS: NotificationSettings = {
   deviceActivityConfig: 'EMAIL_AND_SMS',
@@ -363,8 +364,9 @@ export async function getAnimalLocations(
   pageSize = 100,
   locationIds?: number[],
 ): Promise<AnimalMarker[]> {
-  // The satellite feed comes from the platform; an empty map beats made-up animals.
-  if (!isBackendConfigured()) return isSupabaseConfigured() ? [] : mock.markers;
+  // Without the platform, positions come straight from ceres_telemetry, as on
+  // the web. No telemetry is an empty map, never made-up animals.
+  if (!isBackendConfigured()) return isSupabaseConfigured() ? getLiveAnimalLocations() : mock.markers;
   const endDate = new Date();
   const startDate = new Date();
   startDate.setDate(endDate.getDate() - 7);

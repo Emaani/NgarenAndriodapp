@@ -54,6 +54,10 @@ const FARMER_REPORTS: Action[] = [
   { icon: 'heart-pulse', label: 'report.healthRecords', route: '/health', tint: '#EF4444', perm: 'view_health' },
   { icon: 'tag-outline', label: 'report.deviceManager', route: '/devices', tint: '#9333EA', perm: 'view_animals' },
   { icon: 'dna', label: 'report.breeding', route: '/breeding', tint: '#EC4899', perm: 'view_animals' },
+  { icon: 'vector-polygon', label: 'action.geofences', route: '/geofences', tint: '#16A34A', perm: 'view_animals' },
+  { icon: 'grass', label: 'action.intake', route: '/intake', tint: '#0D9488', perm: 'view_animals' },
+  { icon: 'cart-outline', label: 'action.deviceOrders', route: '/device-orders', tint: '#9333EA' },
+  { icon: 'handshake-outline', label: 'action.partners', route: '/partners', tint: '#21C45D', perm: 'book_vet' },
 ];
 
 // Admin "Enterprise Control Center" — organisation-wide oversight tools that a
@@ -85,6 +89,11 @@ const ADMIN_ACTIONS: Action[] = [
   { icon: 'account-plus-outline', label: 'action.enlistVet', route: '/enlist-vet', tint: '#21C45D' },
   { icon: 'tag-outline', label: 'action.devices', route: '/devices', tint: '#9333EA' },
   { icon: 'map-marker-outline', label: 'action.locations', route: '/locations', tint: '#0D9488' },
+  { icon: 'vector-polygon', label: 'action.geofences', route: '/geofences', tint: '#16A34A' },
+  { icon: 'satellite-variant', label: 'action.liveTelemetry', route: '/live-telemetry', tint: '#0284C7' },
+  { icon: 'grass', label: 'action.intake', route: '/intake', tint: '#0D9488' },
+  { icon: 'cart-outline', label: 'action.deviceOrders', route: '/device-orders', tint: '#9333EA' },
+  { icon: 'handshake-outline', label: 'action.partners', route: '/partners', tint: '#21C45D' },
 ];
 
 // Vet "Health Intelligence System" — clinical oversight across assigned farms.
@@ -99,6 +108,7 @@ const VET_ACTIONS: Action[] = [
   { icon: 'file-chart-outline', label: 'action.reports', route: '/vet-reports', tint: '#6D874F' },
   { icon: 'account-badge-outline', label: 'action.myVetProfile', route: '/vet-credentials', tint: '#0891B2' },
   { icon: 'tag-outline', label: 'action.devices', route: '/devices', tint: '#9333EA' },
+  { icon: 'cart-outline', label: 'action.deviceOrders', route: '/device-orders', tint: '#9333EA' },
   { icon: 'storefront-outline', label: 'action.marketplace', route: '/marketplace', tint: '#0D9488' },
   { icon: 'message-text-outline', label: 'action.messages', route: '/messaging', tint: '#F59E0B' },
 ];

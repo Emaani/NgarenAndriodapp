@@ -13,18 +13,21 @@
 import { AnimalMarker } from './types';
 import { Geofence } from './mock';
 import { distanceToRingMeters, isPointInPolygon } from '@/lib/geo';
+import { fenceApplies } from '@/lib/geofenceShapes';
 
 export interface AnimalFenceStatus {
   animalId: number;
   tag: string;
   lat: number;
   lng: number;
-  /** True when the animal sits inside at least one boundary. */
+  /** True when the animal is where its boundaries say it should be. */
   inside: boolean;
+  /** True when the breach is being inside a keep-out zone rather than outside a paddock. */
+  inExclusion: boolean;
   /** The containing fence, or (when breached) the nearest one. */
   fenceId: number | null;
   fenceName: string | null;
-  /** Metres beyond the nearest boundary. 0 when contained. */
+  /** Metres beyond the nearest boundary (or into a keep-out zone). 0 when contained. */
   metersOutside: number;
   /** GPS quality, carried through so the UI can flag low-confidence breaches. */
   accuracy: AnimalMarker['accuracy'];
@@ -49,27 +52,32 @@ export interface GeofenceReport {
 export function evaluateGeofences(markers: AnimalMarker[], fences: Geofence[]): GeofenceReport {
   const statuses: AnimalFenceStatus[] = markers.map((m) => {
     const point = { lat: m.lat, lng: m.lng };
-    const containing = fences.find((f) => isPointInPolygon(point, f.ring));
+    const base = { animalId: m.animalId, tag: m.tag, lat: m.lat, lng: m.lng, accuracy: m.accuracy, status: m.status };
+    // A fence assigned to particular animals only holds those animals.
+    const keys = [m.tag, ...(m.keys ?? [])];
+    const applicable = fences.filter((f) => fenceApplies(f, keys));
+    const keepIn = applicable.filter((f) => f.mode !== 'keep_out');
 
+    // Inside a keep-out zone is a breach, however well the animal is otherwise penned.
+    const exclusion = applicable.find((f) => f.mode === 'keep_out' && isPointInPolygon(point, f.ring));
+    if (exclusion) {
+      return { ...base, inside: false, inExclusion: true, fenceId: exclusion.id, fenceName: exclusion.name, metersOutside: distanceToRingMeters(point, exclusion.ring) };
+    }
+
+    // No boundary says where this animal belongs, so it can't be out of place.
+    if (keepIn.length === 0) {
+      return { ...base, inside: true, inExclusion: false, fenceId: null, fenceName: null, metersOutside: 0 };
+    }
+
+    const containing = keepIn.find((f) => isPointInPolygon(point, f.ring));
     if (containing) {
-      return {
-        animalId: m.animalId,
-        tag: m.tag,
-        lat: m.lat,
-        lng: m.lng,
-        inside: true,
-        fenceId: containing.id,
-        fenceName: containing.name,
-        metersOutside: 0,
-        accuracy: m.accuracy,
-        status: m.status,
-      };
+      return { ...base, inside: true, inExclusion: false, fenceId: containing.id, fenceName: containing.name, metersOutside: 0 };
     }
 
     // Outside everything — report against whichever boundary is closest.
     let nearest: Geofence | null = null;
     let nearestDistance = Number.POSITIVE_INFINITY;
-    for (const f of fences) {
+    for (const f of keepIn) {
       const d = distanceToRingMeters(point, f.ring);
       if (d < nearestDistance) {
         nearestDistance = d;
@@ -78,16 +86,12 @@ export function evaluateGeofences(markers: AnimalMarker[], fences: Geofence[]): 
     }
 
     return {
-      animalId: m.animalId,
-      tag: m.tag,
-      lat: m.lat,
-      lng: m.lng,
+      ...base,
       inside: false,
+      inExclusion: false,
       fenceId: nearest?.id ?? null,
       fenceName: nearest?.name ?? null,
       metersOutside: Number.isFinite(nearestDistance) ? nearestDistance : 0,
-      accuracy: m.accuracy,
-      status: m.status,
     };
   });
 
@@ -97,9 +101,10 @@ export function evaluateGeofences(markers: AnimalMarker[], fences: Geofence[]): 
     ? []
     : statuses.filter((s) => !s.inside).sort((a, b) => b.metersOutside - a.metersOutside);
 
+  // Occupancy is who is physically inside each boundary, keep-out zones included.
   const occupancy: FenceOccupancy[] = fences.map((fence) => ({
     fence,
-    animals: statuses.filter((s) => s.inside && s.fenceId === fence.id),
+    animals: statuses.filter((s) => isPointInPolygon({ lat: s.lat, lng: s.lng }, fence.ring)),
   }));
 
   return {

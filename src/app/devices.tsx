@@ -68,6 +68,8 @@ export default function Devices() {
       />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         <Button label={t('dev.sync')} icon="sync" loading={syncing} onPress={onSync} style={{ marginBottom: spacing.sm }} />
+        {/* Ordering lives with the devices, as on the web's Devices page. */}
+        <Button label={t('action.deviceOrders')} icon="cart-outline" variant="outline" onPress={() => router.push('/device-orders' as never)} style={{ marginBottom: spacing.sm }} />
         {syncMessage && (
           <AppText
             variant="caption"

@@ -130,9 +130,12 @@ const LEAFLET_HTML = `<!DOCTYPE html>
     fences.forEach(function (f) {
       var ring = f.ring.map(function (p) { return [p.lat, p.lng]; });
       if (ring.length < 3) return;
+      // A boundary keeps the colour it was drawn in; keep-out zones are solid red-edged.
+      var keepOut = f.mode === 'keep_out';
+      var col = keepOut ? '#d9534f' : (f.color || '#6D874F');
       L.polygon(ring, {
-        color: '#6D874F', weight: 2, opacity: 0.9,
-        fillColor: '#6D874F', fillOpacity: 0.10, dashArray: '6 4'
+        color: col, weight: 2, opacity: 0.9,
+        fillColor: col, fillOpacity: keepOut ? 0.18 : 0.10, dashArray: keepOut ? null : '6 4'
       }).bindTooltip(f.name, {
         permanent: true, direction: 'center', className: 'fence-lbl'
       }).addTo(fenceLayer);

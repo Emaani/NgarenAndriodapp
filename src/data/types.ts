@@ -348,6 +348,11 @@ export interface AnimalMarker {
   lastSeenMins: number;
   status: 'active' | 'inactive';
   provider?: SatelliteProvider;
+  /** Other names the animal goes by (AAN, satellite tag, record id), for fence assignments. */
+  keys?: string[];
+  /** When the fix was taken, for the live telemetry view. */
+  recordedAt?: string;
+  batteryPct?: number | null;
 }
 
 export interface Vet {

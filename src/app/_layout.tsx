@@ -117,6 +117,14 @@ function RootLayout() {
           <Stack.Screen name="admin-mirror/[farmerId]" />
           <Stack.Screen name="notifications" />
           <Stack.Screen name="notification-settings" />
+          <Stack.Screen name="geofences" />
+          <Stack.Screen name="geofence-edit" />
+          <Stack.Screen name="live-telemetry" />
+          <Stack.Screen name="intake" />
+          <Stack.Screen name="device-orders" />
+          <Stack.Screen name="order-devices" />
+          <Stack.Screen name="device-order/[id]" />
+          <Stack.Screen name="partners" />
           </Stack>
           </View>
           </AuthProvider>
