@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
-import { Redirect, useRouter } from 'expo-router';
+import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { Animal } from '@/data/types';
 import {
@@ -64,6 +64,15 @@ export default function Approvals() {
   const { data: herd, reload: reloadHerd } = useResource(getHerd, []);
   const { data: sharedAmendments, reload: reloadShared } = useResource(getSharedAmendments, []);
   const [doneRemote, setDoneRemote] = useState<string[]>([]);
+  // Coming back from a booking shows the record as "Submitted to vet" straight away.
+  useFocusEffect(
+    useCallback(() => {
+      reloadDrafts();
+      reloadAssignments();
+      reloadHerd();
+      reloadShared();
+    }, [reloadDrafts, reloadAssignments, reloadHerd, reloadShared]),
+  );
   const [local, setLocal] = useState<Animal[] | null>(null);
   const [localAmend, setLocalAmend] = useState<AnimalAmendment[] | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
@@ -71,12 +80,22 @@ export default function Approvals() {
 
   const assignmentByAan = useMemo(() => new Map(assignments.map((a) => [a.aan, a])), [assignments]);
   // Records the vet completed: pending on the shared record but not captured on this phone.
+  // A record the farmer handed over is the farmer's to approve, even if this
+  // phone also holds the vet's copy (farmer and vet sharing a device).
+  const handedBack = useMemo(
+    () => new Set(assignments.filter((a) => a.status === 'submitted_for_approval' && a.kind === 'registration').map((a) => a.aan)),
+    [assignments],
+  );
   const vetCompleted = useMemo(() => {
     const localCodes = new Set(pending.map((a) => a.ngarenCode));
     return herd.filter(
-      (a) => a.approvalStatus === 'pending' && !!a.ngarenCode && !localCodes.has(a.ngarenCode) && !doneRemote.includes(a.ngarenCode),
+      (a) =>
+        a.approvalStatus === 'pending' &&
+        !!a.ngarenCode &&
+        (!localCodes.has(a.ngarenCode) || handedBack.has(a.ngarenCode)) &&
+        !doneRemote.includes(a.ngarenCode),
     );
-  }, [herd, pending, doneRemote]);
+  }, [herd, pending, doneRemote, handedBack]);
   // The vet's changes to this farmer's animals that haven't been decided.
   const mineShared = useMemo(() => {
     const myCodes = new Set(herd.map((a) => a.ngarenCode).filter(Boolean));
@@ -92,7 +111,7 @@ export default function Approvals() {
   if (!isAuthenticated) return <Redirect href="/login" />;
   if (!canApprove) return <Redirect href="/(tabs)/home" />;
 
-  const items = local ?? pending;
+  const items = (local ?? pending).filter((a) => !a.ngarenCode || !handedBack.has(a.ngarenCode) || doneRemote.includes(a.ngarenCode));
   const amendments = localAmend ?? amendmentsData;
   // A draft the vet has finished leaves "in progress".
   const openDrafts = drafts.filter((d) => {
@@ -115,6 +134,9 @@ export default function Approvals() {
     setBusy(animal.id);
     try {
       if (approve && !(await setLineageApproval(aan, 'approved'))) throw new Error('not saved');
+      // Keep a copy on this phone in step, so it doesn't ask again.
+      const localCopy = pending.find((p) => p.ngarenCode === aan);
+      if (approve && localCopy) await setLocalAnimalApproval(localCopy.id, 'approved');
       const a = assignmentByAan.get(aan);
       if (a) await updateAssignment(a, approve ? 'approved' : 'submitted_to_vet', me);
       if (approve) await deleteDraft(aan);

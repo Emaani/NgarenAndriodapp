@@ -90,7 +90,8 @@ export default function RequestCallout() {
   const recordLabel = (aan: string) => {
     const d = drafts.find((x) => x.aan === aan);
     const a = animals.find((x) => x.ngarenCode === aan);
-    const name = d?.name || a?.name;
+    // A record with no name is stored under its AAN; don't show it twice.
+    const name = d?.name || (a?.name !== aan ? a?.name : undefined);
     return name ? `${aan} · ${name}` : aan;
   };
 

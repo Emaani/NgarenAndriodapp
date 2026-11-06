@@ -9,6 +9,7 @@ import { getLocalEvents } from '@/data/localEvents';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
 import { uuidToId } from '@/lib/ids';
+import { formatDate } from '@/lib/date';
 import { notify } from '@/lib/toast';
 import { useI18n } from '@/i18n';
 import { ActionChip, AppText, BottomSheet, Button, DatePickerField, Fab, Icon } from '@/ui';
@@ -281,7 +282,7 @@ export default function Calendar() {
 
       {/* The day's activities. A vet answers a booking here: accept, decline,
           or move it to another day or time. */}
-      <BottomSheet visible={!!dayOpen && !amending} onClose={() => setDayOpen(null)} title={dayOpen ?? ''}>
+      <BottomSheet visible={!!dayOpen && !amending} onClose={() => setDayOpen(null)} title={dayOpen ? formatDate(dayOpen) : ''}>
         {dayEventsOpen.map((e) => {
           const pending = e.status === 'pending';
           return (

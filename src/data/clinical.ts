@@ -155,6 +155,23 @@ export async function getHealthRecords(): Promise<HealthRecord[]> {
  * Upcoming calendar events, merged from health-record follow-ups and vet
  * support requests (mirrors useCalendarEvents' derivation). Sorted by date.
  */
+// Bookings store the short service values; the calendar shows the names the farmer chose.
+const SERVICE_NAME: Record<string, string> = {
+  Registration: 'Animal registration & record maintenance',
+  Linkage: 'Device linkage & tag activation',
+  Stocktaking: 'Stock taking',
+  Treatment: 'Animal health',
+  Consultation: 'Information & veterinary advice',
+  Tagging: 'Tagging & activity',
+};
+
+export function serviceNames(services: string): string {
+  return services
+    .split(',')
+    .map((s) => SERVICE_NAME[s.trim()] ?? s.trim())
+    .join(', ');
+}
+
 export async function getCalendarEvents(): Promise<CalendarEvent[]> {
   if (!isSupabaseConfigured()) return MOCK_CALENDAR;
   try {
@@ -168,7 +185,7 @@ export async function getCalendarEvents(): Promise<CalendarEvent[]> {
     // A booking's subject is the farmer and the service asked for (App Review 2026-11-05).
     (visits ?? []).forEach((r: Record<string, unknown>) => {
       const farmer = readDetail(r.additional_notes, 'Farmer');
-      const service = readDetail(r.additional_notes, 'Services') ?? (r.issue_category as string) ?? 'Consultation';
+      const service = serviceNames(readDetail(r.additional_notes, 'Services') ?? (r.issue_category as string) ?? 'Consultation');
       const slot = readDetail(r.additional_notes, 'Slot');
       events.push({
         id: `visit-${r.id}`,
