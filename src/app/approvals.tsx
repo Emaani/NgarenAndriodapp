@@ -111,7 +111,10 @@ export default function Approvals() {
   if (!isAuthenticated) return <Redirect href="/login" />;
   if (!canApprove) return <Redirect href="/(tabs)/home" />;
 
-  const items = (local ?? pending).filter((a) => !a.ngarenCode || !handedBack.has(a.ngarenCode) || doneRemote.includes(a.ngarenCode));
+  // A record the farmer just approved (or one waiting above) isn't listed twice.
+  const items = (local ?? pending).filter(
+    (a) => !a.ngarenCode || (!handedBack.has(a.ngarenCode) && !doneRemote.includes(a.ngarenCode)),
+  );
   const amendments = localAmend ?? amendmentsData;
   // A draft the vet has finished leaves "in progress".
   const openDrafts = drafts.filter((d) => {
