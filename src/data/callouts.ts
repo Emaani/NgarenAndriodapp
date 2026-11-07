@@ -347,22 +347,30 @@ const RESPONSE_TEXT = { accepted: 'Accepted', declined: 'Declined', tentative: '
  * leaves other vets' lists), tentative, or decline. The answer and the vet's
  * name go on the booking, so the farmer sees who answered and how.
  */
+/**
+ * The booking as everyone sees it: the row with the farmer's latest shared
+ * change applied. A vet writing to the booking starts from this, so the
+ * farmer's amendment is kept rather than overwritten.
+ */
+async function currentBooking(uuid: string): Promise<Row> {
+  const { data: row, error } = await supabase.from('vet_support_requests').select('*').eq('id', uuid).maybeSingle();
+  if (error || !row) throw error ?? new Error('Booking not found');
+  return applyChange(row, (await getBookingChanges()).get(uuid));
+}
+
 export async function setBookingStatus(uuid: string, response: 'accepted' | 'declined' | 'tentative', vetName: string): Promise<void> {
   const userId = await currentUserId();
-  const { data: row, error: readErr } = await supabase
-    .from('vet_support_requests')
-    .select('requester_id, additional_notes, preferred_date, issue_category')
-    .eq('id', uuid)
-    .maybeSingle();
-  if (readErr || !row) throw readErr ?? new Error('Booking not found');
+  const row = await currentBooking(uuid);
   let notes = withLine(row.additional_notes, BOOKING_LINE.response, RESPONSE_TEXT[response]);
   notes = withLine(notes, BOOKING_LINE.acceptedBy, response === 'declined' ? undefined : vetName);
+  // The farmer's date and time go into the booking itself with the answer.
+  const base = { additional_notes: notes, preferred_date: row.preferred_date };
   const patch =
     response === 'accepted'
-      ? { status: 'accepted', preferred_vet_id: userId, additional_notes: notes }
+      ? { ...base, status: 'accepted', preferred_vet_id: userId }
       : response === 'declined'
-        ? { status: 'declined', additional_notes: notes }
-        : { additional_notes: notes };
+        ? { ...base, status: 'declined' }
+        : base;
   const { data, error } = await supabase.from('vet_support_requests').update(patch).eq('id', uuid).select('id');
   if (error) throw error;
   if (!data?.length) throw new Error('Booking not updated');

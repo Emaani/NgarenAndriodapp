@@ -3,7 +3,7 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 );
 jest.mock('../../services/supabase', () => ({ supabase: {} }));
 
-import { alertText, calloutToRow, readDetail, requestedAgo, rowToCallout, statusFromRow, takenByAnotherVet, withSlot } from '../callouts';
+import { alertText, applyChange, calloutToRow, readDetail, requestedAgo, rowToCallout, statusFromRow, takenByAnotherVet, withSlot } from '../callouts';
 
 const booking = {
   vetName: 'Dr. Sarah Namukasa',
@@ -181,5 +181,20 @@ describe('records handed to the vet', () => {
     const notes = 'Farmer: Enumi\nSlot: 08:00–10:00\nMode: hybrid';
     expect(withSlot(notes, '14:00–16:00')).toBe('Farmer: Enumi\nMode: hybrid\nSlot: 14:00–16:00');
     expect(withSlot(null, '08:00–10:00')).toBe('Slot: 08:00–10:00');
+  });
+});
+
+describe('a farmer’s shared change to a booking', () => {
+  const row = { id: 'b1', status: 'pending', preferred_date: '2026-11-07', additional_notes: 'Farmer: Enumi\nSlot: 09:00–10:00', updated_at: '2026-11-07T10:00:00Z' };
+  it('moves the visit when the change is newer than the booking', () => {
+    const moved = applyChange(row, { kind: 'amend', date: '2026-11-08', slot: '11:00–12:00', by: 'Enumi', at: '2026-11-07T11:00:00Z' });
+    expect(moved.preferred_date).toBe('2026-11-08');
+    expect(readDetail(moved.additional_notes, 'Slot')).toBe('11:00–12:00');
+  });
+  it('cancels the visit', () => {
+    expect(applyChange(row, { kind: 'cancel', by: 'Enumi', at: '2026-11-07T11:00:00Z' }).status).toBe('cancelled');
+  });
+  it('is ignored once the booking itself was changed later', () => {
+    expect(applyChange(row, { kind: 'cancel', by: 'Enumi', at: '2026-11-07T09:00:00Z' })).toBe(row);
   });
 });
