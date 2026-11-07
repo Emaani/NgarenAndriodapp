@@ -13,6 +13,7 @@ import { addSupportRequest } from '@/data/supportRequests';
 import { getAssignment, updateAssignment } from '@/data/recordAssignments';
 import { RecordAssignment } from '@/lib/recordAssignments';
 import { verifyIdentity } from '@/lib/identityCheck';
+import { handleIdentityResult } from '@/lib/faceIdPrompt';
 import { sendLocalNotification } from '@/services/push';
 import { getHerd } from '@/data/herd';
 import { enqueueAnimalSync, processSyncQueue } from '@/data/syncQueue';
@@ -562,16 +563,13 @@ export default function RegisterAnimal() {
 
   const canSubmit = !!aan && !!idType && !tagTaken && tcsAccepted;
 
-  // Face ID gate (spec 3.1.5): the device's face unlock, fingerprint or screen
-  // lock, so the app never leaves the screen (see lib/identityCheck).
+  // Face ID gate (spec 3.1.5): the face or fingerprint linked to the user's
+  // profile, checked by the phone (see lib/identityCheck). No selfie fallback.
   const verifyFaceId = async (): Promise<boolean> => {
     setFaceVerifying(true);
     try {
-      const result = await verifyIdentity({ promptMessage: t('reg.faceIdPrompt', { aan }), cancelLabel: t('common.cancel') });
-      if (result === 'verified') return true;
-      if (result === 'no_camera_permission') Alert.alert(t('reg.faceIdTitle'), t('reg.faceIdNeeded'));
-      else if (result === 'failed') Alert.alert(t('reg.faceIdTitle'), t('reg.faceIdFailed'));
-      return false;
+      const result = await verifyIdentity({ promptMessage: t('reg.faceIdPrompt', { aan }), cancelLabel: t('common.cancel') }, autoApprove ? 'approve_record' : 'submit_record', aan);
+      return handleIdentityResult(result, t, () => router.push('/face-id-setup' as never));
     } finally {
       setFaceVerifying(false);
     }

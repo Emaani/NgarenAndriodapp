@@ -35,8 +35,8 @@ export default function SignUpSuccess() {
         </AppText>
       </View>
       <Button
-        label={t('common.continue')}
-        onPress={() => router.replace('/(tabs)/home')}
+        label={t('fid.setUpNow')}
+        onPress={() => router.replace('/face-id-setup?next=home' as never)}
         style={{ marginBottom: insets.bottom + spacing.lg }}
       />
     </View>

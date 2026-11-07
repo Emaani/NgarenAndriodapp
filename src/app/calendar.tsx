@@ -3,8 +3,8 @@ import { Alert, Pressable, ScrollView, View, useWindowDimensions } from 'react-n
 import { Redirect, useRouter } from 'expo-router';
 import { colors, radius, spacing } from '@/theme';
 import { CalendarEvent, CalendarType, getCalendarEvents } from '@/data/clinical';
-import { amendBooking, setBookingStatus } from '@/data/callouts';
-import { BOOKING_SLOTS } from '@/data/scheduleSlots';
+import { amendBooking, cancelBooking, setBookingStatus } from '@/data/callouts';
+import { RequestState, TIME_OPTIONS, fulfilmentByVet, parseSlot, requestState, slotText } from '@/lib/scheduling';
 import { getLocalEvents } from '@/data/localEvents';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
@@ -12,7 +12,7 @@ import { uuidToId } from '@/lib/ids';
 import { formatDate } from '@/lib/date';
 import { notify } from '@/lib/toast';
 import { useI18n } from '@/i18n';
-import { ActionChip, AppText, BottomSheet, Button, DatePickerField, Fab, Icon } from '@/ui';
+import { ActionChip, AppText, BottomSheet, Button, DatePickerField, Fab, Icon, PickerField } from '@/ui';
 
 const TYPE_TINT: Record<CalendarType, string> = {
   vet_visit: '#3D99F5',
@@ -36,6 +36,20 @@ const WEEKDAYS_SHORT: Record<string, string[]> = {
   en: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
   sw: ['J2', 'J3', 'J4', 'J5', 'Alh', 'Ij', 'J1'],
 };
+
+// How each request state reads on a chip (Tester feedback 2026-11-07).
+const STATE_VARIANT: Record<RequestState, 'success' | 'warning' | 'error' | 'neutral' | 'info'> = {
+  accepted: 'success',
+  fulfilled: 'success',
+  tentative: 'warning',
+  no_response: 'neutral',
+  declined: 'error',
+  cancelled: 'error',
+  unfulfilled: 'error',
+};
+const STATE_FILTERS: ('all' | RequestState)[] = ['all', 'accepted', 'tentative', 'no_response', 'declined', 'fulfilled', 'unfulfilled', 'cancelled'];
+const toMinutes = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+const fromMinutes = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 
 const isoKey = (y: number, m: number, d: number) =>
   `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
@@ -63,8 +77,13 @@ export default function Calendar() {
   const [dayOpen, setDayOpen] = useState<string | null>(null);
   const [amending, setAmending] = useState<CalendarEvent | null>(null);
   const [amendDate, setAmendDate] = useState('');
-  const [amendSlot, setAmendSlot] = useState('');
+  const [amendStart, setAmendStart] = useState('09:00');
+  const [amendEnd, setAmendEnd] = useState('10:00');
   const [busy, setBusy] = useState<string | null>(null);
+  // Month grid, or the list of requests with their status (Tester feedback 2026-11-07).
+  const [view, setView] = useState<'month' | 'requests'>('month');
+  const [stateFilter, setStateFilter] = useState<'all' | RequestState>('all');
+  const [groupBy, setGroupBy] = useState<'date' | 'service' | 'vet'>('date');
 
   const [cursor, setCursor] = useState(() => {
     const n = new Date();
@@ -97,6 +116,17 @@ export default function Calendar() {
     return out;
   }, [cursor]);
 
+  // Every booking, with where it stands.
+  const requests = useMemo(
+    () =>
+      events
+        .filter((e) => !!e.bookingId)
+        .map((e) => ({ e, state: requestState({ status: e.status ?? 'pending', response: e.response, date: e.date.slice(0, 10), cancelled: e.cancelled }, todayKey) }))
+        .sort((a, b) => a.e.date.localeCompare(b.e.date)),
+    [events, todayKey],
+  );
+  const fulfilment = useMemo(() => fulfilmentByVet(requests.map((r) => ({ vet: r.e.vetName ?? t('ae.ngarenSupport'), state: r.state }))), [requests, t]);
+
   if (loading) return null;
   if (!isAuthenticated) return <Redirect href="/login" />;
 
@@ -119,12 +149,13 @@ export default function Calendar() {
     ]);
   };
 
-  const respond = async (e: CalendarEvent, status: 'accepted' | 'declined') => {
+  const myName = user?.fullName ?? user?.email ?? '';
+  const respond = async (e: CalendarEvent, response: 'accepted' | 'declined' | 'tentative') => {
     if (!e.bookingId) return;
     setBusy(e.id);
     try {
-      await setBookingStatus(e.bookingId, status);
-      notify(status === 'accepted' ? t('cal.accepted') : t('cal.declined'));
+      await setBookingStatus(e.bookingId, response, myName || 'Vet');
+      notify(t(`cal.answered.${response}`));
       reload();
     } catch {
       Alert.alert(t('cal.actionFailTitle'), t('cal.actionFailBody'));
@@ -134,17 +165,44 @@ export default function Calendar() {
   };
 
   const startAmend = (e: CalendarEvent) => {
+    const s = parseSlot(e.slot);
     setAmending(e);
     setAmendDate(e.date.slice(0, 10));
-    setAmendSlot(e.slot ?? '');
+    setAmendStart(s ? fromMinutes(s.start) : '09:00');
+    setAmendEnd(s ? fromMinutes(s.end) : '10:00');
   };
 
+  const cancel = (e: CalendarEvent) => {
+    if (!e.bookingId) return;
+    Alert.alert(t('cal.cancelTitle'), t('cal.cancelBody', { service: e.service ?? e.title }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('cal.cancelConfirm'),
+        style: 'destructive',
+        onPress: async () => {
+          setBusy(e.id);
+          try {
+            await cancelBooking(e.bookingId as string, myName || 'Farmer');
+            notify(t('cal.cancelled'));
+            setDayOpen(null);
+            reload();
+          } catch {
+            Alert.alert(t('cal.actionFailTitle'), t('cal.actionFailBody'));
+          } finally {
+            setBusy(null);
+          }
+        },
+      },
+    ]);
+  };
+
+  const amendOk = !!amendDate && toMinutes(amendEnd) > toMinutes(amendStart);
   const saveAmend = async () => {
-    if (!amending?.bookingId || !amendDate || !amendSlot) return;
+    if (!amending?.bookingId || !amendOk) return;
     setBusy(amending.id);
     try {
-      await amendBooking(amending.bookingId, amendDate, amendSlot, user?.fullName ?? user?.email ?? 'Vet');
-      notify(t('cal.amended'));
+      const how = await amendBooking(amending.bookingId, amendDate, slotText(amendStart, amendEnd), myName || 'User');
+      notify(how === 'shared' ? t('cal.amendShared') : t('cal.amended'));
       setAmending(null);
       setDayOpen(null);
       reload();
@@ -193,8 +251,91 @@ export default function Calendar() {
         <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginTop: spacing.xs }}>
           {monthEventCount === 1 ? t('cal.scheduledOne', { count: monthEventCount }) : t('cal.scheduled', { count: monthEventCount })}
         </AppText>
+        <View style={{ flexDirection: 'row', gap: spacing.xs, marginTop: spacing.sm }}>
+          {(['month', 'requests'] as const).map((v) => (
+            <Pressable
+              key={v}
+              onPress={() => setView(v)}
+              style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.full, backgroundColor: view === v ? colors.primary : colors.surface, borderWidth: 1, borderColor: view === v ? colors.primary : colors.divider }}>
+              <AppText variant="caption" color={view === v ? '#fff' : colors.onSurfaceVariant} style={{ fontWeight: '700' }}>
+                {v === 'month' ? t('cal.viewMonth') : t('cal.viewRequests', { count: requests.length })}
+              </AppText>
+            </Pressable>
+          ))}
+        </View>
       </View>
 
+      {view === 'requests' ? (
+        <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.xs }} style={{ marginBottom: spacing.sm }}>
+            {STATE_FILTERS.map((f) => {
+              const n = f === 'all' ? requests.length : requests.filter((r) => r.state === f).length;
+              const on = stateFilter === f;
+              return (
+                <Pressable
+                  key={f}
+                  onPress={() => setStateFilter(f)}
+                  style={{ paddingHorizontal: spacing.mdMinus, paddingVertical: spacing.xs, borderRadius: radius.full, backgroundColor: on ? colors.primary : colors.surface, borderWidth: 1, borderColor: on ? colors.primary : colors.divider }}>
+                  <AppText variant="caption" color={on ? '#fff' : colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
+                    {f === 'all' ? t('dev.filterAll') : t(`cal.state.${f}`)} ({n})
+                  </AppText>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.md }}>
+            <AppText variant="caption" color={colors.onSurfaceVariant}>{t('cal.groupBy')}</AppText>
+            {(['date', 'service', 'vet'] as const).map((g) => (
+              <Pressable key={g} onPress={() => setGroupBy(g)} style={{ paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radius.full, borderWidth: 1, borderColor: groupBy === g ? colors.primary : colors.divider }}>
+                <AppText variant="caption" color={groupBy === g ? colors.primary : colors.onSurfaceVariant} style={{ fontWeight: '600' }}>{t(`cal.group.${g}`)}</AppText>
+              </Pressable>
+            ))}
+          </View>
+          {(() => {
+            const shown = requests.filter((r) => stateFilter === 'all' || r.state === stateFilter);
+            if (shown.length === 0) return <AppText variant="caption" color={colors.onSurfaceVariant}>{t('cal.noRequests')}</AppText>;
+            const keyOf = (r: (typeof shown)[number]) =>
+              groupBy === 'service' ? r.e.service ?? '—' : groupBy === 'vet' ? r.e.vetName ?? t('ae.ngarenSupport') : formatDate(r.e.date);
+            const groups = new Map<string, typeof shown>();
+            shown.forEach((r) => groups.set(keyOf(r), [...(groups.get(keyOf(r)) ?? []), r]));
+            return [...groups.entries()].map(([g, rows]) => (
+              <View key={g} style={{ marginBottom: spacing.md }}>
+                <AppText variant="overline" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.xs }}>{g}</AppText>
+                {rows.map(({ e, state }) => (
+                  <Pressable
+                    key={e.id}
+                    onPress={() => setDayOpen(e.date.slice(0, 10))}
+                    style={{ borderWidth: 1, borderColor: colors.divider, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.xs, gap: 2 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                      <AppText variant="body" style={{ fontWeight: '600', flex: 1 }}>{e.service ?? e.title}</AppText>
+                      <ActionChip label={t(`cal.state.${state}`)} variant={STATE_VARIANT[state]} />
+                    </View>
+                    <AppText variant="caption" color={colors.onSurfaceVariant}>
+                      {[e.vetName ?? t('ae.ngarenSupport'), formatDate(e.date), e.slot].filter(Boolean).join(' · ')}
+                    </AppText>
+                  </Pressable>
+                ))}
+              </View>
+            ));
+          })()}
+
+          {/* Service fulfilment: accepted visits the vet completed with a report in the app. */}
+          <AppText variant="bodyLarge" style={{ fontWeight: '700', marginTop: spacing.md, marginBottom: spacing.xs }}>{t('cal.fulfilmentTitle')}</AppText>
+          <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>{t('cal.fulfilmentNote')}</AppText>
+          {fulfilment.length === 0 ? (
+            <AppText variant="caption" color={colors.onSurfaceVariant}>{t('cal.fulfilmentNone')}</AppText>
+          ) : (
+            fulfilment.map((f) => (
+              <View key={f.vet} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.divider }}>
+                <AppText variant="body" style={{ flex: 1 }}>{f.vet}</AppText>
+                <AppText variant="caption" color={colors.success}>{t('cal.fulfilledCount', { count: f.fulfilled })}</AppText>
+                <AppText variant="caption" color={colors.error}>{t('cal.unfulfilledCount', { count: f.unfulfilled })}</AppText>
+                <AppText variant="body" style={{ fontWeight: '700', width: 48, textAlign: 'right' }}>{f.score === null ? '—' : `${f.score}%`}</AppText>
+              </View>
+            ))
+          )}
+        </ScrollView>
+      ) : (
       <ScrollView contentContainerStyle={{ paddingBottom: spacing.xxl }}>
         {/* Weekday header row */}
         <View style={{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: colors.divider }}>
@@ -277,6 +418,7 @@ export default function Calendar() {
           </AppText>
         ) : null}
       </ScrollView>
+      )}
 
       <Fab icon="plus" onPress={() => router.push('/add-event' as never)} />
 
@@ -284,27 +426,39 @@ export default function Calendar() {
           or move it to another day or time. */}
       <BottomSheet visible={!!dayOpen && !amending} onClose={() => setDayOpen(null)} title={dayOpen ? formatDate(dayOpen) : ''}>
         {dayEventsOpen.map((e) => {
-          const pending = e.status === 'pending';
+          const state = e.bookingId ? requestState({ status: e.status ?? 'pending', response: e.response, date: e.date.slice(0, 10), cancelled: e.cancelled }, todayKey) : null;
+          const open = state === 'no_response' || state === 'tentative' || state === 'accepted';
+          // A vet answers requests to them; the farmer manages their own.
+          const vetSide = canVet && !e.mine;
           return (
             <View key={e.id} style={{ borderWidth: 1, borderColor: colors.divider, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, gap: spacing.xs }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
                 <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: TYPE_TINT[e.type] }} />
-                <AppText variant="bodyLarge" style={{ fontWeight: '600', flex: 1 }}>{e.title}</AppText>
-                {e.status ? (
-                  <ActionChip
-                    label={t(`cal.status.${e.status}`)}
-                    variant={e.status === 'accepted' ? 'success' : e.status === 'declined' ? 'error' : e.status === 'completed' ? 'info' : 'warning'}
-                  />
-                ) : null}
+                <AppText variant="bodyLarge" style={{ fontWeight: '600', flex: 1 }}>{e.service ?? e.title}</AppText>
+                {state ? <ActionChip label={t(`cal.state.${state}`)} variant={STATE_VARIANT[state]} /> : null}
               </View>
-              {e.slot || e.time ? <AppText variant="caption" color={colors.onSurfaceVariant}>{e.slot ?? e.time}</AppText> : null}
-              {e.bookingId && canVet && e.status !== 'declined' && e.status !== 'completed' ? (
-                <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs }}>
-                  {pending ? <Button label={t('vet.accept')} icon="check" loading={busy === e.id} onPress={() => respond(e, 'accepted')} style={{ flex: 1 }} /> : null}
-                  {pending ? <Button label={t('vet.decline')} variant="outline" onPress={() => respond(e, 'declined')} style={{ flex: 1 }} /> : null}
-                  <Button label={t('cal.amend')} variant="outline" icon="calendar-edit" onPress={() => startAmend(e)} style={{ flex: 1 }} />
+              {e.bookingId ? (
+                <AppText variant="caption" color={colors.onSurfaceVariant}>
+                  {[e.vetName ?? t('ae.ngarenSupport'), formatDate(e.date), e.slot, e.endDate ? t('cal.until', { date: formatDate(e.endDate) }) : ''].filter(Boolean).join(' · ')}
+                </AppText>
+              ) : e.slot || e.time ? (
+                <AppText variant="caption" color={colors.onSurfaceVariant}>{e.slot ?? e.time}</AppText>
+              ) : null}
+              {e.bookingId && !e.mine && e.title.includes(' · ') ? <AppText variant="caption" color={colors.onSurfaceVariant}>{e.title.split(' · ')[0]}</AppText> : null}
+              {e.bookingId && vetSide && open ? (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.xs }}>
+                  {state !== 'accepted' ? <Button label={t('vet.accept')} icon="check" loading={busy === e.id} onPress={() => respond(e, 'accepted')} style={{ flexGrow: 1 }} /> : null}
+                  {state === 'no_response' ? <Button label={t('cal.tentative')} variant="outline" onPress={() => respond(e, 'tentative')} style={{ flexGrow: 1 }} /> : null}
+                  {state !== 'accepted' ? <Button label={t('vet.decline')} variant="outline" onPress={() => respond(e, 'declined')} style={{ flexGrow: 1 }} /> : null}
+                  <Button label={t('cal.amend')} variant="outline" icon="calendar-edit" onPress={() => startAmend(e)} style={{ flexGrow: 1 }} />
                 </View>
-              ) : e.bookingId ? (
+              ) : e.bookingId && e.mine && open ? (
+                <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs }}>
+                  <Button label={t('cal.amend')} variant="outline" icon="calendar-edit" onPress={() => startAmend(e)} style={{ flex: 1 }} />
+                  <Button label={t('cal.cancelConfirm')} variant="danger" loading={busy === e.id} onPress={() => cancel(e)} style={{ flex: 1 }} />
+                </View>
+              ) : null}
+              {e.bookingId ? (
                 <Button
                   label={t('cal.viewBooking')}
                   variant="outline"
@@ -334,21 +488,10 @@ export default function Calendar() {
           {amending?.title}
         </AppText>
         <DatePickerField label={t('fv.preferredDate')} value={amendDate} onSelect={setAmendDate} />
-        <AppText variant="body" style={{ fontWeight: '600', marginBottom: spacing.xs }}>{t('fv.timeSlot')}</AppText>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.md }}>
-          {BOOKING_SLOTS.map((s) => {
-            const on = amendSlot === s;
-            return (
-              <Pressable
-                key={s}
-                onPress={() => setAmendSlot(s)}
-                style={{ paddingHorizontal: spacing.mdMinus, paddingVertical: spacing.xs, borderRadius: radius.full, backgroundColor: on ? colors.primary : colors.surface, borderWidth: 1, borderColor: on ? colors.primary : colors.divider }}>
-                <AppText variant="caption" color={on ? '#fff' : colors.onSurfaceVariant} style={{ fontWeight: '600' }}>{s}</AppText>
-              </Pressable>
-            );
-          })}
-        </View>
-        <Button label={t('cal.amendSave')} icon="send-outline" loading={!!amending && busy === amending.id} disabled={!amendDate || !amendSlot} onPress={saveAmend} />
+        <PickerField label={t('ae.startTime')} value={amendStart} options={TIME_OPTIONS.map((v) => ({ label: v, value: v }))} onSelect={setAmendStart} />
+        <PickerField label={t('ae.endTime')} value={amendEnd} options={TIME_OPTIONS.map((v) => ({ label: v, value: v }))} onSelect={setAmendEnd} />
+        {!amendOk && amendDate ? <AppText variant="caption" color={colors.error} style={{ marginTop: -spacing.sm, marginBottom: spacing.sm }}>{t('ae.endBeforeStart')}</AppText> : null}
+        <Button label={t('cal.amendSave')} icon="send-outline" loading={!!amending && busy === amending.id} disabled={!amendOk} onPress={saveAmend} />
       </BottomSheet>
     </View>
   );

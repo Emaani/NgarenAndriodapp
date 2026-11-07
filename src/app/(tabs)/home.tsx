@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, shadow, spacing } from '@/theme';
 import { summaryFromHerd } from '@/lib/herdFleet';
@@ -22,6 +22,7 @@ import { roleTheme } from '@/lib/roles';
 import { Permission } from '@/lib/permissions';
 import { TAGGING_META, TaggingMethod, taggingMeta } from '@/lib/tagging';
 import { useT } from '@/i18n';
+import { faceIdState } from '@/lib/identityCheck';
 import { ActionGrid, AppText, Icon, IconName, NavBanner, NotificationBell } from '@/ui';
 
 function initials(name: string): string {
@@ -190,6 +191,15 @@ function MoreToggle({ expanded, onToggle, count, t }: { expanded: boolean; onTog
 
 export default function Home() {
   const router = useRouter();
+  // null until known; false shows the Face ID reminder.
+  const [faceIdOk, setFaceIdOk] = useState<boolean | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      faceIdState()
+        .then((s) => setFaceIdOk(s === 'ready'))
+        .catch(() => setFaceIdOk(null));
+    }, []),
+  );
   const insets = useSafeAreaInsets();
   const t = useT();
   const { user, appRole, can, canManageTeam } = useAuth();
@@ -440,6 +450,19 @@ export default function Home() {
               </Pressable>
             </View>
           </>
+        )}
+
+        {/* Face ID belongs to the profile (Tester feedback 2026-11-07): remind until it is set up here. */}
+        {faceIdOk === false && (
+          <NavBanner
+            variant="alert"
+            tint="#0891B2"
+            icon="face-recognition"
+            title={t('fid.bannerTitle')}
+            subtitle={t('fid.bannerSub')}
+            onPress={() => router.push('/face-id-setup' as never)}
+            style={{ marginBottom: spacing.lg }}
+          />
         )}
 
         {/* Maker-checker: pending-approval prompt (Manage Animal Records review). */}

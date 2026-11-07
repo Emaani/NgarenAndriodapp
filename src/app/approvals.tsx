@@ -16,6 +16,7 @@ import { getHerd, setLineageApproval } from '@/data/herd';
 import { decideSharedAmendment, getAssignments, getSharedAmendments, updateAssignment } from '@/data/recordAssignments';
 import { RecordAssignment, SharedAmendment, isActive } from '@/lib/recordAssignments';
 import { verifyIdentity } from '@/lib/identityCheck';
+import { handleIdentityResult } from '@/lib/faceIdPrompt';
 import { formatDate } from '@/lib/date';
 import { notify } from '@/lib/toast';
 import { useResource } from '@/data/hooks';
@@ -128,11 +129,8 @@ export default function Approvals() {
   const decideVetRecord = async (animal: Animal, approve: boolean) => {
     const aan = animal.ngarenCode as string;
     if (approve) {
-      const check = await verifyIdentity({ promptMessage: t('reg.faceIdPrompt', { aan }), cancelLabel: t('common.cancel') });
-      if (check !== 'verified') {
-        if (check !== 'cancelled') Alert.alert(t('reg.faceIdTitle'), t('reg.faceIdFailed'));
-        return;
-      }
+      const check = await verifyIdentity({ promptMessage: t('reg.faceIdPrompt', { aan }), cancelLabel: t('common.cancel') }, 'approve_record', aan);
+      if (!handleIdentityResult(check, t, () => router.push('/face-id-setup' as never))) return;
     }
     setBusy(animal.id);
     try {

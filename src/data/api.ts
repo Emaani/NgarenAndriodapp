@@ -639,6 +639,10 @@ export interface CalloutRequestPayload {
   accessAnimals?: string[];
   /** AANs the farmer hands to the vet to complete or maintain (App Review 2026-11-05). */
   records?: string[];
+  /** The day a visit ends, when it runs past the day it starts (Tester feedback 2026-11-07). */
+  endDate?: string;
+  /** "<id> (n of N)" when the visit is one of a repeating series. */
+  series?: string;
 }
 
 /** Fetch call-out requests, from the platform or else Supabase. Mock only with neither. */

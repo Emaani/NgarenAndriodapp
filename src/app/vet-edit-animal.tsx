@@ -10,6 +10,7 @@ import { logAuditEvent } from '@/data/localAuditEvents';
 import { getAssignment, shareAmendment, updateAssignment } from '@/data/recordAssignments';
 import { RecordAssignment, animalFromSnapshot } from '@/lib/recordAssignments';
 import { verifyIdentity } from '@/lib/identityCheck';
+import { handleIdentityResult } from '@/lib/faceIdPrompt';
 import { textToId } from '@/lib/ids';
 import { useResource } from '@/data/hooks';
 import { useAuth } from '@/services/auth';
@@ -133,13 +134,11 @@ export default function VetEditAnimal() {
     ]);
   };
 
-  // The device's face unlock, fingerprint or screen lock (see lib/identityCheck).
+  // The face or fingerprint linked to the vet's profile (see lib/identityCheck).
   const verifyFaceId = async (): Promise<boolean> => {
-    const result = await verifyIdentity({ promptMessage: t('reg.faceIdPrompt', { aan: animal.ngarenCode ?? animal.tag }), cancelLabel: t('common.cancel') });
-    if (result === 'verified') return true;
-    if (result === 'no_camera_permission') Alert.alert(t('reg.faceIdTitle'), t('reg.faceIdNeeded'));
-    else if (result === 'failed') Alert.alert(t('reg.faceIdTitle'), t('reg.faceIdFailed'));
-    return false;
+    const key = animal.ngarenCode ?? animal.tag;
+    const result = await verifyIdentity({ promptMessage: t('reg.faceIdPrompt', { aan: key }), cancelLabel: t('common.cancel') }, 'submit_amendment', key);
+    return handleIdentityResult(result, t, () => router.push('/face-id-setup' as never));
   };
 
   const startOtp = () => {

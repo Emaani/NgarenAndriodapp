@@ -71,6 +71,7 @@ export default function Settings() {
   const preferences: Row[] = [
     { icon: 'account-outline', label: t('settings.row.editProfile'), route: '/edit-profile', onPress: () => router.push('/edit-profile') },
     { icon: 'lock-reset', label: t('settings.row.changePassword'), onPress: () => router.push('/change-password' as never) },
+    { icon: 'face-recognition', label: t('fid.title'), onPress: () => router.push('/face-id-setup' as never) },
     { icon: 'bell-cog-outline', label: t('settings.row.notificationPrefs'), onPress: () => router.push('/notification-settings') },
     { icon: 'message-outline', label: t('settings.row.messages'), onPress: () => router.push('/messaging' as never) },
   ];

@@ -14,7 +14,7 @@
 import { supabase } from '../services/supabase';
 import { isSupabaseConfigured } from '../config';
 import { reportDataFailure, reportDataSuccess } from '../services/dataHealth';
-import { readDetail, statusFromRow } from './callouts';
+import { BOOKING_LINE, applyChange, getBookingChanges, readDetail, statusFromRow } from './callouts';
 import type { CalloutStatus } from './types';
 
 export interface BreedingRecord {
@@ -61,6 +61,14 @@ export interface CalendarEvent {
   bookingId?: string;
   status?: CalloutStatus;
   slot?: string;
+  /** The service asked for, the vet invited or answering, and their answer. */
+  service?: string;
+  vetName?: string;
+  response?: string;
+  cancelled?: boolean;
+  /** True when the signed-in user made the booking (farmer side). */
+  mine?: boolean;
+  endDate?: string;
 }
 
 /* ------------------------------- mock data -------------------------------- */
@@ -183,7 +191,10 @@ export async function getCalendarEvents(): Promise<CalendarEvent[]> {
     ]);
 
     // A booking's subject is the farmer and the service asked for (App Review 2026-11-05).
-    (visits ?? []).forEach((r: Record<string, unknown>) => {
+    // A farmer's amend or cancel is shared separately (see callouts.applyChange).
+    const [changes, session] = await Promise.all([getBookingChanges(), supabase.auth.getSession()]);
+    const me = session.data.session?.user.id;
+    (visits ?? []).map((v: Record<string, unknown>) => applyChange(v, changes.get(String(v.id)))).forEach((r: Record<string, unknown>) => {
       const farmer = readDetail(r.additional_notes, 'Farmer');
       const service = serviceNames(readDetail(r.additional_notes, 'Services') ?? (r.issue_category as string) ?? 'Consultation');
       const slot = readDetail(r.additional_notes, 'Slot');
@@ -196,6 +207,12 @@ export async function getCalendarEvents(): Promise<CalendarEvent[]> {
         bookingId: String(r.id),
         status: statusFromRow(r.status),
         slot,
+        service,
+        vetName: readDetail(r.additional_notes, BOOKING_LINE.acceptedBy) ?? readDetail(r.additional_notes, 'Preferred vet'),
+        response: readDetail(r.additional_notes, BOOKING_LINE.response),
+        cancelled: String(r.status) === 'cancelled',
+        mine: !!me && r.requester_id === me,
+        endDate: readDetail(r.additional_notes, BOOKING_LINE.ends),
       });
     });
 

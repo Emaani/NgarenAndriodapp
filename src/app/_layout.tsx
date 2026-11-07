@@ -125,6 +125,7 @@ function RootLayout() {
           <Stack.Screen name="order-devices" />
           <Stack.Screen name="device-order/[id]" />
           <Stack.Screen name="partners" />
+          <Stack.Screen name="face-id-setup" />
           </Stack>
           </View>
           </AuthProvider>
