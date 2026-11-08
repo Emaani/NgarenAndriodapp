@@ -14,6 +14,7 @@ type Filter = 'all' | NotificationCategory;
 const FILTERS: { key: Filter; labelKey: string }[] = [
   { key: 'all', labelKey: 'notif.all' },
   { key: 'booking', labelKey: 'notif.booking' },
+  { key: 'message', labelKey: 'notif.message' },
   { key: 'device', labelKey: 'notif.device' },
   { key: 'boundary', labelKey: 'notif.boundary' },
 ];
@@ -77,11 +78,27 @@ export default function Notifications() {
         subtitle={t('notif.subtitle')}
         showBack
         right={
-          <Pressable onPress={() => router.push('/notification-settings')} hitSlop={8}>
-            <Icon name="cog-outline" size={26} color="#fff" />
-          </Pressable>
+          <View style={{ flexDirection: 'row', gap: spacing.md }}>
+            <Pressable onPress={() => router.push('/messaging' as never)} hitSlop={8} accessibilityLabel={t('dm.title')}>
+              <Icon name="message-text-outline" size={26} color="#fff" />
+            </Pressable>
+            <Pressable onPress={() => router.push('/notification-settings')} hitSlop={8}>
+              <Icon name="cog-outline" size={26} color="#fff" />
+            </Pressable>
+          </View>
         }
       />
+      {/* Direct messages live alongside notifications (Nov 2026). */}
+      <Pressable
+        onPress={() => router.push('/messaging' as never)}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.md, marginTop: spacing.md, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.primaryTint }}>
+        <Icon name="message-text-outline" size={20} color={colors.primary} />
+        <View style={{ flex: 1 }}>
+          <AppText variant="body" style={{ fontWeight: '700' }} color={colors.primaryDark}>{t('dm.title')}</AppText>
+          <AppText variant="caption" color={colors.primaryDark}>{t('dm.entrySub')}</AppText>
+        </View>
+        <Icon name="chevron-right" size={20} color={colors.primary} />
+      </Pressable>
       <View style={{ flexDirection: 'row', gap: spacing.sm, padding: spacing.md, paddingBottom: 0 }}>
         {FILTERS.map((f) => (
           <FilterChip key={f.key} label={t(f.labelKey)} active={filter === f.key} onPress={() => setFilter(f.key)} />
@@ -92,7 +109,11 @@ export default function Notifications() {
           <EmptyState icon="bell-off-outline" title={t('notif.emptyTitle')} subtitle={t('notif.emptySub')} />
         ) : (
           filtered.map((n) =>
-            n.category === 'booking' ? (
+            n.category === 'message' && n.senderId ? (
+              <Pressable key={n.id} onPress={() => router.push(`/messages/${n.senderId}?name=${encodeURIComponent(n.senderName ?? '')}` as never)}>
+                <NotificationItem item={n} />
+              </Pressable>
+            ) : n.category === 'booking' ? (
               <Pressable key={n.id} onPress={() => router.push('/vet-requests' as never)}>
                 <NotificationItem item={n} />
               </Pressable>

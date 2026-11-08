@@ -17,6 +17,8 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { router } from 'expo-router';
 import { registerPushToken } from '../data/api';
+import { isSupabaseConfigured } from '../config';
+import { supabase } from './supabase';
 
 // How notifications appear while the app is in the foreground. SDK 56 replaced
 // the deprecated `shouldShowAlert` with the explicit banner/list fields.
@@ -179,7 +181,11 @@ export async function registerForPushNotifications(): Promise<string | null> {
       projectId ? { projectId } : undefined,
     );
     const token = tokenResponse.data;
-    await registerPushToken(token, Platform.OS as 'ios' | 'android');
+    // The database sends every new notification to the user's registered phones.
+    if (isSupabaseConfigured()) {
+      await supabase.rpc('register_push_token', { p_token: token, p_platform: Platform.OS }).then(() => undefined, () => undefined);
+    }
+    await registerPushToken(token, Platform.OS as 'ios' | 'android').catch(() => undefined);
     return token;
   } catch (err) {
     // Expected when no EAS projectId is configured yet — don't crash the app.
@@ -189,9 +195,13 @@ export async function registerForPushNotifications(): Promise<string | null> {
 }
 
 /** Boundary alerts open the map; everything else opens the notification center. */
-function routeForNotification(data: { type?: string } | undefined): void {
+function routeForNotification(data: { type?: string; sender_id?: string; sender_name?: string } | undefined): void {
   if (data?.type === 'BOUNDARY_CHECK') {
     router.push('/(tabs)/track');
+  } else if (data?.type === 'message' && data.sender_id) {
+    router.push(`/messages/${data.sender_id}?name=${encodeURIComponent(data.sender_name ?? '')}` as never);
+  } else if (data?.type === 'vet_request') {
+    router.push('/vet-requests' as never);
   } else {
     router.push('/notifications');
   }
@@ -203,7 +213,7 @@ function routeForNotification(data: { type?: string } | undefined): void {
  */
 export function addNotificationResponseListener(): () => void {
   const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-    const data = response.notification.request.content.data as { type?: string } | undefined;
+    const data = response.notification.request.content.data as { type?: string; sender_id?: string; sender_name?: string } | undefined;
     routeForNotification(data);
   });
   return () => sub.remove();
@@ -219,7 +229,7 @@ export async function routeColdStartNotification(): Promise<void> {
   try {
     const response = await Notifications.getLastNotificationResponseAsync();
     if (!response) return;
-    const data = response.notification.request.content.data as { type?: string } | undefined;
+    const data = response.notification.request.content.data as { type?: string; sender_id?: string; sender_name?: string } | undefined;
     routeForNotification(data);
   } catch (error) {
     console.warn('Cold-start notification routing skipped:', error);

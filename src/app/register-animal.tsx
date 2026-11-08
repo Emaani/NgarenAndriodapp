@@ -521,8 +521,9 @@ export default function RegisterAnimal() {
 
   const tagTaken = useMemo(() => {
     const ref = tag.trim().toLowerCase();
-    return !!ref && herd.some((a) => a.tag.toLowerCase() === ref);
-  }, [tag, herd]);
+    // The record being reviewed or continued is not a clash with itself.
+    return !!ref && herd.some((a) => a.tag.toLowerCase() === ref && a.ngarenCode !== aan);
+  }, [tag, herd, aan]);
 
   const hasSatellite = useMemo(
     () => devices.some((d) => !!deviceModel(d.type)?.satellite),

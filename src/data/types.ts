@@ -142,7 +142,7 @@ export interface UserRole {
   note?: string;
 }
 
-export type NotificationCategory = 'device' | 'boundary' | 'booking' | 'account';
+export type NotificationCategory = 'device' | 'boundary' | 'booking' | 'message' | 'account';
 
 export interface AppNotification {
   id: number;
@@ -154,6 +154,9 @@ export interface AppNotification {
   timestamp: string;
   unread: boolean;
   deviceSerial?: string;
+  /** For a message: who sent it, so tapping opens the conversation. */
+  senderId?: string;
+  senderName?: string;
 }
 
 /**

@@ -12,6 +12,7 @@ type Row = Record<string, unknown>;
 
 function categoryOf(type: unknown): NotificationCategory {
   if (type === 'vet_request') return 'booking';
+  if (type === 'message') return 'message';
   return type === 'device' || type === 'boundary' ? type : 'account';
 }
 
@@ -24,6 +25,8 @@ export function rowToNotification(row: Row): AppNotification {
     message: String(row.body ?? ''),
     timestamp: formatDateTime(String(row.created_at)),
     unread: !row.read,
+    senderId: ((row.metadata as Record<string, unknown> | null)?.sender_id as string | undefined) ?? undefined,
+    senderName: ((row.metadata as Record<string, unknown> | null)?.sender_name as string | undefined) ?? undefined,
   };
 }
 
@@ -35,7 +38,7 @@ export async function getRemoteNotifications(limit: number): Promise<AppNotifica
     // Admins can read every row, but the bell is for the signed-in user's own.
     const { data, error } = await supabase
       .from('notifications')
-      .select('id, type, title, body, read, created_at')
+      .select('id, type, title, body, read, created_at, metadata')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(limit);

@@ -181,6 +181,7 @@ const NOTIFICATION_LOOK: Record<AppNotification['category'], { icon: string; tin
   device: { icon: 'flash', tint: colors.warning },
   boundary: { icon: 'fence', tint: colors.error },
   booking: { icon: 'stethoscope', tint: colors.primary },
+  message: { icon: 'message-text-outline', tint: colors.primary },
   account: { icon: 'information-outline', tint: colors.onSurfaceVariant },
 };
 
