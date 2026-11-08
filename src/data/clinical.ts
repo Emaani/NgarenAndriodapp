@@ -69,6 +69,8 @@ export interface CalendarEvent {
   /** True when the signed-in user made the booking (farmer side). */
   mine?: boolean;
   endDate?: string;
+  /** Service codes, for KPIs and finance reports. */
+  codes?: string;
 }
 
 /* ------------------------------- mock data -------------------------------- */
@@ -213,6 +215,7 @@ export async function getCalendarEvents(): Promise<CalendarEvent[]> {
         cancelled: String(r.status) === 'cancelled',
         mine: !!me && r.requester_id === me,
         endDate: readDetail(r.additional_notes, BOOKING_LINE.ends),
+        codes: readDetail(r.additional_notes, BOOKING_LINE.codes),
       });
     });
 

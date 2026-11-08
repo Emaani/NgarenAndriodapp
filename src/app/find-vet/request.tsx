@@ -8,6 +8,8 @@ import { getHerd } from '@/data/herd';
 import { getFarmerPortfolio } from '@/data/portfolio';
 import { getDrafts } from '@/data/localRegistrationDrafts';
 import { assignRecordsToVet } from '@/data/recordAssignments';
+import { deleteBookingDraft, getBookingDraft, saveBookingDraft } from '@/data/bookingDrafts';
+import { NGAREN_SERVICES, serviceCode, serviceCodes } from '@/lib/serviceCodes';
 import { BOOKING_SLOTS } from '@/data/scheduleSlots';
 import { notify } from '@/lib/toast';
 import { formatDate } from '@/lib/date';
@@ -70,8 +72,17 @@ export default function RequestCallout() {
   // Records handed to the vet (App Review 2026-11-05): incomplete registrations
   // to finish and existing records to maintain. Arriving from "Assign Ngaren"
   // pre-ticks the AAN(s).
-  const [recordAans, setRecordAans] = useState<string[]>(() => (aanParam ? aanParam.split(',').map((a) => a.trim()).filter(Boolean) : []));
-  const toggleRecord = (aan: string) => setRecordAans((prev) => (prev.includes(aan) ? prev.filter((x) => x !== aan) : [...prev, aan]));
+  // The AAN(s) the farmer came from are fixed for this visit (Tester feedback
+  // 2026-11-08); other records can be added on top.
+  const lockedAans = useMemo(() => (aanParam ? aanParam.split(',').map((a) => a.trim()).filter(Boolean) : []), [aanParam]);
+  const [recordAans, setRecordAans] = useState<string[]>(lockedAans);
+  const [showMore, setShowMore] = useState(false);
+  const toggleRecord = (aan: string) => {
+    if (lockedAans.includes(aan)) return;
+    setRecordAans((prev) => (prev.includes(aan) ? prev.filter((x) => x !== aan) : [...prev, aan]));
+  };
+  // Asking Ngaren to handle a record: a Ngaren Service Agent is assigned.
+  const ngarenMode = !vetId && (lockedAans.length > 0 || purposeParam === 'Registration');
 
   // Preferred date for the visit. Pre-filled when the farmer arrived from a
   // vet's availability calendar; otherwise the farmer picks one here, exactly
@@ -82,11 +93,11 @@ export default function RequestCallout() {
 
   // Location is auto-derived from the selected animal's registered location — no
   // manual selection needed (Aug 29 2026 standup).
-  const recordsMode = purposes.includes('Registration');
+  const recordsMode = purposes.includes('Registration') || lockedAans.length > 0;
   // Drafts not yet handed over, and the farmer's own animals, by AAN.
   const openDrafts = useMemo(() => drafts.filter((d) => !d.assignedToVet || recordAans.includes(d.aan)), [drafts, recordAans]);
   const recordAnimals = useMemo(() => animals.filter((a) => !!a.ngarenCode && !drafts.some((d) => d.aan === a.ngarenCode)), [animals, drafts]);
-  const chosenRecords = recordsMode && !noAnimalYet ? recordAans : [];
+  const chosenRecords = recordsMode && !noAnimalYet ? [...new Set([...lockedAans, ...recordAans])] : [];
   const recordLabel = (aan: string) => {
     const d = drafts.find((x) => x.aan === aan);
     const a = animals.find((x) => x.ngarenCode === aan);
@@ -183,16 +194,40 @@ export default function RequestCallout() {
     () =>
       [
         { label: t('fv.purpose.registration'), value: 'Registration' },
+        ...(ngarenMode ? [{ label: t('fv.purpose.health'), value: 'Treatment' }, { label: t('fv.purpose.stocktaking'), value: 'Stocktaking' }] : []),
         { label: t('fv.purpose.linkage'), value: 'Linkage' },
         ...(stockTakeAllowed ? [{ label: t('fv.purpose.stocktaking'), value: 'Stocktaking' }] : []),
         { label: t('fv.purpose.health'), value: 'Treatment' },
         { label: t('fv.purpose.advice'), value: 'Consultation' },
         { label: t('fv.purpose.tagging'), value: 'Tagging' },
         { label: t('fv.purpose.ai'), value: 'Artificial Insemination' },
-      ],
-    [t, stockTakeAllowed],
+      ].filter((o, i, all) => (ngarenMode ? NGAREN_SERVICES.includes(o.value) : true) && all.findIndex((x) => x.value === o.value) === i),
+    [t, stockTakeAllowed, ngarenMode],
   );
   const canSubmit = (!!animal || noAnimalYet || chosenRecords.length > 0) && purposes.length > 0 && tcsAccepted && permissionOk && slotOk;
+
+  // Pick up where the farmer left off, then keep saving as they go.
+  const [restored, setRestored] = useState(lockedAans.length === 0);
+  useEffect(() => {
+    if (!lockedAans.length) return;
+    getBookingDraft(lockedAans[0]).then((d) => {
+      if (d) {
+        setPurposes(d.purposes);
+        setPrefDate(d.prefDate);
+        setSlot(d.slot);
+        setMode(d.mode);
+        setUrgency(d.urgency);
+        setNotes(d.notes);
+        setRecordAans([...new Set([...lockedAans, ...d.recordAans])]);
+        if (d.recordAans.some((a) => !lockedAans.includes(a))) setShowMore(true);
+      }
+      setRestored(true);
+    });
+  }, [lockedAans]);
+  useEffect(() => {
+    if (!restored || !lockedAans.length) return;
+    void saveBookingDraft({ aan: lockedAans[0], purposes, prefDate, slot, mode, urgency, notes, recordAans });
+  }, [restored, lockedAans, purposes, prefDate, slot, mode, urgency, notes, recordAans]);
 
   const onSubmit = async () => {
     if (!canSubmit || submitting) return;
@@ -225,6 +260,7 @@ export default function RequestCallout() {
         notes: `${purposeNote}${linkNote}${onBehalfNote}${scopeNote}${slotNote}${notes}`.trim() || undefined,
         mode,
         service: purposes.join(', ') || undefined,
+        serviceCodes: purposes.length ? serviceCodes(purposes) : undefined,
         photo: photo || undefined,
         scheduledFor,
         scheduledSlot: slot || undefined,
@@ -250,6 +286,7 @@ export default function RequestCallout() {
         });
         if (failed.length) Alert.alert(t('fv.recordsFailTitle'), t('fv.recordsFailBody', { aans: failed.join(', ') }));
       }
+      if (lockedAans.length) await deleteBookingDraft(lockedAans[0]);
       notify(chosenRecords.length ? t('fv.recordsSentToast', { count: chosenRecords.length }) : t('fv.sentToast', { label: animalLabel }));
       // A real on-device notification so the farmer has a durable record + proof
       // notifications work (local — no backend push server needed).
@@ -270,7 +307,11 @@ export default function RequestCallout() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <GradientHeader title={isEmergency ? t('findVet.emergency') : t('health.requestVet')} subtitle={vet ? vet.name : isEmergency ? t('fv.subEmergency') : t('fv.subMatched')} showBack />
+      <GradientHeader
+        title={isEmergency ? t('findVet.emergency') : ngarenMode ? t('fv.requestService') : t('health.requestVet')}
+        subtitle={vet ? vet.name : isEmergency ? t('fv.subEmergency') : ngarenMode ? t('fv.agentAssigned') : t('fv.subMatched')}
+        showBack
+      />
       <Screen contentStyle={{ paddingTop: spacing.md }}>
         {/* Purpose of the visit — mandatory; one or more services (Oct 2026). */}
         <AppText variant="body" style={{ fontWeight: '600', marginBottom: spacing.xs }}>
@@ -290,6 +331,9 @@ export default function RequestCallout() {
                 {on ? <Icon name="check" size={13} color="#fff" /> : null}
                 <AppText variant="caption" color={on ? '#fff' : colors.onSurfaceVariant} style={{ fontWeight: '600' }}>
                   {o.label}
+                </AppText>
+                <AppText variant="caption" color={on ? 'rgba(255,255,255,0.8)' : colors.onSurfaceVariant} style={{ fontSize: 10 }}>
+                  {serviceCode(o.value)}
                 </AppText>
               </Pressable>
             );
@@ -399,10 +443,25 @@ export default function RequestCallout() {
             <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>
               {t('fv.recordsIntro')}
             </AppText>
-            {openDrafts.length > 0 ? (
+            {lockedAans.map((aan) => (
+              <View key={aan} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs }}>
+                <Icon name="checkbox-marked" size={20} color={colors.primary} />
+                <AppText variant="body" color={colors.onSurface} style={{ flex: 1, fontWeight: '700' }}>{recordLabel(aan)}</AppText>
+                <Icon name="lock-outline" size={16} color={colors.onSurfaceVariant} />
+              </View>
+            ))}
+            {lockedAans.length > 0 ? (
+              <Pressable onPress={() => setShowMore((v) => !v)} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.sm }}>
+                <Icon name={showMore ? 'chevron-up' : 'plus-circle-outline'} size={18} color={colors.primary} />
+                <AppText variant="body" color={colors.primary} style={{ fontWeight: '600' }}>{t('fv.addOtherAans')}</AppText>
+              </Pressable>
+            ) : null}
+            {lockedAans.length === 0 || showMore ? (
+            <>
+            {openDrafts.some((d) => !lockedAans.includes(d.aan)) ? (
               <AppText variant="overline" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.xs }}>{t('fv.recordsIncomplete')}</AppText>
             ) : null}
-            {openDrafts.map((d) => {
+            {openDrafts.filter((d) => !lockedAans.includes(d.aan)).map((d) => {
               const on = recordAans.includes(d.aan);
               return (
                 <Pressable key={d.aan} onPress={() => toggleRecord(d.aan)} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs }}>
@@ -412,10 +471,10 @@ export default function RequestCallout() {
                 </Pressable>
               );
             })}
-            {recordAnimals.length > 0 ? (
+            {recordAnimals.some((a) => !lockedAans.includes(a.ngarenCode as string)) ? (
               <AppText variant="overline" color={colors.onSurfaceVariant} style={{ marginTop: spacing.sm, marginBottom: spacing.xs }}>{t('fv.recordsExisting')}</AppText>
             ) : null}
-            {recordAnimals.map((a) => {
+            {recordAnimals.filter((a) => !lockedAans.includes(a.ngarenCode as string)).map((a) => {
               const aan = a.ngarenCode as string;
               const on = recordAans.includes(aan);
               return (
@@ -425,7 +484,9 @@ export default function RequestCallout() {
                 </Pressable>
               );
             })}
-            {openDrafts.length === 0 && recordAnimals.length === 0 ? (
+            </>
+            ) : null}
+            {openDrafts.length === 0 && recordAnimals.length === 0 && lockedAans.length === 0 ? (
               <AppText variant="caption" color={colors.onSurfaceVariant} style={{ marginBottom: spacing.sm }}>{t('fv.recordsNone')}</AppText>
             ) : null}
             <View style={{ height: spacing.sm }} />
@@ -461,10 +522,11 @@ export default function RequestCallout() {
         ) : null}
         <Pressable
           onPress={() => setNoAnimalYet((v) => !v)}
-          style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.md }}>
+          disabled={lockedAans.length > 0}
+          style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.md, opacity: lockedAans.length > 0 ? 0.4 : 1 }}>
           <Icon name={noAnimalYet ? 'checkbox-marked' : 'checkbox-blank-outline'} size={22} color={noAnimalYet ? colors.primary : colors.onSurfaceVariant} />
           <AppText variant="body" color={colors.onSurface} style={{ flex: 1 }}>
-            {t('fv.noAnimalYet')}
+            {t('fv.noAnimalYetPermit')}
           </AppText>
         </Pressable>
 
@@ -488,6 +550,13 @@ export default function RequestCallout() {
             );
           })}
         </View>
+
+        {purposes.includes('Registration') && mode !== 'onsite' ? (
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, backgroundColor: colors.warningTint, borderRadius: radius.md, padding: spacing.sm, marginTop: -spacing.sm, marginBottom: spacing.md }}>
+            <Icon name="information-outline" size={16} color={colors.warning} />
+            <AppText variant="caption" color={colors.onSurface} style={{ flex: 1 }}>{t('fv.onsiteRecommended')}</AppText>
+          </View>
+        ) : null}
 
         {/* Auto-generated meeting link for video / hybrid visits (spec 6). */}
         {meetingLink ? (

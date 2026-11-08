@@ -66,6 +66,11 @@ export function withLocalDetails(remote: Animal, local: Animal | undefined): Ani
     address: local.address,
     coordinates: local.coordinates,
     locationId: local.locationId,
+    // The shared record keeps one photo; the phone keeps the full set and any
+    // newer photos not uploaded yet (Tester feedback 2026-11-08: photos didn't update).
+    photos: local.photos?.length ? local.photos : remote.photos,
+    onboardingPhotos: local.onboardingPhotos ?? remote.onboardingPhotos,
+    photoHistory: local.photoHistory ?? remote.photoHistory,
   };
 }
 

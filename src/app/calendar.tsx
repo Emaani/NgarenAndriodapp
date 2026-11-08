@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
-import { Redirect, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, radius, spacing } from '@/theme';
 import { CalendarEvent, CalendarType, getCalendarEvents } from '@/data/clinical';
 import { amendBooking, cancelBooking, setBookingStatus } from '@/data/callouts';
@@ -74,7 +74,9 @@ export default function Calendar() {
     return [...scheduled, ...derived];
   }, []);
   // The day the user tapped, and a booking being moved (App Review 2026-11-05).
-  const [dayOpen, setDayOpen] = useState<string | null>(null);
+  const { date: dateParam } = useLocalSearchParams<{ date?: string }>();
+  const validDate = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : null;
+  const [dayOpen, setDayOpen] = useState<string | null>(validDate);
   const [amending, setAmending] = useState<CalendarEvent | null>(null);
   const [amendDate, setAmendDate] = useState('');
   const [amendStart, setAmendStart] = useState('09:00');
@@ -86,7 +88,7 @@ export default function Calendar() {
   const [groupBy, setGroupBy] = useState<'date' | 'service' | 'vet'>('date');
 
   const [cursor, setCursor] = useState(() => {
-    const n = new Date();
+    const n = validDate ? new Date(`${validDate}T00:00:00`) : new Date();
     return { year: n.getFullYear(), month: n.getMonth() };
   });
 
@@ -307,7 +309,7 @@ export default function Calendar() {
                     onPress={() => setDayOpen(e.date.slice(0, 10))}
                     style={{ borderWidth: 1, borderColor: colors.divider, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.xs, gap: 2 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                      <AppText variant="body" style={{ fontWeight: '600', flex: 1 }}>{e.service ?? e.title}</AppText>
+                      <AppText variant="body" style={{ fontWeight: '600', flex: 1 }}>{e.service ?? e.title}{e.codes ? ` · ${e.codes}` : ''}</AppText>
                       <ActionChip label={t(`cal.state.${state}`)} variant={STATE_VARIANT[state]} />
                     </View>
                     <AppText variant="caption" color={colors.onSurfaceVariant}>
@@ -434,7 +436,7 @@ export default function Calendar() {
             <View key={e.id} style={{ borderWidth: 1, borderColor: colors.divider, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, gap: spacing.xs }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
                 <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: TYPE_TINT[e.type] }} />
-                <AppText variant="bodyLarge" style={{ fontWeight: '600', flex: 1 }}>{e.service ?? e.title}</AppText>
+                <AppText variant="bodyLarge" style={{ fontWeight: '600', flex: 1 }}>{e.service ?? e.title}{e.codes ? ` · ${e.codes}` : ''}</AppText>
                 {state ? <ActionChip label={t(`cal.state.${state}`)} variant={STATE_VARIANT[state]} /> : null}
               </View>
               {e.bookingId ? (

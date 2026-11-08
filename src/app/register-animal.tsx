@@ -10,7 +10,8 @@ import { getFarmLocation, saveFarmLocation } from '@/data/farmLocation';
 import { addLocalAnimal, getLocalAnimals } from '@/data/localAnimals';
 import { getDraft, saveDraft, deleteDraft } from '@/data/localRegistrationDrafts';
 import { addSupportRequest } from '@/data/supportRequests';
-import { getAssignment, updateAssignment } from '@/data/recordAssignments';
+import { getAssignment, shareableDraft, updateAssignment } from '@/data/recordAssignments';
+import { parentFit } from '@/lib/lineage';
 import { RecordAssignment } from '@/lib/recordAssignments';
 import { verifyIdentity } from '@/lib/identityCheck';
 import { handleIdentityResult } from '@/lib/faceIdPrompt';
@@ -216,7 +217,7 @@ export default function RegisterAnimal() {
 
   // The farm owner approves their own record. A vet, or Ngaren finishing a
   // farmer's record, submits it for the farmer's approval (App Review 2026-11-05).
-  const autoApprove = canManageTeam && !assignment;
+  const autoApprove = canManageTeam && (!assignment || assignment.farmerId === user?.id);
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const breedOptions = useMemo(() => breeds.map((b) => ({ label: b.name, value: b.key })), [breeds]);
   // The farmer's own location only: a vet or admin registers for someone else.
@@ -246,20 +247,24 @@ export default function RegisterAnimal() {
     { label: t('reg.unknown'), value: UNKNOWN },
     { label: t('reg.anotherFarm'), value: EXTERNAL },
   ];
-  const damOptions = useMemo(
-    () => [
+  // Only breeding-age females can be the dam and breeding-age males the sire
+  // (Tester feedback 2026-11-08); an animal with no birth date is offered but marked.
+  const parentOptions = (role: 'dam' | 'sire') => {
+    const ref = dob || new Date().toISOString().slice(0, 10);
+    return [
       ...parentBase,
-      ...herd.filter((a) => a.sex !== 'male').map((a) => ({ label: `${a.name ?? a.tag} · ${a.tag}`, value: a.tag })),
-    ],
-    [herd, t],
-  );
-  const sireOptions = useMemo(
-    () => [
-      ...parentBase,
-      ...herd.filter((a) => a.sex !== 'female').map((a) => ({ label: `${a.name ?? a.tag} · ${a.tag}`, value: a.tag })),
-    ],
-    [herd, t],
-  );
+      ...herd.flatMap((a) => {
+        const fit = parentFit(a, role, ref);
+        if (!fit || a.ngarenCode === aan) return [];
+        const label = `${a.name ?? a.tag} · ${a.tag}${fit === 'age_unknown' ? ` · ${t('reg.ageNotRecorded')}` : ''}`;
+        return [{ label, value: a.tag }];
+      }),
+    ];
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const damOptions = useMemo(() => parentOptions('dam'), [herd, t, dob, aan]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const sireOptions = useMemo(() => parentOptions('sire'), [herd, t, dob, aan]);
 
   const photos = useMemo(
     () => [photoFront, photoLeft, photoRight, photoBack].filter((p): p is string => !!p),
@@ -386,7 +391,10 @@ export default function RegisterAnimal() {
     (async () => {
       const local = await getDraft(draftParam);
       const shared = assignedParam || !local ? await getAssignment(draftParam) : undefined;
-      return { d: local ?? shared?.draft, shared };
+      // Farmer and vet can both work on a handed-over record: use the newer copy.
+      const sharedDraft = shared?.draft;
+      const newerShared = !!sharedDraft && (!local || (sharedDraft.updatedAt ?? '') > (local.updatedAt ?? ''));
+      return { d: newerShared ? sharedDraft : local, shared };
     })().then(({ d, shared }) => {
       if (!active) return;
       if (shared?.kind === 'registration') {
@@ -443,6 +451,19 @@ export default function RegisterAnimal() {
     void saveDraft(collectDraft());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aan, idType, sex, purpose, tag, name, color, breedKey, dob, damChoice, damExternal, sireChoice, sireExternal, photoFront, photoLeft, photoRight, photoBack, locationId, locationName, addr1, addr2, city, country, coords, devices, notes]);
+
+  // A handed-over record is shared at each step: the vet on video and the
+  // farmer on the ground can each fill in their part (Tester feedback 2026-11-08).
+  useEffect(() => {
+    if (!assignment || !user || !aan || step < 2) return;
+    const now = new Date().toISOString();
+    shareableDraft({ ...collectDraft(), createdAt: now, updatedAt: now }, user.id)
+      .then((draft) => updateAssignment(assignment, assignment.status, { id: user.id, name: user.fullName ?? user.email ?? undefined }, { draft }))
+      .then(setAssignment)
+      .catch(() => undefined);
+    // Shared when the step changes, not on every keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
 
   // Satellite and Bluetooth are separate integrations, so switching the
   // identification type drops any device of the previous type.
@@ -669,7 +690,9 @@ export default function RegisterAnimal() {
 
       // Tell the farmer the record is back for approval.
       if (assignment && user) {
-        await updateAssignment(assignment, 'submitted_for_approval', { id: user.id, name: user.fullName ?? user.email ?? undefined }).catch(() => undefined);
+        const now = new Date().toISOString();
+        const finalDraft = await shareableDraft({ ...collectDraft(), createdAt: now, updatedAt: now }, user.id).catch(() => undefined);
+        await updateAssignment(assignment, autoApprove ? 'approved' : 'submitted_for_approval', { id: user.id, name: user.fullName ?? user.email ?? undefined }, finalDraft ? { draft: finalDraft } : {}).catch(() => undefined);
       }
 
       notify(autoApprove ? t('reg.notifyCreated', { aan: code }) : t('reg.notifySubmitted', { aan: code }));

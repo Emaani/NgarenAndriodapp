@@ -53,6 +53,8 @@ export interface RecordAssignment {
   updatedBy: string;
   updatedByName?: string;
   at: string;
+  /** When the farmer handed it over (kept as the assignment moves on). */
+  assignedAt?: string;
 }
 
 /** Still with the vet: shown in the vet's task list and as "Submitted to vet" to the farmer. */

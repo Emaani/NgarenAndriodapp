@@ -60,8 +60,10 @@ export default function VetManageAnimals() {
 
   const filteredHerd = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return herd;
-    return herd.filter((a) =>
+    // Only approved records can be amended: one waiting for the farmer stays in their queue.
+    const editable = herd.filter((a) => a.approvalStatus !== 'pending');
+    if (!q) return editable;
+    return editable.filter((a) =>
       [a.name, a.tag, a.accountNumber, a.ngarenCode, a.breed.name].filter(Boolean).some((x) => String(x).toLowerCase().includes(q)),
     );
   }, [herd, query]);
@@ -71,15 +73,16 @@ export default function VetManageAnimals() {
   if (!canVet) return <Redirect href="/(tabs)/home" />;
 
   // One handed-over record: who, which AAN, what was asked, how the visit runs.
+  const openRecord = (a: RecordAssignment) =>
+    router.push(
+      (a.kind === 'registration'
+        ? `/register-animal?draft=${encodeURIComponent(a.aan)}&assigned=1`
+        : `/vet-edit-animal?aan=${encodeURIComponent(a.aan)}`) as never,
+    );
   const AssignedRow = ({ a }: { a: RecordAssignment }) => (
     <Pressable
-      onPress={() =>
-        router.push(
-          (a.kind === 'registration'
-            ? `/register-animal?draft=${encodeURIComponent(a.aan)}&assigned=1`
-            : `/vet-edit-animal?aan=${encodeURIComponent(a.aan)}`) as never,
-        )
-      }
+      // The request opens in the calendar to accept, decline or propose a new time.
+      onPress={() => (a.date ? router.push(`/calendar?date=${a.date}` as never) : openRecord(a))}
       style={({ pressed }) => [
         { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, gap: 4, borderWidth: 1, borderColor: colors.primary, opacity: pressed ? 0.9 : 1 },
         shadow[1],
@@ -97,8 +100,15 @@ export default function VetManageAnimals() {
         {t('vma.serviceLine', { service: a.kind === 'registration' ? t('vma.serviceRegister') : t('vma.serviceMaintain') })}
       </AppText>
       <AppText variant="caption" color={colors.onSurfaceVariant}>
-        {[a.mode ? t('vma.meetingLine', { mode: t(`fv.${a.mode}`) }) : '', a.date ? formatDate(a.date) : '', a.slot ?? ''].filter(Boolean).join(' · ')}
+        {t('vma.visitLine', { date: a.date ? `${formatDate(a.date)}${a.slot ? ` ${a.slot}` : ''}` : '—', mode: a.mode ? t(`fv.${a.mode}`) : '—' })}
       </AppText>
+      <AppText variant="caption" color={colors.onSurfaceVariant}>
+        {t('vma.assignedOn', { date: formatDateTime(a.assignedAt ?? a.at) })}
+      </AppText>
+      <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs }}>
+        {a.date ? <Button label={t('vma.openCalendar')} icon="calendar-month-outline" variant="outline" onPress={() => router.push(`/calendar?date=${a.date}` as never)} style={{ flex: 1 }} /> : null}
+        <Button label={t('vma.openRecord')} icon="file-document-edit-outline" onPress={() => openRecord(a)} style={{ flex: 1 }} />
+      </View>
     </Pressable>
   );
 

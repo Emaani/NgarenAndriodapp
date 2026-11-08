@@ -76,6 +76,7 @@ function detailLines(p: CalloutRequestPayload): string {
     [DETAIL_LABEL.records, p.records?.join(', ')],
     [BOOKING_LINE.ends, p.endDate],
     [BOOKING_LINE.series, p.series],
+    [BOOKING_LINE.codes, p.serviceCodes],
   ];
   return lines.filter(([, value]) => value).map(([label, value]) => `${label}: ${value}`).join('\n');
 }
@@ -234,6 +235,7 @@ export const BOOKING_LINE = {
   acceptedBy: 'Vet',
   ends: 'Ends',
   series: 'Series',
+  codes: 'Service codes',
 } as const;
 
 /** The notes with `label` set to `value` (removed when there is none), other lines kept. */

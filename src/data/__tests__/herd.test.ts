@@ -54,4 +54,10 @@ describe('withLocalDetails', () => {
   it('leaves animals from other devices untouched', () => {
     expect(withLocalDetails(remote, undefined)).toBe(remote);
   });
+
+  it('shows the photos taken on this phone, not just the one the shared record keeps', () => {
+    const shared = { ...remote, photos: ['https://x/old.jpg'] };
+    expect(withLocalDetails(shared, { ...local, photos: ['file:///new-front.jpg', 'file:///new-left.jpg'] }).photos).toEqual(['file:///new-front.jpg', 'file:///new-left.jpg']);
+    expect(withLocalDetails(shared, { ...local, photos: [] }).photos).toEqual(['https://x/old.jpg']);
+  });
 });

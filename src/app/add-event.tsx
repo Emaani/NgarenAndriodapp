@@ -31,6 +31,7 @@ import {
 } from '@/lib/scheduling';
 import { useAuth } from '@/services/auth';
 import { notify } from '@/lib/toast';
+import { serviceCode } from '@/lib/serviceCodes';
 import { useT } from '@/i18n';
 import { AppText, Button, DatePickerField, GradientHeader, Icon, PickerField, Screen, TextField } from '@/ui';
 
@@ -195,6 +196,7 @@ export default function AddEvent() {
           notes: [link ? `[Meeting link: ${link}]` : '', notes.trim()].filter(Boolean).join(' ') || undefined,
           mode,
           service,
+          serviceCodes: serviceCode(service),
           scheduledFor: dates[i],
           scheduledSlot: slotText(startTime, endTime),
           endDate: span > 0 ? shiftDate(dates[i], span) : undefined,
@@ -271,7 +273,7 @@ export default function AddEvent() {
           options={[{ label: t('urgency.routine'), value: 'Routine' }, { label: t('urgency.emergency'), value: 'Emergency' }]}
           onSelect={(v) => setUrgency(v as CalloutUrgency)}
         />
-        <PickerField label={t('ae.serviceRequest')} required value={service} options={SERVICES.map((s) => ({ label: t(s.label), value: s.value }))} onSelect={setService} />
+        <PickerField label={t('ae.serviceRequest')} required value={service} options={SERVICES.map((s) => ({ label: `${t(s.label)} · ${serviceCode(s.value)}`, value: s.value }))} onSelect={setService} />
 
         {/* Who is invited. */}
         <Label text={t('ae.invitee')} required />

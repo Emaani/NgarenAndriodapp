@@ -643,6 +643,8 @@ export interface CalloutRequestPayload {
   endDate?: string;
   /** "<id> (n of N)" when the visit is one of a repeating series. */
   series?: string;
+  /** Service codes for KPIs, data and finance reports, e.g. "NGS-REG, NGS-HLT". */
+  serviceCodes?: string;
 }
 
 /** Fetch call-out requests, from the platform or else Supabase. Mock only with neither. */

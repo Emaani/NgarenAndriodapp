@@ -114,6 +114,7 @@ export async function assignRecordsToVet(input: {
     updatedBy: input.farmer.id,
     updatedByName: input.farmer.name,
     at,
+    assignedAt: at,
   };
   for (const d of input.drafts) {
     try {

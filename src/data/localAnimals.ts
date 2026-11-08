@@ -80,11 +80,13 @@ export async function setLocalAnimalApproval(
   }
 }
 
-/** True when a capture needs BOTH admin validation and farmer confirmation
- *  before it is finalised — i.e. a record captured by a third party (a vet).
- *  (Oct 2026 standup: vet-side registration is not final until both sign off.) */
-export function requiresDualApproval(a: Animal): boolean {
-  return a.capturedByRole === 'veterinary';
+/** True when a capture needs BOTH admin validation and farmer confirmation.
+ *  No longer: the farmer is the final, sole approver of an animal's
+ *  registration, and Ngaren only reviews for quality assurance (Tester
+ *  feedback 2026-11-08, replacing the Oct 2026 dual sign-off). Kept so the
+ *  approval screen has one place to change if that is reversed. */
+export function requiresDualApproval(_a: Animal): boolean {
+  return false;
 }
 
 /**

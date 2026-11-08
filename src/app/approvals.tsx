@@ -12,6 +12,7 @@ import {
 } from '@/data/localAnimals';
 import { getPendingAmendments, setAmendmentStatus, AnimalAmendment } from '@/data/localAmendments';
 import { getDrafts, deleteDraft, RegistrationDraft } from '@/data/localRegistrationDrafts';
+import { getBookingDrafts } from '@/data/bookingDrafts';
 import { getHerd, setLineageApproval } from '@/data/herd';
 import { decideSharedAmendment, getAssignments, getSharedAmendments, updateAssignment } from '@/data/recordAssignments';
 import { RecordAssignment, SharedAmendment, isActive } from '@/lib/recordAssignments';
@@ -65,6 +66,8 @@ export default function Approvals() {
   const { data: herd, reload: reloadHerd } = useResource(getHerd, []);
   const { data: sharedAmendments, reload: reloadShared } = useResource(getSharedAmendments, []);
   const [doneRemote, setDoneRemote] = useState<string[]>([]);
+  // Service requests started but not sent: "Assignment in progress".
+  const { data: bookingDrafts, reload: reloadBookingDrafts } = useResource(getBookingDrafts, []);
   // Coming back from a booking shows the record as "Submitted to vet" straight away.
   useFocusEffect(
     useCallback(() => {
@@ -72,7 +75,8 @@ export default function Approvals() {
       reloadAssignments();
       reloadHerd();
       reloadShared();
-    }, [reloadDrafts, reloadAssignments, reloadHerd, reloadShared]),
+      reloadBookingDrafts();
+    }, [reloadDrafts, reloadAssignments, reloadHerd, reloadShared, reloadBookingDrafts]),
   );
   const [local, setLocal] = useState<Animal[] | null>(null);
   const [localAmend, setLocalAmend] = useState<AnimalAmendment[] | null>(null);
@@ -105,6 +109,8 @@ export default function Approvals() {
 
   // Field-Operations validators (owner / admin / delegated approver) review here.
   const canApprove = canManageTeam || can('approve_records');
+  // The farmer is the final approver; Ngaren reviews for quality assurance only (Tester feedback 2026-11-08).
+  const readOnly = isAdmin;
   // Which party the signed-in user represents in a dual approval.
   const party: 'admin' | 'farmer' = isAdmin ? 'admin' : 'farmer';
 
@@ -259,10 +265,28 @@ export default function Approvals() {
                   </View>
                   <ActionChip label={t('approvals.awaitingYou')} variant="warning" />
                 </View>
-                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                  <Button label={t('approvals.approve')} icon="check" loading={busy === a.id} onPress={() => decideVetRecord(a, true)} style={{ flex: 1 }} />
-                  <Button label={t('approvals.sendBack')} variant="outline" onPress={() => decideVetRecord(a, false)} style={{ flex: 1 }} />
-                </View>
+                {readOnly ? (
+                  <AppText variant="caption" color={colors.onSurfaceVariant}>{t('approvals.qaOnly')}</AppText>
+                ) : (
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+                    {/* Review opens the record to check or amend it, then approve from there. */}
+                    <Button
+                      label={t('approvals.review')}
+                      icon="file-search-outline"
+                      variant="outline"
+                      onPress={() =>
+                        router.push(
+                          (assignmentByAan.get(a.ngarenCode as string)?.draft
+                            ? `/register-animal?draft=${encodeURIComponent(a.ngarenCode as string)}&assigned=1`
+                            : `/animals/${a.id}`) as never,
+                        )
+                      }
+                      style={{ flexGrow: 1 }}
+                    />
+                    <Button label={t('approvals.approve')} icon="check" loading={busy === a.id} onPress={() => decideVetRecord(a, true)} style={{ flexGrow: 1 }} />
+                    <Button label={t('approvals.sendBack')} variant="outline" onPress={() => decideVetRecord(a, false)} style={{ flexGrow: 1 }} />
+                  </View>
+                )}
               </View>
             ))}
             <View style={{ height: 1, backgroundColor: colors.divider, marginVertical: spacing.md }} />
@@ -305,6 +329,13 @@ export default function Approvals() {
                         <AppText variant="caption" color={colors.primaryDark}>{assignmentNote(assignment)}</AppText>
                       ) : null}
                     </View>
+                    <Button label={t('approvals.continueTogether')} variant="outline" onPress={() => router.push(`/register-animal?draft=${encodeURIComponent(d.aan)}&assigned=1` as never)} style={{ paddingHorizontal: spacing.sm }} />
+                  </View>
+                ) : bookingDrafts.some((b) => b.aan === d.aan) ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.warningTint, borderRadius: radius.sm, padding: spacing.sm }}>
+                    <Icon name="progress-pencil" size={16} color={colors.warning} />
+                    <AppText variant="caption" color={colors.onSurface} style={{ flex: 1, fontWeight: '700' }}>{t('approvals.assignmentInProgress')}</AppText>
+                    <Button label={t('approvals.continueAssignment')} onPress={() => router.push(`/find-vet/request?purpose=Registration&aan=${encodeURIComponent(d.aan)}` as never)} style={{ paddingHorizontal: spacing.sm }} />
                   </View>
                 ) : (
                   <View style={{ flexDirection: 'row', gap: spacing.sm }}>
@@ -396,10 +427,14 @@ export default function Approvals() {
                     )}
                   </>
                 ) : (
+                  readOnly ? (
+                  <AppText variant="caption" color={colors.onSurfaceVariant}>{t('approvals.qaOnly')}</AppText>
+                ) : (
                   <View style={{ flexDirection: 'row', gap: spacing.sm }}>
                     <Button label={t('approvals.activate')} icon="check" loading={busy === a.id} onPress={() => decideSingle(a, 'approved')} style={{ flex: 1 }} />
                     <Button label={t('approvals.reject')} variant="outline" onPress={() => decideSingle(a, 'rejected')} style={{ flex: 1 }} />
                   </View>
+                )
                 )}
               </View>
             );
