@@ -17,6 +17,7 @@ import { verifyIdentity } from '@/lib/identityCheck';
 import { handleIdentityResult } from '@/lib/faceIdPrompt';
 import { sendLocalNotification } from '@/services/push';
 import { getHerd } from '@/data/herd';
+import { getFarmerPortfolio } from '@/data/portfolio';
 import { enqueueAnimalSync, processSyncQueue } from '@/data/syncQueue';
 import { notify } from '@/lib/toast';
 import { Animal, RegisteredDevice } from '@/data/types';
@@ -149,6 +150,10 @@ export default function RegisterAnimal() {
   const { data: paddocks } = useResource(() => (isBackendConfigured() ? getLocations() : Promise.resolve([])), []);
   const { data: herd } = useResource(getHerd, []);
   const { data: localHerd } = useResource(getLocalAnimals, []);
+  // Ngaren (admin) registers for a farmer and the farmer approves (Tester feedback 2026-11-08).
+  const { data: farmers } = useResource(() => (appRole === 'admin' ? getFarmerPortfolio() : Promise.resolve([])), []);
+  const [onBehalfFarmerId, setOnBehalfFarmerId] = useState('');
+  const [savedBreedName, setSavedBreedName] = useState('');
   const { data: farmLocation } = useResource<PlaceDetails | null>(() => getFarmLocation(user?.id), null);
 
   // Wizard position (1..STEP_COUNT). Each step is validated before Next unlocks.
@@ -217,7 +222,9 @@ export default function RegisterAnimal() {
 
   // The farm owner approves their own record. A vet, or Ngaren finishing a
   // farmer's record, submits it for the farmer's approval (App Review 2026-11-05).
-  const autoApprove = canManageTeam && (!assignment || assignment.farmerId === user?.id);
+  // Ngaren never approves a registration itself; the farmer it belongs to does.
+  const capturingForFarmer = appRole === 'admin' && !assignment;
+  const autoApprove = canManageTeam && appRole !== 'admin' && (!assignment || assignment.farmerId === user?.id);
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const breedOptions = useMemo(() => breeds.map((b) => ({ label: b.name, value: b.key })), [breeds]);
   // The farmer's own location only: a vet or admin registers for someone else.
@@ -382,6 +389,8 @@ export default function RegisterAnimal() {
     devices,
     notes,
     startedBy: user?.fullName ?? user?.email ?? undefined,
+    farmerId: onBehalfFarmerId || undefined,
+    breedName: breedOptions.find((b) => b.value === breedKey)?.label ?? (savedBreedName || undefined),
   });
 
   // Resume / edit an existing draft (or existing AAN) passed as ?draft=<aan>.
@@ -415,6 +424,8 @@ export default function RegisterAnimal() {
         setName(d.name ?? '');
         setColor(d.color ?? '');
         setBreedKey(d.breedKey ?? '');
+        setSavedBreedName(d.breedName ?? '');
+        setOnBehalfFarmerId(d.farmerId ?? '');
         setDob(d.dob ?? '');
         setDamChoice(d.damChoice ?? UNKNOWN);
         setDamExternal(d.damExternal ?? '');
@@ -521,7 +532,7 @@ export default function RegisterAnimal() {
   // Per-step completion gates (Oct 2026 spec): identification type is the only
   // mandatory animal field; location (paddock) and coordinates are optional.
   const stepValid: Record<number, boolean> = {
-    1: !!aan,
+    1: !!aan && (!capturingForFarmer || !!onBehalfFarmerId),
     2: !!idType && !tagTaken,
     3: true,
     4: true,
@@ -529,7 +540,7 @@ export default function RegisterAnimal() {
   };
   // A one-line hint for why the current step can't advance yet.
   const stepHint: Record<number, string> = {
-    1: t('reg.needAanFirst'),
+    1: aan && capturingForFarmer && !onBehalfFarmerId ? t('reg.needFarmer') : t('reg.needAanFirst'),
     2: !idType ? t('reg.needIdType') : t('reg.tagTaken'),
     3: '',
     4: '',
@@ -630,7 +641,7 @@ export default function RegisterAnimal() {
   const doSubmit = async () => {
     setSubmitting(true);
     try {
-      const breedName = breedOptions.find((b) => b.value === breedKey)?.label ?? 'Unknown';
+      const breedName = breedOptions.find((b) => b.value === breedKey)?.label ?? (savedBreedName || 'Unknown');
       // Use the AAN generated on step 1 (fall back defensively).
       const code = aan || generateNgarenCode(countryCode);
       // A visual ear tag is not a connected device, so it never gets telemetry.
@@ -672,7 +683,7 @@ export default function RegisterAnimal() {
         adminApproved: autoApprove || appRole === 'admin',
         farmerApproved: autoApprove || (appRole === 'farmer' && !assignment),
         // A record finished for a farmer belongs to that farmer.
-        farmerId: assignment?.farmerId,
+        farmerId: assignment?.farmerId ?? (capturingForFarmer ? onBehalfFarmerId : undefined),
       };
       await addLocalAnimal(newAnimal);
       if (willSaveAsFarm) await saveFarmLocation(user?.id, capturedPlace);
@@ -741,6 +752,18 @@ export default function RegisterAnimal() {
                 />
                 <Button label={t('reg.aanGenerate')} icon="identifier" onPress={generateAan} />
               </>
+            ) : null}
+
+            {/* Ngaren registers for a farmer, who approves the record. */}
+            {capturingForFarmer ? (
+              <PickerField
+                label={t('reg.forFarmer')}
+                required
+                value={onBehalfFarmerId}
+                placeholder={t('fv.onBehalfPlaceholder')}
+                options={farmers.map((f) => ({ label: f.farmerName, value: f.id }))}
+                onSelect={setOnBehalfFarmerId}
+              />
             ) : null}
 
             {/* Alternative: let Ngaren onboard on the farmer's behalf. */}

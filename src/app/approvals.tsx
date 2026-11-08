@@ -11,7 +11,7 @@ import {
   updateLocalAnimal,
 } from '@/data/localAnimals';
 import { getPendingAmendments, setAmendmentStatus, AnimalAmendment } from '@/data/localAmendments';
-import { getDrafts, deleteDraft, RegistrationDraft } from '@/data/localRegistrationDrafts';
+import { getDraft, getDrafts, deleteDraft, saveDraft, RegistrationDraft } from '@/data/localRegistrationDrafts';
 import { getBookingDrafts } from '@/data/bookingDrafts';
 import { getHerd, setLineageApproval } from '@/data/herd';
 import { decideSharedAmendment, getAssignments, getSharedAmendments, updateAssignment } from '@/data/recordAssignments';
@@ -127,7 +127,7 @@ export default function Approvals() {
   // A draft the vet has finished leaves "in progress".
   const openDrafts = drafts.filter((d) => {
     const a = assignmentByAan.get(d.aan);
-    return !a || isActive(a) || a.status === 'cancelled';
+    return (!a || isActive(a) || a.status === 'cancelled') && !vetCompleted.some((v) => v.ngarenCode === d.aan);
   });
   const me = { id: user?.id ?? '', name: user?.fullName ?? user?.email ?? undefined };
 
@@ -177,6 +177,40 @@ export default function Approvals() {
 
   const assignmentNote = (a: RecordAssignment) =>
     [a.date ? formatDate(a.date) : '', a.slot ?? '', a.mode ? t(`fv.${a.mode}`) : ''].filter(Boolean).join(' · ');
+
+  // Review opens the record in the registration form to check or amend before
+  // approving. A record finished before records were shared has no shared copy,
+  // so the form starts from the record itself.
+  const reviewRecord = async (a: Animal) => {
+    const aan = a.ngarenCode as string;
+    if (!assignmentByAan.get(aan)?.draft && !(await getDraft(aan))) {
+      await saveDraft({
+        aan,
+        idType: a.identificationType ?? '',
+        sex: a.sex ?? '',
+        purpose: a.purpose,
+        tag: a.tag !== aan ? a.tag : '',
+        name: a.name ?? '',
+        color: a.color,
+        breedKey: a.breed.key,
+        breedName: a.breed.name,
+        dob: a.dateOfBirth,
+        damChoice: a.damTag ?? '',
+        sireChoice: a.sireTag ?? '',
+        photos: a.photos ?? [],
+        locationName: a.locationName,
+        addr1: a.address?.line1,
+        addr2: a.address?.line2,
+        city: a.address?.city,
+        country: a.address?.country,
+        coords: a.coordinates ?? null,
+        devices: a.devices,
+        notes: a.description,
+        farmerId: a.farmerId,
+      });
+    }
+    router.push(`/register-animal?draft=${encodeURIComponent(aan)}&assigned=1` as never);
+  };
 
   const refresh = () => {
     reload();
@@ -277,13 +311,7 @@ export default function Approvals() {
                       label={t('approvals.review')}
                       icon="file-search-outline"
                       variant="outline"
-                      onPress={() =>
-                        router.push(
-                          (assignmentByAan.get(a.ngarenCode as string)?.draft
-                            ? `/register-animal?draft=${encodeURIComponent(a.ngarenCode as string)}&assigned=1`
-                            : `/animals/${a.id}`) as never,
-                        )
-                      }
+                      onPress={() => void reviewRecord(a)}
                       style={{ flexGrow: 1 }}
                     />
                     <Button label={t('approvals.approve')} icon="check" loading={busy === a.id} onPress={() => decideVetRecord(a, true)} style={{ flexGrow: 1 }} />

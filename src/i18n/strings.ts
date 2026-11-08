@@ -2102,6 +2102,8 @@ const en: Dict = {
   'vma.assignedOn': 'Assigned {date}',
   'vma.openCalendar': 'Calendar',
   'vma.openRecord': 'Open record',
+  'reg.forFarmer': 'Farmer this animal belongs to',
+  'reg.needFarmer': 'Choose the farmer this animal belongs to. The farmer approves the record.',
 };
 
 // Kiswahili — navigation + primary surfaces. UI copy only (no clinical/consent).
@@ -4167,6 +4169,8 @@ const sw: Dict = {
   'vma.assignedOn': 'Imekabidhiwa {date}',
   'vma.openCalendar': 'Kalenda',
   'vma.openRecord': 'Fungua rekodi',
+  'reg.forFarmer': 'Mkulima anayemiliki mnyama huyu',
+  'reg.needFarmer': 'Chagua mkulima anayemiliki mnyama huyu. Mkulima ndiye anaidhinisha rekodi.',
 };
 
 /** Missing keys in a non-English locale fall back to English automatically. */

@@ -324,6 +324,12 @@ export default function AddEvent() {
                 );
               })}
             </View>
+            {service === 'Registration' && mode !== 'onsite' ? (
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, backgroundColor: colors.warningTint, borderRadius: radius.md, padding: spacing.sm, marginTop: -spacing.sm, marginBottom: spacing.md }}>
+                <Icon name="information-outline" size={16} color={colors.warning} />
+                <AppText variant="caption" style={{ flex: 1 }}>{t('fv.onsiteRecommended')}</AppText>
+              </View>
+            ) : null}
             {mode !== 'onsite' ? (
               <Pressable onPress={() => Linking.openURL('https://meet.jit.si').catch(() => {})} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: -spacing.sm, marginBottom: spacing.md }}>
                 <Icon name="video-outline" size={15} color={colors.primary} />

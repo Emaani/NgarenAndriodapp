@@ -19,6 +19,10 @@ export interface RegistrationDraft {
   name?: string;
   color?: string;
   breedKey?: string;
+  /** The breed's name, kept when the key isn't in this phone's breed list. */
+  breedName?: string;
+  /** The farmer the record belongs to, when Ngaren captures it for them. */
+  farmerId?: string;
   dob?: string;
   damChoice?: string;
   damExternal?: string;

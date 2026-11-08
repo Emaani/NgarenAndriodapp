@@ -96,7 +96,10 @@ export default function RequestCallout() {
   const recordsMode = purposes.includes('Registration') || lockedAans.length > 0;
   // Drafts not yet handed over, and the farmer's own animals, by AAN.
   const openDrafts = useMemo(() => drafts.filter((d) => !d.assignedToVet || recordAans.includes(d.aan)), [drafts, recordAans]);
-  const recordAnimals = useMemo(() => animals.filter((a) => !!a.ngarenCode && !drafts.some((d) => d.aan === a.ngarenCode)), [animals, drafts]);
+  const recordAnimals = useMemo(
+    () => animals.filter((a) => !!a.ngarenCode && a.approvalStatus !== 'pending' && !drafts.some((d) => d.aan === a.ngarenCode)),
+    [animals, drafts],
+  );
   const chosenRecords = recordsMode && !noAnimalYet ? [...new Set([...lockedAans, ...recordAans])] : [];
   const recordLabel = (aan: string) => {
     const d = drafts.find((x) => x.aan === aan);
