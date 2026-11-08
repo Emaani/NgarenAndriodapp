@@ -122,7 +122,8 @@ export default function Approvals() {
   const items = (local ?? pending).filter(
     (a) => !a.ngarenCode || (!handedBack.has(a.ngarenCode) && !doneRemote.includes(a.ngarenCode)),
   );
-  const amendments = localAmend ?? amendmentsData;
+  // A change that is also shared (farmer and vet on one phone) is listed once, as the shared one.
+  const amendments = (localAmend ?? amendmentsData).filter((a) => !sharedAmendments.some((sh) => sh.id === a.id));
   // A draft the vet has finished leaves "in progress".
   const openDrafts = drafts.filter((d) => {
     const a = assignmentByAan.get(d.aan);
@@ -160,6 +161,8 @@ export default function Approvals() {
     setBusyAmend(am.id);
     try {
       await decideSharedAmendment(am, status);
+      // Settle this phone's copy of the same change too.
+      await setAmendmentStatus(am.id, status);
       if (status === 'approved') await updateLocalAnimal((a) => a.ngarenCode === am.animalKey, am.patch);
       const a = assignmentByAan.get(am.animalKey);
       if (a && a.status === 'submitted_for_approval') await updateAssignment(a, 'approved', me);
