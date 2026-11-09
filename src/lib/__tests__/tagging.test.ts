@@ -1,6 +1,9 @@
 import {
+  ELA_SUPPORTS_CODED_PHY,
   bleFormFactor,
+  bleReconfigurable,
   bleVariant,
+  puckBatteryYears,
   deviceFitsIdType,
   deviceOptionsFor,
   isBleModel,
@@ -62,10 +65,39 @@ describe('ELA BLE tag variants & battery projection', () => {
     expect(projectedBatteryYears('ELA Blue COIN T', 0, 5)).toBe(3.3);
     expect(projectedBatteryYears('ELA Blue COIN ID', 0, 10)).toBeNull();
   });
+
+  it('does not apply the COIN +40 °C table to PUCK tags', () => {
+    expect(projectedBatteryYears('ELA Blue PUCK ID', 0, 5)).toBeNull();
+    expect(puckBatteryYears('ELA Blue COIN ID', 0, 5)).toBeNull();
+  });
+
+  it("reads ELA's PUCK curves at +80 °C (plan figure) and +23 °C", () => {
+    expect(puckBatteryYears('ELA Blue PUCK ID', 0, 5)).toEqual({ at80: 15.7, at23: 18.4 });
+    expect(puckBatteryYears('ELA Blue PUCK ID', 0, 2)).toEqual({ at80: 9.3, at23: 11 });
+    expect(puckBatteryYears('ELA Blue PUCK ID', 4, 5)).toEqual({ at80: 14.4, at23: 16.9 });
+    expect(puckBatteryYears('ELA Blue PUCK ID', 0, 4)).toBeNull();
+  });
+
+  it("scales MOV and T curves by the ID reference, as ELA's doc §10 does", () => {
+    expect(puckBatteryYears('ELA Blue PUCK MOV', 0, 5)).toEqual({ at80: 14.2, at23: 16.6 });
+    expect(puckBatteryYears('ELA Blue PUCK T', 0, 5)).toEqual({ at80: 13, at23: 15.2 });
+    // +4 dBm at 3 s: ID ratio 14.4 / 12.5 (the doc's own worked figures).
+    expect(puckBatteryYears('ELA Blue PUCK T', 4, 3)).toEqual({ at80: 8.1, at23: 9.5 });
+  });
+
+  it('allows Bluetooth reconfiguration (connected mode) only under 3 s', () => {
+    expect(bleReconfigurable(2)).toBe(true);
+    expect(bleReconfigurable(3)).toBe(false);
+    expect(bleReconfigurable(5)).toBe(false);
+  });
 });
 
 describe('ELA read range', () => {
-  it("returns ELA's open-field measurements at +4 dBm by form factor", () => {
+  it('records that ELA BAF tags have no Coded PHY (long range)', () => {
+    expect(ELA_SUPPORTS_CODED_PHY).toBe(false);
+  });
+
+  it("returns ELA's indicative open-field figures at +4 dBm by form factor", () => {
     expect(openFieldRangeM('ELA Blue PUCK ID')).toBe(500);
     expect(openFieldRangeM('ELA Blue COIN ID')).toBe(200);
     expect(openFieldRangeM('ELA Blue COIN MOV')).toBe(200);

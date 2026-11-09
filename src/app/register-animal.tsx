@@ -35,6 +35,8 @@ import {
   methodForDevices,
   openFieldRangeM,
   projectedBatteryYears,
+  puckBatteryYears,
+  bleReconfigurable,
 } from '@/lib/tagging';
 import { normalizeBleMac } from '@/lib/bleFrame';
 import { buildMacIndex, nearestTags, NearbyTag, noteNearbyTag } from '@/lib/bleResolve';
@@ -1177,20 +1179,38 @@ export default function RegisterAnimal() {
                 <PickerField label={t('reg.blePower')} value={dPower} options={BLE_TX_POWER_OPTIONS} onSelect={setDPower} />
               </View>
             </View>
-            {/* Projected battery life at a sustained +40 °C (ELA, Oct 27 2026). */}
+            {/* Battery: COIN = ELA's +40 °C table (Oct 27 2026); PUCK = ELA's
+                +23/+80 °C curves (doc 04E, Nov 9 2026), planned on +80 °C. */}
             {(() => {
-              const years = projectedBatteryYears(dType, Number(dPower), Number(dInterval));
-              const short = years != null && years < 5;
+              const period = Number(dInterval);
+              const years = projectedBatteryYears(dType, Number(dPower), period);
+              const puck = puckBatteryYears(dType, Number(dPower), period);
+              const short = (years != null && years < 5) || (puck != null && puck.at80 < 5);
               return (
-                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, marginTop: -spacing.xs, marginBottom: spacing.md }}>
-                  <Icon name="battery-heart-variant" size={14} color={short ? colors.warning : colors.onSurfaceVariant} />
-                  <AppText variant="caption" color={short ? colors.warning : colors.onSurfaceVariant} style={{ flex: 1 }}>
-                    {years != null ? t('reg.bleBatteryProjected', { years }) : t('reg.bleBatteryNote')}
-                  </AppText>
-                </View>
+                <>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, marginTop: -spacing.xs, marginBottom: spacing.md }}>
+                    <Icon name="battery-heart-variant" size={14} color={short ? colors.warning : colors.onSurfaceVariant} />
+                    <AppText variant="caption" color={short ? colors.warning : colors.onSurfaceVariant} style={{ flex: 1 }}>
+                      {puck
+                        ? t('reg.bleBatteryPuck', { low: puck.at80, high: puck.at23 })
+                        : years != null
+                          ? t('reg.bleBatteryProjected', { years })
+                          : t('reg.bleBatteryNote')}
+                    </AppText>
+                  </View>
+                  {puck && !bleReconfigurable(period) ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, marginTop: -spacing.sm, marginBottom: spacing.md }}>
+                      <Icon name="bluetooth-settings" size={14} color={colors.onSurfaceVariant} />
+                      <AppText variant="caption" color={colors.onSurfaceVariant} style={{ flex: 1 }}>
+                        {t('reg.bleConnectedMode', { period })}
+                      </AppText>
+                    </View>
+                  ) : null}
+                </>
               );
             })()}
-            {/* Read range: ELA measured +4 dBm in open field only (Nov 2026). */}
+            {/* Read range: ELA's indicative +4 dBm open-field figure, not a
+                guarantee — ELA advises an on-site test with 1–2 tags (Nov 9 2026). */}
             {(() => {
               const metres = openFieldRangeM(dType);
               if (metres == null) return null;
