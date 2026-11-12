@@ -161,12 +161,14 @@ export function puckBatteryYears(type: string, txPowerDbm: number, intervalSec: 
 }
 
 /**
- * ELA's BLE connected mode (reconfiguring a tag over Bluetooth) is reachable only
- * when the advertising period is under 3 s (PUCK doc 04E). At longer periods a
- * tag must be configured before it is fitted (factory TAGSET02 or NFC).
+ * ELA's BLE connected mode (reconfiguring a tag over Bluetooth). Under 3 s is a
+ * RECOMMENDATION, not a limit (Anthony Melliez, Nov 12 2026): at longer periods
+ * the connection may take several tries, but once set it works normally. Tags
+ * can be unlocked and reconfigured at any time with ELA Device Manager; the NFC
+ * lock is managed from the Windows version with an NFC reader, not the mobile app.
  */
-export const ELA_CONNECTED_MODE_MAX_PERIOD_S = 3;
-export const bleReconfigurable = (intervalSec: number) => intervalSec < ELA_CONNECTED_MODE_MAX_PERIOD_S;
+export const ELA_EASY_CONNECT_MAX_PERIOD_S = 3;
+export const bleConnectsEasily = (intervalSec: number) => intervalSec < ELA_EASY_CONNECT_MAX_PERIOD_S;
 
 /**
  * Indicative open-field read range at +4 dBm, metres (ELA, Nov 2 2026). NOT a
@@ -194,8 +196,9 @@ export function openFieldRangeM(type: string): number | null {
  * the 5-year target at +40 °C; PUCK tags clear it at every listed setting (ID
  * 0 dBm / 5 s ≈ 15.7 y at +80 °C). 5 s stays the default: a 15 s scan hears
  * about three adverts from every tag in range, so a stock-take doesn't need 2 s.
- * The trade-off: at 5 s the tag can't be reconfigured over Bluetooth (connected
- * mode needs < 3 s). +4 dBm buys range (indicative only) at the cost of battery.
+ * The trade-off: at 5 s a Bluetooth connection to reconfigure the tag may take a
+ * few tries (ELA recommends < 3 s for easy connection; Device Manager can always
+ * unlock and reconfigure). +4 dBm buys range (indicative only) at the cost of battery.
  */
 export const BLE_FRAME_FORMATS: { value: 'ela_id' | 'ngaren_custom' | 'name_aan'; label: string }[] = [
   { value: 'ngaren_custom', label: 'Ngaren custom frame (AAN in payload)' },

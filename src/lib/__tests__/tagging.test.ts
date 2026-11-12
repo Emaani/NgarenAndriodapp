@@ -1,7 +1,7 @@
 import {
   ELA_SUPPORTS_CODED_PHY,
   bleFormFactor,
-  bleReconfigurable,
+  bleConnectsEasily,
   bleVariant,
   puckBatteryYears,
   deviceFitsIdType,
@@ -85,10 +85,10 @@ describe('ELA BLE tag variants & battery projection', () => {
     expect(puckBatteryYears('ELA Blue PUCK T', 4, 3)).toEqual({ at80: 8.1, at23: 9.5 });
   });
 
-  it('allows Bluetooth reconfiguration (connected mode) only under 3 s', () => {
-    expect(bleReconfigurable(2)).toBe(true);
-    expect(bleReconfigurable(3)).toBe(false);
-    expect(bleReconfigurable(5)).toBe(false);
+  it('flags periods of 3 s or more as "connection may take a few tries" (ELA recommendation, not a limit)', () => {
+    expect(bleConnectsEasily(2)).toBe(true);
+    expect(bleConnectsEasily(3)).toBe(false);
+    expect(bleConnectsEasily(5)).toBe(false);
   });
 });
 

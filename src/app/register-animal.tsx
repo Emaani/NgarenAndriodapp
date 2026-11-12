@@ -36,7 +36,7 @@ import {
   openFieldRangeM,
   projectedBatteryYears,
   puckBatteryYears,
-  bleReconfigurable,
+  bleConnectsEasily,
 } from '@/lib/tagging';
 import { normalizeBleMac } from '@/lib/bleFrame';
 import { buildMacIndex, nearestTags, NearbyTag, noteNearbyTag } from '@/lib/bleResolve';
@@ -1198,7 +1198,7 @@ export default function RegisterAnimal() {
                           : t('reg.bleBatteryNote')}
                     </AppText>
                   </View>
-                  {puck && !bleReconfigurable(period) ? (
+                  {puck && !bleConnectsEasily(period) ? (
                     <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, marginTop: -spacing.sm, marginBottom: spacing.md }}>
                       <Icon name="bluetooth-settings" size={14} color={colors.onSurfaceVariant} />
                       <AppText variant="caption" color={colors.onSurfaceVariant} style={{ flex: 1 }}>
