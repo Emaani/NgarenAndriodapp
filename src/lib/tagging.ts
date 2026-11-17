@@ -103,9 +103,10 @@ export function bleVariant(type: string): 'id' | 'mov' | 't' {
 
 /**
  * Blue COIN projected battery life, years, at a SUSTAINED +40 °C — ELA technical
- * support (Anthony Melliez, Oct 27 2026), for ELA's standard formats. The coin
- * cell caps every configuration at 5 years. Indicative only; a custom frame may
- * shift these slightly. COIN tags only — PUCK tags use ELA_PUCK_CURVES.
+ * support (Anthony Melliez, Oct 27 2026), for ELA's standard formats. ELA caps
+ * the COIN estimate at 5 years (confirmed Nov 17 2026) and expects our custom
+ * frame to give the same +40 °C figures. COIN tags only — PUCK tags use
+ * ELA_PUCK_CURVES.
  */
 export const ELA_AUTONOMY_40C: Record<'id' | 'mov' | 't', Record<string, number>> = {
   //        '<dBm>|<period s>'
@@ -124,8 +125,10 @@ export function projectedBatteryYears(type: string, txPowerDbm: number, interval
  * Blue PUCK battery life, years — read from ELA's "BLE PUCK format – Battery life
  * cycle 04E" (firmware v3.x.x, 10% self-discharge applied, capped at 20 years
  * including storage), sent by Anthony Melliez on Nov 9 2026. ELA has no +40 °C
- * curve; it publishes +23 °C and +80 °C, so a sustained +40 °C is planned on the
- * +80 °C figure (conservative). Other temperatures in the doc: −18 °C ≈ 9 y and
+ * curve; it publishes +23 °C and +80 °C. ELA confirmed (Nov 17 2026) that the
+ * +80 °C curve is a conservative plan for a sustained +40 °C — life at +40 °C is
+ * better, since heat drains the cell faster — and that the PUCK estimate is
+ * capped at 20 years (COIN: 5). Other temperatures in the doc: −18 °C ≈ 9 y and
  * −30 °C ≈ 3 y at 3 s; −40 °C only 0.09 y at 3 s.
  *
  * `id23`, `id80`, `id23p4` are the Blue PUCK ID reference curves (0 dBm at +23 °C
@@ -163,9 +166,13 @@ export function puckBatteryYears(type: string, txPowerDbm: number, intervalSec: 
 /**
  * ELA's BLE connected mode (reconfiguring a tag over Bluetooth). Under 3 s is a
  * RECOMMENDATION, not a limit (Anthony Melliez, Nov 12 2026): at longer periods
- * the connection may take several tries, but once set it works normally. Tags
- * can be unlocked and reconfigured at any time with ELA Device Manager; the NFC
- * lock is managed from the Windows version with an NFC reader, not the mobile app.
+ * the connection may take several tries, but once set it works normally. It
+ * applies to ALL ELA BLE tags on firmware 3.x.x; firmware 4.x.x tags can enter
+ * connected mode at longer periods (Nov 17 2026). Tags can be unlocked and
+ * reconfigured at any time with ELA Device Manager; the NFC lock is managed from
+ * the Windows version with an NFC reader, not the mobile app. Connectable mode
+ * can be switched off for field operation in the custom frame's advertising
+ * settings (NGR-BLE-001 v1.2 asks for that).
  */
 export const ELA_EASY_CONNECT_MAX_PERIOD_S = 3;
 export const bleConnectsEasily = (intervalSec: number) => intervalSec < ELA_EASY_CONNECT_MAX_PERIOD_S;

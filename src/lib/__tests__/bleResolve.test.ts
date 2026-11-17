@@ -23,14 +23,14 @@ describe('resolveDetection', () => {
     const r = resolveDetection(
       {
         mac: 'aa:bb:cc:dd:ee:01',
-        manufacturerData: encodeNgarenFrame({ aan: 'UG-1026-K7Q2MX', variant: 'mov', counter: 7, motionCount: 4 }),
+        manufacturerData: encodeNgarenFrame({ aan: 'UG-1026-K7Q2MX', variant: 'mov', counter: 7, movementTotal: 4 }),
         batteryMv: 2950,
         lowBatteryAlert: true,
         seenAt: now,
       },
       index,
     );
-    expect(r).toMatchObject({ aan: 'UG-1026-K7Q2MX', via: 'frame', mismatch: false, variant: 'mov', motionCount: 4, counter: 7, batteryMv: 2950, lowBattery: true });
+    expect(r).toMatchObject({ aan: 'UG-1026-K7Q2MX', via: 'frame', mismatch: false, variant: 'mov', movementTotal: 4, counter: 7, batteryMv: 2950, lowBattery: true });
   });
 
   it('falls back to the NFC-written name, then the static MAC', () => {
@@ -55,6 +55,15 @@ describe('makeDeduper', () => {
     const frame = { mac: 'AA:BB:CC:DD:EE:01', manufacturerData: encodeNgarenFrame({ aan: 'UG-1026-K7Q2MX', counter: 42 }), seenAt: now };
     expect(isNew(resolveDetection(frame, index))).toBe(true);
     expect(isNew(resolveDetection(frame, index))).toBe(false);
+  });
+
+  it('accepts the same counter again after it has wrapped (days later)', () => {
+    const isNew = makeDeduper();
+    const read = (seenAt: string) =>
+      resolveDetection({ mac: 'AA:BB:CC:DD:EE:01', manufacturerData: encodeNgarenFrame({ aan: 'UG-1026-K7Q2MX', counter: 42 }), seenAt }, index);
+    expect(isNew(read('2026-10-26T10:00:00.000Z'))).toBe(true);
+    // 65 536 frames at 5 s later (~3.8 days) the counter is 42 again.
+    expect(isNew(read('2026-10-30T01:00:00.000Z'))).toBe(true);
   });
 
   it('de-duplicates counter-less reads per MAC within the window', () => {

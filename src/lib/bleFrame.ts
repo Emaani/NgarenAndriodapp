@@ -1,10 +1,11 @@
 /**
  * Ngaren BLE custom frame codec (ELA Innovation BAF firmware) — spec
- * NGR-BLE-001 v1.1 (Oct 27 2026).
+ * NGR-BLE-001 v1.2 (Nov 17 2026), following ELA R&D's review of v1.1.
  *
  * ELA confirmed that Blue COIN / Blue PUCK tags have a STATIC identity (fixed
  * MAC + advertising name, the name changeable only over NFC) and that BAF can
- * carry a custom payload. v1.1 follows ELA's further constraints:
+ * carry a custom payload — as three custom frames, one per tag variant (ID,
+ * MOV, T), all with this 13-byte layout. Constraints:
  *  - a tag is EITHER a MOV (motion) OR a T (temperature) variant, never both,
  *    so the sensor field's meaning depends on the variant;
  *  - battery is NOT in our payload — ELA tags report it in millivolts in the
@@ -18,12 +19,20 @@
  *
  *   0      Frame marker 0x4E ('N')
  *   1      Version (high nibble, = 1) | tag variant (low nibble: 0 ID, 1 MOV, 2 T)
+ *          → the whole byte is 0x10 (ID), 0x11 (MOV) or 0x12 (T)
  *   2–8    AAN, bit-packed (country 8b, month 4b, year 7b, sequence 30b = 49b,
  *          zero-padded to 56b)
- *   9–10   Rolling frame counter, uint16; 0xFFFF = not supported
- *   11–12  Sensor value, by variant; 0x8000 = none (ID tags):
- *            MOV → movement events since the previous frame, uint16
- *            T   → temperature in 0.01 °C, int16 (two's complement)
+ *   9–10   Rolling frame counter, uint16, full range: after 0xFFFF it wraps to
+ *          0x0000 (ELA BAF behaviour). Readers work modulo 65 536.
+ *   11–12  Sensor value, by variant:
+ *            ID  → 0x8000 (no sensor; ignored)
+ *            MOV → cumulative movement events since the tag's last startup,
+ *                  uint16, wrapping after 0xFFFF; readers subtract the previous
+ *                  frame's value (modulo 65 536) to get events in between
+ *            T   → temperature in 0.01 °C, int16 (two's complement); 0x8000 = no reading
+ *
+ * v1.1 → v1.2: 0xFFFF is now a normal counter value (no "unsupported"
+ * sentinel), and MOV carries ELA's cumulative count instead of a per-frame count.
  *
  * Identity can be resolved three ways, in order of preference: the custom
  * frame's AAN, an AAN written into the advertising name, or the static MAC
@@ -41,8 +50,10 @@ export type TagVariant = 'id' | 'mov' | 't';
 export const TAG_VARIANT_CODES: Record<TagVariant, number> = { id: 0, mov: 1, t: 2 };
 const VARIANT_BY_CODE: Record<number, TagVariant> = { 0: 'id', 1: 'mov', 2: 't' };
 
-export const COUNTER_UNSUPPORTED = 0xffff;
+/** No sensor (ID) / no temperature reading (T). Never used for MOV, whose count uses the full uint16 range. */
 export const SENSOR_NONE = 0x8000;
+/** Counters are uint16 and wrap from 0xFFFF to 0x0000. */
+export const U16_RANGE = 0x10000;
 
 /**
  * Stable 8-bit country codes for the packed AAN. Explicit (never derived from
@@ -60,10 +71,10 @@ export interface NgarenFrame {
   version: number;
   variant: TagVariant;
   aan: string;
-  /** Rolling counter, or null when the firmware doesn't provide one. */
-  counter: number | null;
-  /** MOV tags: movement events since the previous frame. */
-  motionCount: number | null;
+  /** Rolling frame counter, 0–65535 (wraps). */
+  counter: number;
+  /** MOV tags: cumulative movement events since the tag's last startup (wraps at 65536). */
+  movementTotal: number | null;
   /** T tags: temperature, °C (0.01 resolution). */
   temperature: number | null;
 }
@@ -129,20 +140,23 @@ export function unpackAan(bytes: Uint8Array): string | null {
 
 /* ------------------------------ frame codec ------------------------------ */
 
+/** A value reduced to the uint16 range, the way the tag's counters wrap. */
+const toU16 = (n: number) => ((Math.round(n) % U16_RANGE) + U16_RANGE) % U16_RANGE;
+
 /**
- * Encode a payload. A motion count is only valid on a MOV tag and a
+ * Encode a payload. A movement count is only valid on a MOV tag and a
  * temperature only on a T tag (ELA: one tag can't carry both) — passing a
- * reading the variant can't produce throws.
+ * reading the variant can't produce throws. Counters wrap like the tag's.
  */
 export function encodeNgarenFrame(input: {
   aan: string;
   variant?: TagVariant;
-  counter?: number | null;
-  motionCount?: number | null;
+  counter?: number;
+  movementTotal?: number | null;
   temperature?: number | null;
 }): Uint8Array {
   const variant = input.variant ?? 'id';
-  if (input.motionCount != null && variant !== 'mov') throw new Error('Motion count needs a MOV tag');
+  if (input.movementTotal != null && variant !== 'mov') throw new Error('Movement count needs a MOV tag');
   if (input.temperature != null && variant !== 't') throw new Error('Temperature needs a T tag');
 
   const out = new Uint8Array(NGAREN_FRAME_LENGTH);
@@ -150,13 +164,13 @@ export function encodeNgarenFrame(input: {
   out[1] = (NGAREN_FRAME_VERSION << 4) | TAG_VARIANT_CODES[variant];
   out.set(packAan(input.aan), 2);
 
-  const counter = input.counter == null ? COUNTER_UNSUPPORTED : Math.max(0, Math.min(0xfffe, Math.round(input.counter)));
+  const counter = toU16(input.counter ?? 0);
   out[9] = counter >> 8;
   out[10] = counter & 0xff;
 
   let sensor = SENSOR_NONE;
-  if (variant === 'mov' && input.motionCount != null) {
-    sensor = Math.max(0, Math.min(0x7fff, Math.round(input.motionCount)));
+  if (variant === 'mov') {
+    sensor = toU16(input.movementTotal ?? 0);
   } else if (variant === 't' && input.temperature != null) {
     sensor = Math.max(-0x7fff, Math.min(0x7fff, Math.round(input.temperature * 100))) & 0xffff;
   }
@@ -176,16 +190,51 @@ export function decodeNgarenFrame(payload: Uint8Array): NgarenFrame | null {
 
   const counter = (payload[9] << 8) | payload[10];
   const sensorRaw = (payload[11] << 8) | payload[12];
-  const hasSensor = sensorRaw !== SENSOR_NONE;
-  const signed = sensorRaw > 0x7fff ? sensorRaw - 0x10000 : sensorRaw;
+  const signed = sensorRaw > 0x7fff ? sensorRaw - U16_RANGE : sensorRaw;
   return {
     version,
     variant,
     aan,
-    counter: counter === COUNTER_UNSUPPORTED ? null : counter,
-    motionCount: variant === 'mov' && hasSensor ? sensorRaw : null,
-    temperature: variant === 't' && hasSensor ? signed / 100 : null,
+    counter,
+    // MOV uses the full uint16 range, so 0x8000 is a real count there.
+    movementTotal: variant === 'mov' ? sensorRaw : null,
+    temperature: variant === 't' && sensorRaw !== SENSOR_NONE ? signed / 100 : null,
   };
+}
+
+/* --------------------------- counter arithmetic -------------------------- */
+
+/** Steps from `prev` to `cur` on a uint16 counter that wraps after 0xFFFF. */
+export function u16Delta(prev: number, cur: number): number {
+  return toU16(cur - prev);
+}
+
+/**
+ * Movement events between two frames from the same MOV tag (ELA: the count is
+ * cumulative since the tag's last startup). Subtracts modulo 65 536.
+ *
+ * When the time between the frames and the advertising period are known, the
+ * frame counter is checked against the elapsed time: a counter that didn't
+ * advance by about elapsed/period means the tag restarted in between, and the
+ * current total is then the events since that restart (a lower bound).
+ * Assumes both counters restart from 0 at startup — to be confirmed by ELA.
+ */
+export function movementEventsBetween(
+  prev: Pick<NgarenFrame, 'counter' | 'movementTotal'>,
+  cur: Pick<NgarenFrame, 'counter' | 'movementTotal'>,
+  timing?: { elapsedSec: number; periodSec: number },
+): { events: number; restarted: boolean } | null {
+  if (prev.movementTotal == null || cur.movementTotal == null) return null;
+  if (timing && timing.periodSec > 0 && timing.elapsedSec >= 0) {
+    const expected = timing.elapsedSec / timing.periodSec;
+    // Beyond one wrap the counter can't be checked against the clock.
+    if (expected < U16_RANGE - 1) {
+      const frames = u16Delta(prev.counter, cur.counter);
+      const slack = Math.max(3, expected * 0.2);
+      if (Math.abs(frames - expected) > slack) return { events: cur.movementTotal, restarted: true };
+    }
+  }
+  return { events: u16Delta(prev.movementTotal, cur.movementTotal), restarted: false };
 }
 
 /**

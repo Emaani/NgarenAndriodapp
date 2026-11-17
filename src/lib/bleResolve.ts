@@ -43,8 +43,10 @@ export interface BleResolution {
   variant: TagVariant | null;
   batteryMv: number | null;
   lowBattery: boolean;
+  /** Frame counter (uint16, wraps); null without a Ngaren frame. */
   counter: number | null;
-  motionCount: number | null;
+  /** MOV: cumulative movement events since the tag's last startup. */
+  movementTotal: number | null;
   temperature: number | null;
   rssi: number | null;
   seenAt: string;
@@ -89,7 +91,7 @@ export function resolveDetection(d: BleDetection, macIndex: Map<string, string>)
     batteryMv: d.batteryMv ?? null,
     lowBattery: !!d.lowBatteryAlert,
     counter: frame?.counter ?? null,
-    motionCount: frame?.motionCount ?? null,
+    movementTotal: frame?.movementTotal ?? null,
     temperature: frame?.temperature ?? null,
     rssi: d.rssi ?? null,
     seenAt: d.seenAt,
@@ -143,24 +145,28 @@ export function matchToHerd(r: BleResolution, animalIdByAan: Map<string, number>
 }
 
 /**
- * De-duplicate reads across phones/gateways. A frame is new when its
- * (mac, counter) pair hasn't been seen; reads without a counter (standard ELA
- * ID frame) are de-duplicated per MAC within `windowMs`.
+ * De-duplicate reads across phones/gateways. A frame is a repeat when the same
+ * (mac, counter) pair was seen within `counterWindowMs` — the window stops the
+ * counter's wrap (after 65 536 frames, ~3.8 days at 5 s) from hiding a genuine
+ * new frame. Reads without a counter (standard ELA frame) are de-duplicated per
+ * MAC within `windowMs`.
  */
-export function makeDeduper(windowMs = 30_000): (r: BleResolution) => boolean {
-  const seenCounters = new Set<string>();
+export function makeDeduper(windowMs = 30_000, counterWindowMs = 10 * 60_000): (r: BleResolution) => boolean {
+  const seenCounters = new Map<string, number>();
   const lastSeenAt = new Map<string, number>();
   return (r) => {
+    const parsed = Date.parse(r.seenAt);
+    const t = Number.isFinite(parsed) ? parsed : Date.now();
     if (r.counter != null) {
       const k = `${r.mac}#${r.counter}`;
-      if (seenCounters.has(k)) return false;
-      seenCounters.add(k);
+      const prev = seenCounters.get(k);
+      if (prev != null && t - prev < counterWindowMs) return false;
+      seenCounters.set(k, t);
       return true;
     }
-    const t = Date.parse(r.seenAt);
     const prev = lastSeenAt.get(r.mac);
-    if (prev != null && Number.isFinite(t) && t - prev < windowMs) return false;
-    lastSeenAt.set(r.mac, Number.isFinite(t) ? t : Date.now());
+    if (prev != null && t - prev < windowMs) return false;
+    lastSeenAt.set(r.mac, t);
     return true;
   };
 }

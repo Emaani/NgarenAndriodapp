@@ -37,6 +37,7 @@ import {
   projectedBatteryYears,
   puckBatteryYears,
   bleConnectsEasily,
+  bleFormFactor,
 } from '@/lib/tagging';
 import { normalizeBleMac } from '@/lib/bleFrame';
 import { buildMacIndex, nearestTags, NearbyTag, noteNearbyTag } from '@/lib/bleResolve';
@@ -1180,7 +1181,8 @@ export default function RegisterAnimal() {
               </View>
             </View>
             {/* Battery: COIN = ELA's +40 °C table (Oct 27 2026); PUCK = ELA's
-                +23/+80 °C curves (doc 04E, Nov 9 2026), planned on +80 °C. */}
+                +23/+80 °C curves (doc 04E), planned on +80 °C — ELA confirmed
+                that as a conservative figure for a sustained +40 °C (Nov 17 2026). */}
             {(() => {
               const period = Number(dInterval);
               const years = projectedBatteryYears(dType, Number(dPower), period);
@@ -1198,7 +1200,8 @@ export default function RegisterAnimal() {
                           : t('reg.bleBatteryNote')}
                     </AppText>
                   </View>
-                  {puck && !bleConnectsEasily(period) ? (
+                  {/* ELA (Nov 17 2026): the 3 s recommendation applies to all ELA BLE tags on firmware 3.x. */}
+                  {bleFormFactor(dType) && !bleConnectsEasily(period) ? (
                     <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, marginTop: -spacing.sm, marginBottom: spacing.md }}>
                       <Icon name="bluetooth-settings" size={14} color={colors.onSurfaceVariant} />
                       <AppText variant="caption" color={colors.onSurfaceVariant} style={{ flex: 1 }}>
