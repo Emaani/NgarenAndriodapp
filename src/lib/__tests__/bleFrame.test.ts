@@ -13,12 +13,14 @@ import {
 } from '@/lib/bleFrame';
 import { generateNgarenCode } from '@/lib/ngaren';
 
-// Reference vectors (spec NGR-BLE-001 v1.2) — computed independently (Python)
+// Reference vectors (spec NGR-BLE-001 v1.3) — computed independently (Python)
 // and quoted verbatim in the spec + payload examples sent to ELA R&D, so the
 // app and the spec can't drift apart.
 const REF_AAN = 'UG-1026-K7Q2MX';
 const REF_PACKED = '01 A3 53 3D C5 4E 80';
-const REF_ID = '4E 10 01 A3 53 3D C5 4E 80 04 D2 80 00';
+// v1.3: ELA's native "no reading" value 0x7FFF (was 0x8000).
+const REF_ID = '4E 10 01 A3 53 3D C5 4E 80 04 D2 7F FF';
+const REF_T_NO_READING = '4E 12 01 A3 53 3D C5 4E 80 00 00 7F FF';
 const REF_MOV = '4E 11 01 A3 53 3D C5 4E 80 04 D2 00 03';
 const REF_T = '4E 12 01 A3 53 3D C5 4E 80 04 D2 0E F1';
 // v1.2: 0xFFFF is an ordinary counter value (65535), the step before the wrap.
@@ -47,7 +49,7 @@ describe('AAN bit-packing', () => {
   });
 });
 
-describe('Ngaren custom frame (v1.2)', () => {
+describe('Ngaren custom frame (v1.3)', () => {
   it('encodes the documented ID / MOV / T reference frames', () => {
     expect(toHex(encodeNgarenFrame({ aan: REF_AAN, variant: 'id', counter: 1234 }))).toBe(REF_ID);
     expect(toHex(encodeNgarenFrame({ aan: REF_AAN, variant: 'mov', counter: 1234, movementTotal: 3 }))).toBe(REF_MOV);
@@ -75,6 +77,31 @@ describe('Ngaren custom frame (v1.2)', () => {
     expect(decodeNgarenFrame(encodeNgarenFrame({ aan: REF_AAN, counter: 0xffff }))!.counter).toBe(65535);
     expect(decodeNgarenFrame(encodeNgarenFrame({ aan: REF_AAN, variant: 'mov', movementTotal: 0x8000 }))!.movementTotal).toBe(32768);
     expect(decodeNgarenFrame(encodeNgarenFrame({ aan: REF_AAN, variant: 't' }))!.temperature).toBeNull();
+  });
+
+  it("uses ELA's native T encoding: 0x7FFF = no reading, 0x8000 is a real (minimum) value", () => {
+    expect(toHex(encodeNgarenFrame({ aan: REF_AAN, variant: 't', counter: 0 }))).toBe(REF_T_NO_READING);
+    const raw = (hi: number, lo: number) => {
+      const f = encodeNgarenFrame({ aan: REF_AAN, variant: 't' });
+      f[11] = hi;
+      f[12] = lo;
+      return decodeNgarenFrame(f)!.temperature;
+    };
+    expect(raw(0x7f, 0xff)).toBeNull();
+    expect(raw(0x80, 0x00)).toBe(-327.68);
+    expect(raw(0x7f, 0xfe)).toBe(327.66);
+    // An out-of-range reading never encodes as the "no reading" value.
+    expect(decodeNgarenFrame(encodeNgarenFrame({ aan: REF_AAN, variant: 't', temperature: 400 }))!.temperature).toBe(327.66);
+  });
+
+  it('a MOV count of 0x7FFF is a real count (MOV has no "no reading" value)', () => {
+    expect(decodeNgarenFrame(encodeNgarenFrame({ aan: REF_AAN, variant: 'mov', movementTotal: 0x7fff }))!.movementTotal).toBe(32767);
+  });
+
+  it('ignores bytes after byte 12 (battery voltage appended by the custom frame)', () => {
+    const frame = encodeNgarenFrame({ aan: REF_AAN, variant: 'mov', counter: 9, movementTotal: 5 });
+    const longer = new Uint8Array([0x57, 0x07, ...frame, 0x0b, 0xcd]);
+    expect(findNgarenFrame(longer)).toMatchObject({ aan: REF_AAN, counter: 9, movementTotal: 5 });
   });
 
   it('rejects a reading the tag variant cannot produce (no motion + temperature on one tag)', () => {

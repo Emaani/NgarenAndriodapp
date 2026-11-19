@@ -1933,7 +1933,6 @@ const en: Dict = {
   'reg.bleBatteryNote': 'ELA gives no projection for this tag and setting. Shorter periods and +4 dBm reduce battery life.',
   'reg.bleBatteryProjected': 'Projected battery life at a sustained +40 °C: about {years} years (ELA COIN estimate; the cell caps it at 5).',
   'reg.bleBatteryPuck': 'Projected battery life (ELA PUCK curves): about {low} years at a sustained +80 °C and {high} years at +23 °C. ELA confirms a sustained +40 °C lasts longer than the +80 °C figure, so plan on that one. ELA caps it at 20 years.',
-  'reg.bleConnectedMode': 'At {period} s, connecting to a tag on firmware 3.x over Bluetooth to change its settings may take a few tries (ELA recommends under 3 s; firmware 4.x connects at longer periods). ELA Device Manager can unlock and reconfigure tags at any time.',
   'reg.bleRange': 'Indicative read range at +4 dBm: about {metres} m in open field. ELA does not guarantee a range: it depends on the surroundings and the receiver. Test 1–2 tags on site before relying on it. These tags have no long-range (Coded PHY) mode.',
   'reg.bleRangeLow': 'The ELA figure is for +4 dBm only: about {metres} m in open field, not guaranteed. Expect less at 0 dBm and test 1–2 tags on site. These tags have no long-range (Coded PHY) mode.',
   'stock.bleNoneTitle': 'No Bluetooth tags registered',
@@ -4081,7 +4080,6 @@ const sw: Dict = {
   'reg.bleBatteryNote': 'ELA haina makadirio ya kitambulisho na mpangilio huu. Vipindi vifupi na +4 dBm vinapunguza maisha ya betri.',
   'reg.bleBatteryProjected': 'Maisha ya betri yanayotarajiwa kwa joto la +40 °C mfululizo: takriban miaka {years} (makadirio ya ELA kwa COIN; seli ina kikomo cha 5).',
   'reg.bleBatteryPuck': 'Maisha ya betri yanayotarajiwa (michoro ya ELA ya PUCK): takriban miaka {low} kwa +80 °C mfululizo na miaka {high} kwa +23 °C. ELA inathibitisha kuwa joto la +40 °C mfululizo hudumu zaidi ya takwimu ya +80 °C, kwa hiyo panga kwa takwimu hiyo. ELA ina kikomo cha miaka 20.',
-  'reg.bleConnectedMode': 'Kwa sekunde {period}, kuunganisha kitambulisho chenye programu dhibiti 3.x kupitia Bluetooth ili kubadilisha mipangilio yake kunaweza kuhitaji majaribio kadhaa (ELA inapendekeza chini ya sekunde 3; programu dhibiti 4.x huunganisha kwa vipindi virefu zaidi). ELA Device Manager inaweza kufungua na kubadilisha mipangilio ya vitambulisho wakati wowote.',
   'reg.bleRange': 'Umbali wa kusoma unaokadiriwa kwa +4 dBm: takriban mita {metres} eneo wazi. ELA haihakikishi umbali: unategemea mazingira na kipokezi. Jaribu vitambulisho 1–2 shambani kabla ya kuutegemea. Vitambulisho hivi havina hali ya masafa marefu (Coded PHY).',
   'reg.bleRangeLow': 'Takwimu ya ELA ni ya +4 dBm tu: takriban mita {metres} eneo wazi, haihakikishwi. Tarajia kidogo zaidi kwa 0 dBm na ujaribu vitambulisho 1–2 shambani. Vitambulisho hivi havina hali ya masafa marefu (Coded PHY).',
 

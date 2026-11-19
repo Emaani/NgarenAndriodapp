@@ -36,8 +36,6 @@ import {
   openFieldRangeM,
   projectedBatteryYears,
   puckBatteryYears,
-  bleConnectsEasily,
-  bleFormFactor,
 } from '@/lib/tagging';
 import { normalizeBleMac } from '@/lib/bleFrame';
 import { buildMacIndex, nearestTags, NearbyTag, noteNearbyTag } from '@/lib/bleResolve';
@@ -1200,15 +1198,6 @@ export default function RegisterAnimal() {
                           : t('reg.bleBatteryNote')}
                     </AppText>
                   </View>
-                  {/* ELA (Nov 17 2026): the 3 s recommendation applies to all ELA BLE tags on firmware 3.x. */}
-                  {bleFormFactor(dType) && !bleConnectsEasily(period) ? (
-                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, marginTop: -spacing.sm, marginBottom: spacing.md }}>
-                      <Icon name="bluetooth-settings" size={14} color={colors.onSurfaceVariant} />
-                      <AppText variant="caption" color={colors.onSurfaceVariant} style={{ flex: 1 }}>
-                        {t('reg.bleConnectedMode', { period })}
-                      </AppText>
-                    </View>
-                  ) : null}
                 </>
               );
             })()}

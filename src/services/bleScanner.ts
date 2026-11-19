@@ -9,7 +9,8 @@
 import { PermissionsAndroid, Platform } from 'react-native';
 import * as Location from 'expo-location';
 import type { BleManager } from 'react-native-ble-plx';
-import { bytesFromBase64 } from '@/lib/bleFrame';
+import { bytesFromBase64, findNgarenFrame } from '@/lib/bleFrame';
+import { parseElaAdvertisement } from '@/lib/bleAdv';
 import type { BleDetection } from '@/lib/bleResolve';
 
 export type BleScanFailure = 'unavailable' | 'permission' | 'bluetooth_off' | 'location_off' | 'failed';
@@ -112,10 +113,18 @@ export async function scanForTags(
           return;
         }
         if (!device) return;
+        // Android: the raw record holds the advertisement AND the scan response,
+        // so the custom frame and ELA's battery data (same company id) both
+        // survive. Fall back to the single manufacturerData field elsewhere.
+        const raw = bytesFromBase64(device.rawScanRecord);
+        const ela = raw ? parseElaAdvertisement(raw) : null;
+        const frameData = ela?.manufacturerData.find((m) => findNgarenFrame(m)) ?? null;
         onDetection({
           mac: device.id,
           name: device.localName ?? device.name,
-          manufacturerData: bytesFromBase64(device.manufacturerData),
+          manufacturerData: frameData ?? bytesFromBase64(device.manufacturerData),
+          batteryMv: ela?.batteryMv ?? null,
+          lowBatteryAlert: ela?.lowBatteryPercent != null,
           rssi: device.rssi,
           seenAt: new Date().toISOString(),
         });

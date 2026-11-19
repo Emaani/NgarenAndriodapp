@@ -164,18 +164,14 @@ export function puckBatteryYears(type: string, txPowerDbm: number, intervalSec: 
 }
 
 /**
- * ELA's BLE connected mode (reconfiguring a tag over Bluetooth). Under 3 s is a
- * RECOMMENDATION, not a limit (Anthony Melliez, Nov 12 2026): at longer periods
- * the connection may take several tries, but once set it works normally. It
- * applies to ALL ELA BLE tags on firmware 3.x.x; firmware 4.x.x tags can enter
- * connected mode at longer periods (Nov 17 2026). Tags can be unlocked and
- * reconfigured at any time with ELA Device Manager; the NFC lock is managed from
- * the Windows version with an NFC reader, not the mobile app. Connectable mode
- * can be switched off for field operation in the custom frame's advertising
- * settings (NGR-BLE-001 v1.2 asks for that).
+ * Firmware and reconfiguration (ELA, Nov 18 2026): pilot tags ship with firmware
+ * 4.x.x, the only firmware with Bluetooth Advanced Features (our custom frame).
+ * ELA's "under 3 s" connected-mode recommendation is for firmware 3.x.x only, so
+ * it doesn't apply to our tags. Connectable mode is OFF in the field; tags are
+ * still unlocked and reconfigured over NFC with ELA Device Manager (Windows
+ * version + NFC reader), not the mobile app.
  */
-export const ELA_EASY_CONNECT_MAX_PERIOD_S = 3;
-export const bleConnectsEasily = (intervalSec: number) => intervalSec < ELA_EASY_CONNECT_MAX_PERIOD_S;
+export const ELA_PILOT_FIRMWARE = '4.x.x';
 
 /**
  * Indicative open-field read range at +4 dBm, metres (ELA, Nov 2 2026). NOT a
@@ -203,9 +199,8 @@ export function openFieldRangeM(type: string): number | null {
  * the 5-year target at +40 °C; PUCK tags clear it at every listed setting (ID
  * 0 dBm / 5 s ≈ 15.7 y at +80 °C). 5 s stays the default: a 15 s scan hears
  * about three adverts from every tag in range, so a stock-take doesn't need 2 s.
- * The trade-off: at 5 s a Bluetooth connection to reconfigure the tag may take a
- * few tries (ELA recommends < 3 s for easy connection; Device Manager can always
- * unlock and reconfigure). +4 dBm buys range (indicative only) at the cost of battery.
+ * Reconfiguration is over NFC with ELA Device Manager, so the period doesn't
+ * affect it. +4 dBm buys range (indicative only) at the cost of battery.
  */
 export const BLE_FRAME_FORMATS: { value: 'ela_id' | 'ngaren_custom' | 'name_aan'; label: string }[] = [
   { value: 'ngaren_custom', label: 'Ngaren custom frame (AAN in payload)' },

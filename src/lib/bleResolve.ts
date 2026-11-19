@@ -22,11 +22,17 @@ export interface BleDetection {
   /** Raw Manufacturer Specific Data (with or without company id). */
   manufacturerData?: Uint8Array | null;
   /**
-   * Battery from ELA's SCAN RESPONSE, in mV — only present when the tag's
-   * "Battery voltage presence" parameter is on and the reader scans actively.
+   * Battery in mV. Standard ELA frames: from the SCAN RESPONSE
+   * (`06 FF 57 07 F2 <LSB> <MSB>`, "Battery voltage presence" on, active scan —
+   * see lib/bleAdv). Ngaren custom frame: ELA's custom frame adds the voltage
+   * itself (ELA R&D, Nov 19 2026); its position is still to be confirmed.
    */
   batteryMv?: number | null;
-  /** ELA's low-battery alert (≤15%), also carried in the scan response. */
+  /**
+   * ELA's < 15 % battery alert — standard frames only, and only with "Battery
+   * voltage presence" off. Custom-frame tags never send it, so low battery has
+   * to be judged from the voltage.
+   */
   lowBatteryAlert?: boolean;
   rssi?: number | null;
   seenAt: string;

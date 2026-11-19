@@ -1,6 +1,7 @@
 /**
  * Ngaren BLE custom frame codec (ELA Innovation BAF firmware) — spec
- * NGR-BLE-001 v1.2 (Nov 17 2026), following ELA R&D's review of v1.1.
+ * NGR-BLE-001 v1.3 (Nov 19 2026), following ELA R&D's answers to v1.2. ELA R&D
+ * is now building the custom frame on firmware 4.x.x.
  *
  * ELA confirmed that Blue COIN / Blue PUCK tags have a STATIC identity (fixed
  * MAC + advertising name, the name changeable only over NFC) and that BAF can
@@ -8,9 +9,11 @@
  * MOV, T), all with this 13-byte layout. Constraints:
  *  - a tag is EITHER a MOV (motion) OR a T (temperature) variant, never both,
  *    so the sensor field's meaning depends on the variant;
- *  - battery is NOT in our payload — ELA tags report it in millivolts in the
- *    SCAN RESPONSE (when "Battery voltage presence" is enabled), or only as a
- *    ≤15% alert when it isn't. The scanner layer reads it (see bleResolve).
+ *  - battery: ELA R&D (Nov 19 2026) says the custom frame adds the battery
+ *    voltage itself, so "Battery voltage in the scan response" is not enabled
+ *    and no < 15 % alert is ever sent (the beacon only sends the coded frame).
+ *    Where the custom frame places it is still to be confirmed by ELA, so the
+ *    decoder accepts and ignores bytes after byte 12.
  * This module is the single source of truth: the spec sent to ELA R&D
  * describes exactly what is implemented and tested here.
  *
@@ -24,15 +27,19 @@
  *          zero-padded to 56b)
  *   9–10   Rolling frame counter, uint16, full range: after 0xFFFF it wraps to
  *          0x0000 (ELA BAF behaviour). Readers work modulo 65 536.
- *   11–12  Sensor value, by variant:
- *            ID  → 0x8000 (no sensor; ignored)
+ *   11–12  Sensor value, ELA native encoding, big-endian (byte 11 MSB, byte 12 LSB):
+ *            ID  → 0x7FFF (no sensor; ignored)
  *            MOV → cumulative movement events since the tag's last startup,
- *                  uint16, wrapping after 0xFFFF; readers subtract the previous
- *                  frame's value (modulo 65 536) to get events in between
- *            T   → temperature in 0.01 °C, int16 (two's complement); 0x8000 = no reading
+ *                  uint16, wrapping after 0xFFFF; no "no reading" value. Readers
+ *                  subtract the previous frame's value (modulo 65 536)
+ *            T   → temperature, int16 (two's complement), 0.01 °C;
+ *                  0x7FFF = no reading (ELA native value)
+ *   Both counters (frame and MOV) restart from 0 when the tag starts up (ELA).
  *
  * v1.1 → v1.2: 0xFFFF is now a normal counter value (no "unsupported"
  * sentinel), and MOV carries ELA's cumulative count instead of a per-frame count.
+ * v1.2 → v1.3: bytes 11–12 follow ELA's native encodings — the "no reading"
+ * value is 0x7FFF (was 0x8000); MOV wrap and counter restart confirmed.
  *
  * Identity can be resolved three ways, in order of preference: the custom
  * frame's AAN, an AAN written into the advertising name, or the static MAC
@@ -50,8 +57,14 @@ export type TagVariant = 'id' | 'mov' | 't';
 export const TAG_VARIANT_CODES: Record<TagVariant, number> = { id: 0, mov: 1, t: 2 };
 const VARIANT_BY_CODE: Record<number, TagVariant> = { 0: 'id', 1: 'mov', 2: 't' };
 
-/** No sensor (ID) / no temperature reading (T). Never used for MOV, whose count uses the full uint16 range. */
-export const SENSOR_NONE = 0x8000;
+/**
+ * No sensor (ID) / no temperature reading (T) — ELA's native "no reading" value
+ * (ELA R&D, Nov 19 2026). Never used for MOV, whose count uses the full uint16 range.
+ */
+export const SENSOR_NONE = 0x7fff;
+/** T range that doesn't collide with SENSOR_NONE: −327.68 … +327.66 °C. */
+const T_MIN_RAW = -0x8000;
+const T_MAX_RAW = 0x7ffe;
 /** Counters are uint16 and wrap from 0xFFFF to 0x0000. */
 export const U16_RANGE = 0x10000;
 
@@ -172,14 +185,17 @@ export function encodeNgarenFrame(input: {
   if (variant === 'mov') {
     sensor = toU16(input.movementTotal ?? 0);
   } else if (variant === 't' && input.temperature != null) {
-    sensor = Math.max(-0x7fff, Math.min(0x7fff, Math.round(input.temperature * 100))) & 0xffff;
+    sensor = Math.max(T_MIN_RAW, Math.min(T_MAX_RAW, Math.round(input.temperature * 100))) & 0xffff;
   }
   out[11] = sensor >> 8;
   out[12] = sensor & 0xff;
   return out;
 }
 
-/** Decode a 13-byte payload starting at the marker; null if it isn't ours. */
+/**
+ * Decode a payload starting at the marker; null if it isn't ours. Bytes after
+ * byte 12 (e.g. the battery voltage ELA's custom frame appends) are ignored.
+ */
 export function decodeNgarenFrame(payload: Uint8Array): NgarenFrame | null {
   if (payload.length < NGAREN_FRAME_LENGTH || payload[0] !== NGAREN_FRAME_MARKER) return null;
   const version = payload[1] >> 4;
@@ -216,8 +232,8 @@ export function u16Delta(prev: number, cur: number): number {
  * When the time between the frames and the advertising period are known, the
  * frame counter is checked against the elapsed time: a counter that didn't
  * advance by about elapsed/period means the tag restarted in between, and the
- * current total is then the events since that restart (a lower bound).
- * Assumes both counters restart from 0 at startup — to be confirmed by ELA.
+ * current total is then the events since that restart (a lower bound). ELA
+ * confirmed (Nov 19 2026) that both counters restart from 0 at startup.
  */
 export function movementEventsBetween(
   prev: Pick<NgarenFrame, 'counter' | 'movementTotal'>,
